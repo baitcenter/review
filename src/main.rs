@@ -9,7 +9,8 @@ mod cluster;
 use clap::{App, Arg};
 use cluster::read_clusters_from_file;
 use cluster::Cluster;
-use cursive::views::{Dialog, TextView};
+use cursive::traits::*;
+use cursive::views::{Dialog, SelectView};
 use cursive::Cursive;
 
 fn main() {
@@ -33,10 +34,12 @@ fn main() {
         }
     }
 
+    let names: Vec<String> = clusters.iter().map(|e| e.cluster_id.clone()).collect();
+    let mut cluster_select = SelectView::new();
+    cluster_select.add_all_str(names);
     let mut siv = Cursive::default();
-    siv.add_layer(
-        Dialog::around(TextView::new(format!("Read {} clusters.", clusters.len())))
-            .button("Quit", |s| s.quit()),
-    );
+    siv.add_layer(Dialog::around(
+        cluster_select.scrollable().full_width().full_height(),
+    ));
     siv.run();
 }

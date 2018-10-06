@@ -7,7 +7,7 @@ use std::path::Path;
 
 #[derive(Deserialize, Debug)]
 pub struct Cluster {
-    cluster_id: String,
+    pub cluster_id: String,
     description: String,
     examples: Vec<String>,
     category: String,
