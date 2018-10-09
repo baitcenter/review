@@ -9,7 +9,7 @@ use std::path::Path;
 pub struct Cluster {
     pub cluster_id: String,
     description: String,
-    examples: Vec<String>,
+    pub examples: Vec<String>,
     category: String,
     confidence: Option<f64>,
     qualifier: i32,
