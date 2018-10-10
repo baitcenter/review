@@ -47,11 +47,7 @@ fn main() {
 
     let names: Vec<String> = clusters.iter().map(|e| e.cluster_id.clone()).collect();
     let mut cluster_select = SelectView::new();
-    let index_width = if names.len() == 0 {
-        1
-    } else {
-        ((names.len() + 1) as f64).log10() as usize + 1
-    };
+    let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
     for (i, label) in names.iter().enumerate() {
         let index_str = (i + 1).to_string();
         cluster_select.add_item(
