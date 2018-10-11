@@ -35,7 +35,7 @@ fn main() {
         }
     }
 
-    let examples = if clusters.len() > 0 {
+    let examples = if !clusters.is_empty() {
         join_examples(&clusters[0].examples)
     } else {
         "".to_string()
@@ -71,8 +71,8 @@ fn main() {
     siv.run();
 }
 
-fn join_examples(examples: &Vec<String>) -> String {
-    if examples.len() > 0 {
+fn join_examples(examples: &[String]) -> String {
+    if !examples.is_empty() {
         examples.join("\n\n")
     } else {
         "(no example)".to_string()
