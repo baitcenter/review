@@ -1,0 +1,22 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/rust:1.29
+    steps:
+      - checkout
+      - restore_cache:
+          key: cargo
+      - run:
+          name: Check formatting
+          command: |
+            rustup component add rustfmt-preview
+            cargo fmt -- --check
+      - run:
+          name: Build
+          command: cargo build
+      - save_cache:
+          key: cargo
+          paths:
+            - "~/.cargo"
+            - "./target"
