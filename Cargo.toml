@@ -1,7 +1,8 @@
 [package]
 name = "review"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Min Kim <msk@petabi.com>"]
+publish = false
 
 [dependencies]
 clap = "2"
