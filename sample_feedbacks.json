@@ -1,0 +1,1298 @@
+[
+    {
+        "cluster_id": " ",
+        "description": " ",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)([^A-Za-z])",
+        "count": 8298
+    },
+    {
+        "cluster_id": "ABOR",
+        "description": "ABOR",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(ABOR)",
+        "count": 125
+    },
+    {
+        "cluster_id": "ACCT",
+        "description": "ACCT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(ACCT)",
+        "count": 200
+    },
+    {
+        "cluster_id": "ALLO",
+        "description": "ALLO",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(ALLO)",
+        "count": 165
+    },
+    {
+        "cluster_id": "ANSI SET",
+        "description": "ANSI SET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SET.+ANSI.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "ANSI sET",
+        "description": "ANSI sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+ANSI.+P)",
+        "count": 9
+    },
+    {
+        "cluster_id": "ANSI set",
+        "description": "ANSI set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+ANSI.+P|set.+ANSI.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "ANSi SEt",
+        "description": "ANSi SEt",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+ANSi.+P|SEt.+ANSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "ANSi SeT",
+        "description": "ANSi SeT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+ANSi.+P|SeT.+ANSi.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "ANSi Set",
+        "description": "ANSi Set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+ANSi.+P|Set.+ANSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "ANSi seT",
+        "description": "ANSi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+ANSi.+P|seT.+ANSi.+p)",
+        "count": 13
+    },
+    {
+        "cluster_id": "ANSi set",
+        "description": "ANSi set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+ANSi.+P|set.+ANSi.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "ANsI SeT",
+        "description": "ANsI SeT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+ANsI.+P|SeT.+ANsI.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "ANsI Set",
+        "description": "ANsI Set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+ANsI.+P|Set.+ANsI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "ANsI seT",
+        "description": "ANsI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+ANsI.+P|seT.+ANsI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "ANsi SET",
+        "description": "ANsi SET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SET.+ANsi.+P|SET.+ANsi.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "ANsi Set",
+        "description": "ANsi Set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+ANsi.+P|Set.+ANsi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "ANsi sEt",
+        "description": "ANsi sEt",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sEt.+ANsi.+P|sEt.+ANsi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "APPE",
+        "description": "APPE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(APPE)",
+        "count": 160
+    },
+    {
+        "cluster_id": "APPEND",
+        "description": "APPEND",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(APPEND)",
+        "count": 210
+    },
+    {
+        "cluster_id": "AUTHENTICATE",
+        "description": "AUTHENTICATE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(AUTHENTICATE)",
+        "count": 295
+    },
+    {
+        "cluster_id": "Acceptable HTTP Not",
+        "description": "Acceptable HTTP Not",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Not.+Acceptable)",
+        "count": 210
+    },
+    {
+        "cluster_id": "Accepted HTTP",
+        "description": "Accepted HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Accepted)",
+        "count": 210
+    },
+    {
+        "cluster_id": "Agent GET HTTP User bits disk infobot userpass",
+        "description": "Agent GET HTTP User bits disk infobot userpass",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+HTTP.+User.+Agent)",
+        "count": 660
+    },
+    {
+        "cluster_id": "Allowed HTTP Method Not",
+        "description": "Allowed HTTP Method Not",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Method.+Not.+Allowed)",
+        "count": 190
+    },
+    {
+        "cluster_id": "AnSI SeT",
+        "description": "AnSI SeT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+AnSI.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "AnSI seT",
+        "description": "AnSI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+AnSI.+P)",
+        "count": 5
+    },
+    {
+        "cluster_id": "AnSI set",
+        "description": "AnSI set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+AnSI.+P|set.+AnSI.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "AnSi SEt pa",
+        "description": "AnSi SEt pa",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+AnSi.+pa)",
+        "count": 6
+    },
+    {
+        "cluster_id": "AnSi sET",
+        "description": "AnSi sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+AnSi.+P|sET.+AnSi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "AnSi sEt",
+        "description": "AnSi sEt",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sEt.+AnSi.+P|sEt.+AnSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "AnSi seT",
+        "description": "AnSi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+AnSi.+P|seT.+AnSi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "AnSi set",
+        "description": "AnSi set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+AnSi.+P|set.+AnSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "AnsI Pa set",
+        "description": "AnsI Pa set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+AnsI.+Pa)",
+        "count": 5
+    },
+    {
+        "cluster_id": "AnsI SET",
+        "description": "AnsI SET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SET.+AnsI.+P|SET.+AnsI.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "AnsI seT",
+        "description": "AnsI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+AnsI.+P|seT.+AnsI.+p)",
+        "count": 9
+    },
+    {
+        "cluster_id": "Ansi SET",
+        "description": "Ansi SET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SET.+Ansi.+P|SET.+Ansi.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "Ansi SeT",
+        "description": "Ansi SeT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+Ansi.+P|SeT.+Ansi.+p)",
+        "count": 11
+    },
+    {
+        "cluster_id": "Ansi Set",
+        "description": "Ansi Set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+Ansi.+P|Set.+Ansi.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "Ansi sET",
+        "description": "Ansi sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+Ansi.+P|sET.+Ansi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "Ansi sEt",
+        "description": "Ansi sEt",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sEt.+Ansi.+P|sEt.+Ansi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "BAD",
+        "description": "BAD",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(BAD)",
+        "count": 1340
+    },
+    {
+        "cluster_id": "Bad Gateway HTTP",
+        "description": "Bad Gateway HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Bad.+Gateway)",
+        "count": 200
+    },
+    {
+        "cluster_id": "Bad HTTP Request",
+        "description": "Bad HTTP Request",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Bad.+Request)",
+        "count": 250
+    },
+    {
+        "cluster_id": "CAPABILITY",
+        "description": "CAPABILITY",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CAPABILITY)",
+        "count": 215
+    },
+    {
+        "cluster_id": "CDUP",
+        "description": "CDUP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CDUP)",
+        "count": 155
+    },
+    {
+        "cluster_id": "CHECK",
+        "description": "CHECK",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CHECK)",
+        "count": 250
+    },
+    {
+        "cluster_id": "CLOSE",
+        "description": "CLOSE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CLOSE)",
+        "count": 265
+    },
+    {
+        "cluster_id": "CONNECT HTTP Host www",
+        "description": "CONNECT HTTP Host www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CONNECT.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 720
+    },
+    {
+        "cluster_id": "COPY",
+        "description": "COPY",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(COPY)",
+        "count": 325
+    },
+    {
+        "cluster_id": "CREATE",
+        "description": "CREATE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(CREATE)",
+        "count": 260
+    },
+    {
+        "cluster_id": "Content HTTP No",
+        "description": "Content HTTP No",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+No.+Content)",
+        "count": 280
+    },
+    {
+        "cluster_id": "Continue HTTP",
+        "description": "Continue HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Continue)",
+        "count": 155
+    },
+    {
+        "cluster_id": "Created HTTP",
+        "description": "Created HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Created)",
+        "count": 200
+    },
+    {
+        "cluster_id": "DATA",
+        "description": "DATA",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(DATA)",
+        "count": 265
+    },
+    {
+        "cluster_id": "DELE",
+        "description": "DELE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(DELE)",
+        "count": 690
+    },
+    {
+        "cluster_id": "DELETE HTTP Host www",
+        "description": "DELETE HTTP Host www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(DELETE.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 590
+    },
+    {
+        "cluster_id": "DELTE",
+        "description": "DELTE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(DELTE)",
+        "count": 240
+    },
+    {
+        "cluster_id": "EHLO",
+        "description": "EHLO",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(EHLO)",
+        "count": 280
+    },
+    {
+        "cluster_id": "ERR",
+        "description": "ERR",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(ERR)",
+        "count": 2055
+    },
+    {
+        "cluster_id": "EXPN",
+        "description": "EXPN",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(EXPN)",
+        "count": 230
+    },
+    {
+        "cluster_id": "Error HTTP Internal Server",
+        "description": "Error HTTP Internal Server",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Internal.+Server.+Error)",
+        "count": 250
+    },
+    {
+        "cluster_id": "FILE ZIPPERCOMPRESSFILEname name",
+        "description": "FILE ZIPPERCOMPRESSFILEname name",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(ZIPPERCOMPRESSFILEname.+FILE.+name[^A-Za-z])",
+        "count": 1320
+    },
+    {
+        "cluster_id": "Forbidden HTTP",
+        "description": "Forbidden HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Forbidden)",
+        "count": 240
+    },
+    {
+        "cluster_id": "Found HTTP",
+        "description": "Found HTTP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Found)",
+        "count": 210
+    },
+    {
+        "cluster_id": "Found HTTP Not",
+        "description": "Found HTTP Not",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Not.+Found)",
+        "count": 285
+    },
+    {
+        "cluster_id": "GET HTTP Host www",
+        "description": "GET HTTP Host www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 645
+    },
+    {
+        "cluster_id": "GET HTTP Referer",
+        "description": "GET HTTP Referer",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+HTTP.+Referer[^A-Za-z])",
+        "count": 660
+    },
+    {
+        "cluster_id": "GET HTTP content dec html javascript text type",
+        "description": "GET HTTP content dec html javascript text type",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+javascript.+dec.+HTTP.+content.+type.+text.+html[^A-Za-z])",
+        "count": 665
+    },
+    {
+        "cluster_id": "GET HTTP content html log sipark summary text type",
+        "description": "GET HTTP content html log sipark summary text type",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+sipark.+log.+summary.+HTTP.+content.+type.+text.+html[^A-Za-z])",
+        "count": 660
+    },
+    {
+        "cluster_id": "GET HTTP content html php read text type",
+        "description": "GET HTTP content html php read text type",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+read.+php.+HTTP.+content.+type.+text.+html)",
+        "count": 660
+    },
+    {
+        "cluster_id": "GET HTTP content html text type",
+        "description": "GET HTTP content html text type",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(GET.+HTTP.+content.+type.+text.+html[^A-Za-z])",
+        "count": 1980
+    },
+    {
+        "cluster_id": "Gateway HTTP Timeout",
+        "description": "Gateway HTTP Timeout",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Gateway.+Timeout)",
+        "count": 250
+    },
+    {
+        "cluster_id": "HEAD HTTP Host www",
+        "description": "HEAD HTTP Host www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HEAD.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 605
+    },
+    {
+        "cluster_id": "HELO",
+        "description": "HELO",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HELO)",
+        "count": 195
+    },
+    {
+        "cluster_id": "HELP",
+        "description": "HELP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HELP)",
+        "count": 480
+    },
+    {
+        "cluster_id": "HTTP Host POST www",
+        "description": "HTTP Host POST www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(POST.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 670
+    },
+    {
+        "cluster_id": "HTTP Host PUT www",
+        "description": "HTTP Host PUT www",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(PUT.+HTTP.+Host.+www[^A-Za-z])",
+        "count": 685
+    },
+    {
+        "cluster_id": "HTTP Implemented Not",
+        "description": "HTTP Implemented Not",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Not.+Implemented)",
+        "count": 170
+    },
+    {
+        "cluster_id": "HTTP Moved Permanently",
+        "description": "HTTP Moved Permanently",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Moved.+Permanently)",
+        "count": 230
+    },
+    {
+        "cluster_id": "HTTP OK",
+        "description": "HTTP OK",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+OK)",
+        "count": 210
+    },
+    {
+        "cluster_id": "HTTP Protocols Switching",
+        "description": "HTTP Protocols Switching",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Switching.+Protocols)",
+        "count": 180
+    },
+    {
+        "cluster_id": "HTTP Request Timedout",
+        "description": "HTTP Request Timedout",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Request.+Timedout)",
+        "count": 230
+    },
+    {
+        "cluster_id": "HTTP Service Unavailable",
+        "description": "HTTP Service Unavailable",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(HTTP.+Service.+Unavailable)",
+        "count": 215
+    },
+    {
+        "cluster_id": "LIST",
+        "description": "LIST",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(LIST)",
+        "count": 625
+    },
+    {
+        "cluster_id": "LOGIN",
+        "description": "LOGIN",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(LOGIN)",
+        "count": 335
+    },
+    {
+        "cluster_id": "LOGOUT",
+        "description": "LOGOUT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(LOGOUT)",
+        "count": 290
+    },
+    {
+        "cluster_id": "MAIL",
+        "description": "MAIL",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(MAIL)",
+        "count": 210
+    },
+    {
+        "cluster_id": "MODE",
+        "description": "MODE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(MODE)",
+        "count": 140
+    },
+    {
+        "cluster_id": "NO",
+        "description": "NO",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "",
+        "count": 1415
+    },
+    {
+        "cluster_id": "NOOP",
+        "description": "NOOP",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(NOOP)",
+        "count": 1225
+    },
+    {
+        "cluster_id": "OK",
+        "description": "OK",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "",
+        "count": 3235
+    },
+    {
+        "cluster_id": "PASS",
+        "description": "PASS",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(PASS)",
+        "count": 600
+    },
+    {
+        "cluster_id": "PASV",
+        "description": "PASV",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(PASV)",
+        "count": 215
+    },
+    {
+        "cluster_id": "PORT",
+        "description": "PORT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(PORT)",
+        "count": 185
+    },
+    {
+        "cluster_id": "Pa SEt aNsi",
+        "description": "Pa SEt aNsi",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+aNsi.+Pa)",
+        "count": 6
+    },
+    {
+        "cluster_id": "QUIT",
+        "description": "QUIT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(QUIT)",
+        "count": 880
+    },
+    {
+        "cluster_id": "RCPT",
+        "description": "RCPT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(RCPT)",
+        "count": 260
+    },
+    {
+        "cluster_id": "REIN",
+        "description": "REIN",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(REIN)",
+        "count": 135
+    },
+    {
+        "cluster_id": "REST",
+        "description": "REST",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(REST)",
+        "count": 145
+    },
+    {
+        "cluster_id": "RETR",
+        "description": "RETR",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(RETR)",
+        "count": 630
+    },
+    {
+        "cluster_id": "RSET",
+        "description": "RSET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(RSET)",
+        "count": 715
+    },
+    {
+        "cluster_id": "Release Thanatos pdb",
+        "description": "Release Thanatos pdb",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Release.+Thanatos.+pdb)",
+        "count": 660
+    },
+    {
+        "cluster_id": "SAML",
+        "description": "SAML",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SAML)",
+        "count": 345
+    },
+    {
+        "cluster_id": "SEARCH",
+        "description": "SEARCH",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEARCH)",
+        "count": 275
+    },
+    {
+        "cluster_id": "SELECT",
+        "description": "SELECT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SELECT)",
+        "count": 245
+    },
+    {
+        "cluster_id": "SEND",
+        "description": "SEND",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEND)",
+        "count": 245
+    },
+    {
+        "cluster_id": "SET aNSI",
+        "description": "SET aNSI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SET.+aNSI.+P|SET.+aNSI.+pAd)",
+        "count": 5
+    },
+    {
+        "cluster_id": "SEt aNSI",
+        "description": "SEt aNSI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+aNSI.+PAd|SEt.+aNSI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "SEt anSI",
+        "description": "SEt anSI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+anSI.+P|SEt.+anSI.+p)",
+        "count": 9
+    },
+    {
+        "cluster_id": "SEt anSi",
+        "description": "SEt anSi",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SEt.+anSi.+P|SEt.+anSi.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "SMNT",
+        "description": "SMNT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SMNT)",
+        "count": 195
+    },
+    {
+        "cluster_id": "SOML",
+        "description": "SOML",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SOML)",
+        "count": 275
+    },
+    {
+        "cluster_id": "STARTTLS",
+        "description": "STARTTLS",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(STARTTLS)",
+        "count": 290
+    },
+    {
+        "cluster_id": "STAT",
+        "description": "STAT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(STAT)",
+        "count": 565
+    },
+    {
+        "cluster_id": "STOR",
+        "description": "STOR",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(STOR)",
+        "count": 185
+    },
+    {
+        "cluster_id": "STORE",
+        "description": "STORE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(STORE)",
+        "count": 300
+    },
+    {
+        "cluster_id": "STRU",
+        "description": "STRU",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(STRU)",
+        "count": 180
+    },
+    {
+        "cluster_id": "SeT aNSi",
+        "description": "SeT aNSi",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+aNSi.+P|SeT.+aNSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "SeT aNsI",
+        "description": "SeT aNsI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+aNsI.+P|SeT.+aNsI.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "SeT aNsi",
+        "description": "SeT aNsi",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+aNsi.+P|SeT.+aNsi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "SeT ansI",
+        "description": "SeT ansI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(SeT.+ansI.+P|SeT.+ansI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "Set aNSi",
+        "description": "Set aNSi",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+aNSi.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "Set anSI",
+        "description": "Set anSI",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(Set.+anSI.+P|Set.+anSI.+pAdDIN)",
+        "count": 6
+    },
+    {
+        "cluster_id": "TURN",
+        "description": "TURN",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(TURN)",
+        "count": 320
+    },
+    {
+        "cluster_id": "TYPE",
+        "description": "TYPE",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(TYPE)",
+        "count": 180
+    },
+    {
+        "cluster_id": "USER",
+        "description": "USER",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(USER)",
+        "count": 580
+    },
+    {
+        "cluster_id": "VRFY",
+        "description": "VRFY",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(VRFY)",
+        "count": 360
+    },
+    {
+        "cluster_id": "aNSI sET",
+        "description": "aNSI sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+aNSI.+P|sET.+aNSI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "aNSI seT",
+        "description": "aNSI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+aNSI.+P|seT.+aNSI.+pADd)",
+        "count": 6
+    },
+    {
+        "cluster_id": "aNSi seT",
+        "description": "aNSi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+aNSi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "aNsI set",
+        "description": "aNsI set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+aNsI.+P|set.+aNsI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "aNsi sET",
+        "description": "aNsi sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+aNsi.+P|sET.+aNsi.+p)",
+        "count": 8
+    },
+    {
+        "cluster_id": "aNsi seT",
+        "description": "aNsi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+aNsi.+P|seT.+aNsi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "aNsi set",
+        "description": "aNsi set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+aNsi.+P|set.+aNsi.+p)",
+        "count": 10
+    },
+    {
+        "cluster_id": "anSI seT",
+        "description": "anSI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+anSI.+P|seT.+anSI.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "anSI set",
+        "description": "anSI set",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(set.+anSI.+P|set.+anSI.+p)",
+        "count": 5
+    },
+    {
+        "cluster_id": "anSi sET",
+        "description": "anSi sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+anSi.+P|sET.+anSi.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "anSi seT",
+        "description": "anSi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+anSi.+P|seT.+anSi.+p)",
+        "count": 6
+    },
+    {
+        "cluster_id": "ansI sET",
+        "description": "ansI sET",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(sET.+ansI.+P|sET.+ansI.+p)",
+        "count": 10
+    },
+    {
+        "cluster_id": "ansI seT",
+        "description": "ansI seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+ansI.+P|seT.+ansI.+p)",
+        "count": 7
+    },
+    {
+        "cluster_id": "ansi seT",
+        "description": "ansi seT",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(seT.+ansi.+P|seT.+ansi.+padd)",
+        "count": 7
+    },
+    {
+        "cluster_id": "char from uuid",
+        "description": "char from uuid",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(uuid.+from.+char)",
+        "count": 660
+    },
+    {
+        "cluster_id": "xmlqueryselect",
+        "description": "xmlqueryselect",
+        "examples": [],
+        "category": "",
+        "qualifier": 0,
+        "signature": "(?i)(xmlqueryselect[^A-Za-z])",
+        "count": 660
+    }
+]
