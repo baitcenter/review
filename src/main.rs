@@ -76,10 +76,10 @@ fn main() {
                     s.screen_mut().add_layer_at(
                         Position::new(Offset::Center, Offset::Parent(5)),
                         Dialog::new()
-                            .content(
-                                LinearLayout::vertical()
-                                    .child(TextView::new(format!("You have selected {}", selected_status))),
-                            ).dismiss_button("Ok"),
+                            .content(LinearLayout::vertical().child(TextView::new(format!(
+                                "You have selected {}",
+                                selected_status
+                            )))).dismiss_button("Ok"),
                     );
                 }).dismiss_button("Back to the previous window"),
         );
