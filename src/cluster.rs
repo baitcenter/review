@@ -15,12 +15,12 @@ pub struct Cluster {
     qualifier: i32,
     signature: String,
     count: u32,
-    status: Option<char>,
+    pub status: Option<String>,
 }
 
 impl Cluster {
     pub fn get_cluster_properties(&self) -> String {
-        format!("cluster_id: {}\ndescription: {}\nexamples: {:?}\ncategory: {}\nconfidence: {:?}\nqualifier: {}\nsignature: {}\ncount: {}\nstatus: {:?} \n\n\nPlease choose the status of this cluster: s (suspicious), b (benign), or u (unknow)",&self.cluster_id, &self.description, &self.examples, &self.category, &self.confidence, &self.qualifier, &self.signature, &self.count, &self.status)
+        format!("cluster_id: {}\ndescription: {}\nexamples: {:?}\ncategory: {}\nconfidence: {:?}\nqualifier: {}\nsignature: {}\ncount: {}\nstatus: {:?} \n\n",&self.cluster_id, &self.description, &self.examples, &self.category, &self.confidence, &self.qualifier, &self.signature, &self.count, &self.status)
     }
 }
 

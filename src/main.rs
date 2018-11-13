@@ -12,7 +12,7 @@ use cluster::Cluster;
 use cursive::direction::Orientation;
 use cursive::traits::*;
 use cursive::view::{Offset, Position};
-use cursive::views::{Dialog, LinearLayout, SelectView, TextView};
+use cursive::views::{Dialog, DummyView, LinearLayout, RadioGroup, SelectView, TextView};
 use cursive::Cursive;
 
 fn main() {
@@ -36,13 +36,8 @@ fn main() {
         }
     }
 
-    let examples = if !clusters.is_empty() {
-        join_examples(&clusters[0].examples)
-    } else {
-        "".to_string()
-    };
-    let examples_view = TextView::new(examples)
-        .with_id("examples")
+    let quit_view = TextView::new("Press q to quit".to_string())
+        .with_id("quit")
         .full_width()
         .full_height();
 
@@ -58,45 +53,44 @@ fn main() {
     }
 
     cluster_select.set_on_submit(move |s, i| {
+        let mut status_group: RadioGroup<String> = RadioGroup::new();
         s.screen_mut().add_layer_at(
             Position::new(Offset::Center, Offset::Parent(5)),
-            Dialog::around(TextView::new(Cluster::get_cluster_properties(
-                &clusters[*i],
-            ))).button("s", |s| {
-                show_save_status_window(s);
-            }).button("b", |s| {
-                show_save_status_window(s);
-            }).button("u", |s| {
-                show_save_status_window(s);
-            }).dismiss_button("Back to the previous window"),
+            Dialog::new()
+                .content(
+                    LinearLayout::vertical()
+                        .child(TextView::new(Cluster::get_cluster_properties(
+                            &clusters[*i],
+                        ))).child(DummyView)
+                        .child(DummyView)
+                        .child(TextView::new("Please select the status of this cluster"))
+                        .child(
+                            LinearLayout::horizontal()
+                                .child(status_group.button_str("Suspicious"))
+                                .child(status_group.button_str("Benign"))
+                                .child(status_group.button_str("Unknown")),
+                        ).child(DummyView),
+                ).button("Save", move |s| {
+                    let selected_status = status_group.selection().to_string();
+
+                    s.screen_mut().add_layer_at(
+                        Position::new(Offset::Center, Offset::Parent(5)),
+                        Dialog::new()
+                            .content(
+                                LinearLayout::vertical()
+                                    .child(TextView::new(format!("You have selected {}", selected_status))),
+                            ).dismiss_button("Ok"),
+                    );
+                }).dismiss_button("Back to the previous window"),
         );
     });
 
-    let separator = TextView::new("").fixed_height(1);
-
     let top_layout = LinearLayout::new(Orientation::Vertical)
         .child(cluster_select.scrollable().full_width().fixed_height(20))
-        .child(separator)
-        .child(examples_view);
+        .child(DummyView)
+        .child(quit_view);
     let mut siv = Cursive::default();
     siv.add_fullscreen_layer(top_layout);
     siv.add_global_callback('q', |s| s.quit());
     siv.run();
-}
-
-fn join_examples(examples: &[String]) -> String {
-    if !examples.is_empty() {
-        examples.join("\n\n")
-    } else {
-        "Press q to quit".to_string()
-    }
-}
-
-fn show_save_status_window(s: &mut Cursive) {
-    s.screen_mut().add_layer_at(
-        Position::new(Offset::Center, Offset::Parent(10)),
-        Dialog::around(TextView::new("Would you like to save the status?"))
-            .dismiss_button("YES")
-            .dismiss_button("NO"),
-    );
 }
