@@ -26,12 +26,3 @@ fn main() {
         }
     }
 }
-
-fn show_save_status_window(s: &mut Cursive) {
-    s.screen_mut().add_layer_at(
-        Position::new(Offset::Center, Offset::Parent(10)),
-        Dialog::around(TextView::new("Would you like to save the status?"))
-            .dismiss_button("YES")
-            .dismiss_button("NO"),
-    );
-}
