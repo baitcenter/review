@@ -1,9 +1,5 @@
 extern crate clap;
-
-#[macro_use]
-extern crate serde_derive;
-
-mod cluster;
+mod event;
 use clap::{App, Arg};
 
 fn main() {
@@ -17,11 +13,11 @@ fn main() {
         ).get_matches();
     let filename = matches.value_of("INPUT").unwrap();
 
-    let cluster_view = cluster::ClusterView::new(filename);
-    match cluster_view {
-        Ok(mut cluster_view) => cluster_view.run(),
+    let event_view = event::EventView::new(filename);
+    match event_view {
+        Ok(mut event_view) => event_view.run(),
         Err(e) => {
-            eprintln!("Failed to create a cluster_view: {}", e);
+            eprintln!("Failed to create a event_view: {}", e);
             std::process::exit(1);
         }
     }
