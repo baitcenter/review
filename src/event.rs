@@ -15,7 +15,7 @@ pub struct Event {
     event_id: i64,
     description: Option<String>,
     cluster_id: i64,
-    rules: String,
+    rules: Option<String>,
     category_id: i64,
     detector_id: i64,
     examples: Option<String>,
@@ -37,7 +37,7 @@ impl Event {
             "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nstatus_id: {}\n\n",
             &self.event_id,
             &self.cluster_id,
-            &self.rules,
+            &self.rules.as_ref().unwrap_or(&"-".to_string()),
             &self.description.as_ref().unwrap_or(&"-".to_string()),
             category.get(&self.category_id).unwrap(),
             &self.detector_id,
@@ -96,7 +96,7 @@ impl Event {
             let mut event = Event {
                 event_id: 0,
                 cluster_id: 0,
-                rules: "".to_string(),
+                rules: None,
                 description: None,
                 category_id: 0,
                 detector_id: 0,
@@ -113,7 +113,10 @@ impl Event {
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "cluster_id" {
                     event.cluster_id = events_statement.read::<i64>(column_id)?;
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "rules" {
-                    event.rules = events_statement.read::<String>(column_id)?;
+                    match events_statement.read::<String>(column_id) {
+                        Ok(value) => event.rules = Some(value),
+                        Err(_) => event.rules = None,
+                    }
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "description" {
                     match events_statement.read::<String>(column_id) {
                         Ok(value) => event.description = Some(value),
@@ -356,7 +359,13 @@ impl EventView {
             database_filename: database_name.to_string(),
         };
 
-        let names: Vec<String> = event_view.events.iter().map(|e| e.rules.clone()).collect();
+        let names: Vec<String> = event_view
+            .events
+            .iter()
+            .map(|e| match e.rules {
+                Some(ref rule) => rule.clone(),
+                None => "-".to_string(),
+            }).collect();
         let mut event_select = SelectView::new();
         let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
         for (i, label) in names.iter().enumerate() {
