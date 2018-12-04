@@ -213,9 +213,14 @@ impl Event {
 
                         sql_cmd = "select max(publish_id) from ready_table;".to_string();
                         let mut cursor = connection.prepare(sql_cmd).unwrap().cursor();
-
-                        let publish_id =
-                            cursor.next().unwrap().unwrap()[0].as_integer().unwrap() + 1;
+                        let publish_id = match cursor.next().unwrap() {
+                            Some(value) => if value[0].kind() != sqlite::Type::Null {
+                                value[0].as_integer().unwrap() + 1
+                            } else {
+                                1
+                            },
+                            None => 1,
+                        };
                         let action_id = *action
                             .iter()
                             .find(|&x| x.1.to_lowercase() == "update")
