@@ -1,4 +1,5 @@
 extern crate cursive;
+extern crate quale;
 extern crate sqlite;
 
 use self::cursive::direction::Orientation;
@@ -8,6 +9,7 @@ use self::cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, Sele
 use self::cursive::Cursive;
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
 use std::process;
 use std::sync::mpsc;
 
@@ -22,6 +24,7 @@ pub struct Event {
     priority_id: i64,
     qualifier_id: i64,
     status_id: i64,
+    signature: String,
     is_updated: bool,
 }
 
@@ -34,7 +37,7 @@ impl Event {
         category: &HashMap<i64, String>,
     ) -> String {
         format!(
-            "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nstatus_id: {}\n\n",
+            "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nsignature: {}\nstatus_id: {}\n\n",
             &self.event_id,
             &self.cluster_id,
             &self.rules.as_ref().unwrap_or(&"-".to_string()),
@@ -44,6 +47,7 @@ impl Event {
             &self.examples.as_ref().unwrap_or(&"-".to_string()),
             priority.get(&self.priority_id).unwrap(),
             qualifier.get(&self.qualifier_id).unwrap(),
+            &self.signature,
             status.get(&self.status_id).unwrap(),
         )
     }
@@ -104,6 +108,7 @@ impl Event {
                 priority_id: 0,
                 qualifier_id: 0,
                 status_id: 0,
+                signature: "".to_string(),
                 is_updated: false,
             };
 
@@ -137,12 +142,8 @@ impl Event {
                     event.qualifier_id = events_statement.read::<i64>(column_id)?;
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "status_id" {
                     event.status_id = events_statement.read::<i64>(column_id)?;
-                } else {
-                    eprintln!(
-                        "Error! Unexpected database schema found: {}",
-                        events_table.get(&column_id).unwrap(),
-                    );
-                    process::exit(1);
+                } else if events_table.get(&column_id).unwrap().to_lowercase() == "signature" {
+                    event.signature = events_statement.read::<String>(column_id)?;
                 }
             }
             events.push(event);
@@ -290,20 +291,22 @@ pub struct EventView {
     qualifier: HashMap<i64, String>,
     category: HashMap<i64, String>,
     action: HashMap<i64, String>,
-    database_filename: String,
+    central_dbname: String,
+    rcvg_dbname: String,
 }
 
 pub enum EventViewMessage {
     PrintEventProps(usize),
     SaveEventQualifier((usize, i64)),
     SaveChangesToDatabase(),
+    InvokeEventorProcess(),
 }
 
 impl EventView {
-    pub fn new(database_name: &str) -> Result<EventView, Box<Error>> {
+    pub fn new(central_dbname: &str, rcvg_dbname: &str) -> Result<EventView, Box<Error>> {
         let (event_view_tx, event_view_rx) = mpsc::channel::<EventViewMessage>();
         let status =
-            Event::read_table_from_database(&database_name.to_string(), &"Status".to_string());
+            Event::read_table_from_database(&central_dbname.to_string(), &"Status".to_string());
         if let Err(e) = status {
             eprintln!("Failed to read database: {}", e);
             process::exit(1);
@@ -311,35 +314,35 @@ impl EventView {
         let status = status.unwrap();
 
         let priority =
-            Event::read_table_from_database(&database_name.to_string(), &"Priority".to_string());
+            Event::read_table_from_database(&central_dbname.to_string(), &"Priority".to_string());
         if let Err(e) = priority {
             eprintln!("Failed to read database: {}", e);
             process::exit(1);
         }
 
         let qualifier =
-            Event::read_table_from_database(&database_name.to_string(), &"Qualifier".to_string());
+            Event::read_table_from_database(&central_dbname.to_string(), &"Qualifier".to_string());
         if let Err(e) = qualifier {
             eprintln!("Failed to read database: {}", e);
             process::exit(1);
         }
 
         let category =
-            Event::read_table_from_database(&database_name.to_string(), &"Category".to_string());
+            Event::read_table_from_database(&central_dbname.to_string(), &"Category".to_string());
         if let Err(e) = category {
             eprintln!("Failed to read database: {}", e);
             process::exit(1);
         }
 
         let action =
-            Event::read_table_from_database(&database_name.to_string(), &"Action".to_string());
+            Event::read_table_from_database(&central_dbname.to_string(), &"Action".to_string());
         if let Err(e) = action {
             eprintln!("Failed to read database: {}", e);
             process::exit(1);
         }
 
         let events = Event::read_events_from_database(
-            &database_name.to_string(),
+            &central_dbname.to_string(),
             &status
                 .iter()
                 .find(|&x| x.1.to_lowercase() == "review")
@@ -361,7 +364,8 @@ impl EventView {
             qualifier: qualifier.unwrap(),
             category: category.unwrap(),
             action: action.unwrap(),
-            database_filename: database_name.to_string(),
+            central_dbname: central_dbname.to_string(),
+            rcvg_dbname: rcvg_dbname.to_string(),
         };
 
         let names: Vec<String> = event_view
@@ -417,8 +421,12 @@ impl EventView {
                 .child(event_prop_box1)
                 .child(event_prop_box2),
         );
-
-        event_view.cursive.add_global_callback('q', |s| s.quit());
+        let event_view_tx_clone = event_view.event_view_tx.clone();
+        event_view.cursive.add_global_callback('q', move |_s| {
+            event_view_tx_clone
+                .send(EventViewMessage::InvokeEventorProcess())
+                .unwrap();
+        });
         let event_view_tx_clone = event_view.event_view_tx.clone();
         event_view.cursive.add_global_callback('s', move |_s| {
             event_view_tx_clone
@@ -474,7 +482,7 @@ impl EventView {
                     EventViewMessage::SaveChangesToDatabase() => {
                         if let Err(e) = Event::write_changes_to_database(
                             &mut self.cursive,
-                            &self.database_filename,
+                            &self.central_dbname,
                             &mut self.events,
                             &self.status,
                             &self.action,
@@ -483,10 +491,81 @@ impl EventView {
                             process::exit(1);
                         }
                     }
+
+                    EventViewMessage::InvokeEventorProcess() => {
+                        let is_updated = &self.events.iter().find(|&x| x.is_updated == true);
+                        if is_updated.is_some() {
+                            let eventor_path = quale::which("eventor")
+                                .unwrap_or(Path::new("not found").to_path_buf());
+                            if eventor_path.to_str().unwrap() == "not found" {
+                                EventView::create_popup_window(
+                                    &mut self.cursive,
+                                    Box::new("Unable to find the path to eventor."),
+                                    Box::new("Quit without invoking Eventor process"),
+                                );
+                            } else {
+                                let central_dbname_option =
+                                    format!("--central_db {}", &self.central_dbname);
+                                let rcvg_dbname_option = format!("--rcvg_db {}", &self.rcvg_dbname);
+
+                                let output = process::Command::new(eventor_path.clone())
+                                    .arg("publish")
+                                    .arg(central_dbname_option.clone())
+                                    .arg(rcvg_dbname_option.clone())
+                                    .output();
+
+                                match output {
+                                    Ok(_) => {
+                                        let popup_message = format!(
+                                            "The following command is executed:\n\ncommand: {:?} {} {} \n",
+                                            eventor_path, central_dbname_option, rcvg_dbname_option
+                                        );
+                                        EventView::create_popup_window(
+                                            &mut self.cursive,
+                                            Box::new(popup_message.as_str()),
+                                            Box::new("Quit"),
+                                        );
+                                    }
+                                    Err(e) => {
+                                        let popup_message =
+                                            format!("Failed to execute eventor: {}", e);
+                                        EventView::create_popup_window(
+                                            &mut self.cursive,
+                                            Box::new(popup_message.as_str()),
+                                            Box::new("Quit"),
+                                        );
+                                    }
+                                };
+                            }
+                        } else {
+                            EventView::create_popup_window(
+                                &mut self.cursive,
+                                Box::new("Nothing is saved!"),
+                                Box::new("Quit without invoking Eventor process"),
+                            );
+                        }
+                    }
                 }
             }
 
             self.cursive.step();
         }
+    }
+
+    pub fn create_popup_window(
+        cursive: &mut Cursive,
+        popup_message: Box<&str>,
+        button_message: Box<&str>,
+    ) {
+        cursive.screen_mut().add_layer_at(
+            Position::new(
+                cursive::view::Offset::Center,
+                cursive::view::Offset::Parent(5),
+            ),
+            Dialog::new()
+                .content(TextView::new(*popup_message))
+                .dismiss_button(*button_message),
+        );
+        cursive.quit();
     }
 }
