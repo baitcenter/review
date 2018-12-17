@@ -8,3 +8,4 @@ publish = false
 clap = "2"
 cursive = "0.9"
 sqlite = "0.24.0"
+quale = "1.0.0"
