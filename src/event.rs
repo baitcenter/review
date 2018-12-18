@@ -31,13 +31,12 @@ pub struct Event {
 impl Event {
     pub fn get_event_properties(
         &self,
-        status: &HashMap<i64, String>,
         priority: &HashMap<i64, String>,
         qualifier: &HashMap<i64, String>,
         category: &HashMap<i64, String>,
     ) -> String {
         format!(
-            "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nsignature: {}\nstatus_id: {}\n\n",
+            "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nsignature: {}\n\n",
             &self.event_id,
             &self.cluster_id,
             &self.rules.as_ref().unwrap_or(&"-".to_string()),
@@ -48,7 +47,6 @@ impl Event {
             priority.get(&self.priority_id).unwrap(),
             qualifier.get(&self.qualifier_id).unwrap(),
             &self.signature,
-            status.get(&self.status_id).unwrap(),
         )
     }
 
@@ -157,116 +155,29 @@ impl Event {
         database_filename: &String,
         events: &mut Vec<Event>,
         status: &HashMap<i64, String>,
-        action: &HashMap<i64, String>,
     ) -> Result<usize, Box<Error>> {
-        let mut event_keys: Vec<usize> = Vec::new();
-        for i in 0..events.len() {
-            if events[i].is_updated == true {
-                event_keys.push(i);
-            }
-        }
-
-        let mut popup_message = "Nothing to save!".to_string();
-        if !event_keys.is_empty() {
-            for key in 0..event_keys.len() {
-                let connection = sqlite::open(database_filename)?;
-                // For now, just set active for all the updated events.
-                let mut sql_cmd = format!(
-                    "update events set status_id = {}, qualifier_id = {} where event_id = {};",
-                    &status
-                        .iter()
-                        .find(|&x| x.1.to_lowercase() == "active")
-                        .unwrap()
-                        .0,
-                    events[event_keys[key]].qualifier_id,
-                    events[event_keys[key]].event_id,
-                );
-
-                connection.execute(sql_cmd)?;
-                events[event_keys[key]].status_id = *status
+        for event in events.iter().filter(|e| e.is_updated) {
+            let connection = sqlite::open(database_filename)?;
+            // For now, just set active for all the updated events.
+            let mut sql_cmd = format!(
+                "update events set status_id = {}, qualifier_id = {} where event_id = {};",
+                &status
                     .iter()
                     .find(|&x| x.1.to_lowercase() == "active")
                     .unwrap()
-                    .0;
-
-                sql_cmd = format!(
-                    "select * from ready_table where event_id = {};",
-                    events[event_keys[key]].event_id
-                );
-                let mut ready_table_cursor = connection.prepare(sql_cmd).unwrap().cursor();
-                match ready_table_cursor.next().unwrap() {
-                    Some(_) => {
-                        sql_cmd = format!(
-                            "update ready_table set action_id = {} where event_id = {}",
-                            *action
-                                .iter()
-                                .find(|&x| x.1.to_lowercase() == "update")
-                                .unwrap()
-                                .0,
-                            events[event_keys[key]].event_id,
-                        );
-                        connection.execute(sql_cmd)?;
-                    }
-                    None => {
-                        sql_cmd = "select * from ready_table;".to_string();
-                        let statement = connection.prepare(sql_cmd).unwrap();
-                        let columns = statement.names();
-
-                        sql_cmd = "select max(publish_id) from ready_table;".to_string();
-                        let mut cursor = connection.prepare(sql_cmd).unwrap().cursor();
-                        let publish_id = match cursor.next().unwrap() {
-                            Some(value) => if value[0].kind() != sqlite::Type::Null {
-                                value[0].as_integer().unwrap() + 1
-                            } else {
-                                1
-                            },
-                            None => 1,
-                        };
-                        let action_id = *action
-                            .iter()
-                            .find(|&x| x.1.to_lowercase() == "update")
-                            .unwrap()
-                            .0;
-                        let event_id = events[event_keys[key]].event_id;
-                        let detector_id = events[event_keys[key]].detector_id;
-
-                        let mut values: Vec<i64> = Vec::new();
-                        for c in 0..columns.len() {
-                            if columns[c].to_lowercase() == "publish_id" {
-                                values.push(publish_id);
-                            } else if columns[c].to_lowercase() == "action_id" {
-                                values.push(action_id);
-                            } else if columns[c].to_lowercase() == "event_id" {
-                                values.push(event_id);
-                            } else if columns[c].to_lowercase() == "detector_id" {
-                                values.push(detector_id);
-                            } else if columns[c].to_lowercase() == "time_published" {
-                                values.push(0);
-                            } else {
-                                eprintln!(
-                                    "Error! Unexpected database schema found: {}",
-                                    columns[c],
-                                );
-                                process::exit(1);
-                            }
-                        }
-
-                        sql_cmd = "insert into ready_table Values(".to_string();
-                        for key in 0..values.len() {
-                            if key == 0 {
-                                sql_cmd = format!("{}{}", sql_cmd, values[key]);
-                            } else {
-                                sql_cmd = format!("{}, {}", sql_cmd, values[key]);
-                            }
-                        }
-                        sql_cmd = format!("{});", sql_cmd);
-                        connection.execute(sql_cmd)?;
-                    }
-                }
-            }
-            popup_message = "Saved!".to_string();
+                    .0,
+                event.qualifier_id,
+                event.event_id,
+            );
+            connection.execute(sql_cmd)?;
         }
 
+        let popup_message: String;
+        if events.iter().any(|&ref x| x.is_updated) {
+            popup_message = "Saved!".to_string();
+        } else {
+            popup_message = "Nothing to save!".to_string();
+        }
         cursive.screen_mut().add_layer_at(
             Position::new(
                 cursive::view::Offset::Center,
@@ -448,7 +359,6 @@ impl EventView {
                             .unwrap();
                         event_prop_window1.set_content(Event::get_event_properties(
                             &self.events[item],
-                            &self.status,
                             &self.priority,
                             &self.qualifier,
                             &self.category,
@@ -485,14 +395,20 @@ impl EventView {
                             &self.central_dbname,
                             &mut self.events,
                             &self.status,
-                            &self.action,
                         ) {
-                            eprintln!("Failed to write results to database: {}", e);
-                            process::exit(1);
+                            let popup_message =
+                                format!("Failed to save changes to database: {}", e);
+                            EventView::create_popup_window(
+                                &mut self.cursive,
+                                Box::new(popup_message.as_str()),
+                                Box::new("Quit"),
+                            );
                         }
                     }
 
                     EventViewMessage::InvokeEventorProcess() => {
+                        EventView::insert_records_into_ready_table(&self);
+
                         let is_updated = &self.events.iter().find(|&x| x.is_updated == true);
                         if is_updated.is_some() {
                             let eventor_path = quale::which("eventor")
@@ -549,6 +465,23 @@ impl EventView {
             }
 
             self.cursive.step();
+        }
+    }
+
+    pub fn insert_records_into_ready_table(&self) {
+        for event in self.events.iter().filter(|e| e.is_updated) {
+            let connection = sqlite::open(&self.central_dbname).unwrap();
+            let action_id = *self
+                .action
+                .iter()
+                .find(|&x| x.1.to_lowercase() == "update")
+                .unwrap()
+                .0;
+            let sql_cmd = format!(
+                "insert into ready_table (action_id, event_id, detector_id) Values({}, {}, {});",
+                action_id, event.event_id, event.detector_id,
+            );
+            connection.execute(sql_cmd).unwrap();
         }
     }
 
