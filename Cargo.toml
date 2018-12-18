@@ -1,7 +1,10 @@
 [package]
 name = "review"
-version = "0.1.1"
-authors = ["Min Kim <msk@petabi.com>"]
+version = "0.2.0"
+authors = [
+    "Atsushi Yoshioka <yoshioka@petabi.com>",
+    "Min Kim <msk@petabi.com>",
+]
 publish = false
 
 [dependencies]
