@@ -1,0 +1,17 @@
+stages:
+  - build
+
+rust-latest:
+  stage: build
+  image: rust:latest
+  cache:
+    paths:
+      - target/
+  before_script:
+    - apt-get update -yqq
+    - apt-get install -yqq --no-install-recommends libncurses-dev
+  script:
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+    - cargo build --verbose
+    - cargo test --verbose

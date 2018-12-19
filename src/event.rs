@@ -285,7 +285,8 @@ impl EventView {
             .map(|e| match e.rules {
                 Some(ref rule) => rule.clone(),
                 None => "-".to_string(),
-            }).collect();
+            })
+            .collect();
         let mut event_select = SelectView::new();
         let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
         for (i, label) in names.iter().enumerate() {

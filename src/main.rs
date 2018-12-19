@@ -14,7 +14,8 @@ fn main() {
                 .value_name("central_db")
                 .help("Path to the central database file")
                 .required(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("rcvg_db")
                 .short("r")
                 .long("rcvg_db")
@@ -22,7 +23,8 @@ fn main() {
                 .value_name("rcvg_db")
                 .help("Path to the REconverge database file")
                 .required(true),
-        ).get_matches();
+        )
+        .get_matches();
     let central_db = matches.value_of("central_db").unwrap();
     let rcvg_db = matches.value_of("rcvg_db").unwrap();
     let event_view = event::EventView::new(central_db, rcvg_db);
