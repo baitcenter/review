@@ -16,7 +16,7 @@ use std::sync::mpsc;
 pub struct Event {
     event_id: i64,
     description: Option<String>,
-    cluster_id: i64,
+    cluster_id: Option<String>,
     rules: Option<String>,
     category_id: i64,
     detector_id: i64,
@@ -38,7 +38,7 @@ impl Event {
         format!(
             "event_id: {}\ncluster_id: {}\nrules: {}\ndescription: {}\ncategory_id: {}\ndetector_id: {}\nexamples: {}\npriority_id: {}\nqualifier_id: {}\nsignature: {}\n\n",
             &self.event_id,
-            &self.cluster_id,
+            &self.cluster_id.as_ref().unwrap_or(&"-".to_string()),
             &self.rules.as_ref().unwrap_or(&"-".to_string()),
             &self.description.as_ref().unwrap_or(&"-".to_string()),
             category.get(&self.category_id).unwrap(),
@@ -97,7 +97,7 @@ impl Event {
         while let sqlite::State::Row = events_statement.next().unwrap() {
             let mut event = Event {
                 event_id: 0,
-                cluster_id: 0,
+                cluster_id: None,
                 rules: None,
                 description: None,
                 category_id: 0,
@@ -106,7 +106,7 @@ impl Event {
                 priority_id: 0,
                 qualifier_id: 0,
                 status_id: 0,
-                signature: "".to_string(),
+                signature: String::new().to_string(),
                 is_updated: false,
             };
 
@@ -114,7 +114,10 @@ impl Event {
                 if events_table.get(&column_id).unwrap().to_lowercase() == "event_id" {
                     event.event_id = events_statement.read::<i64>(column_id)?;
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "cluster_id" {
-                    event.cluster_id = events_statement.read::<i64>(column_id)?;
+                    match events_statement.read::<String>(column_id) {
+                        Ok(value) => event.cluster_id = Some(value),
+                        Err(_) => event.cluster_id = None,
+                    }
                 } else if events_table.get(&column_id).unwrap().to_lowercase() == "rules" {
                     match events_statement.read::<String>(column_id) {
                         Ok(value) => event.rules = Some(value),
