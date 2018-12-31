@@ -159,7 +159,7 @@ impl Event {
         for event in events.iter().filter(|e| e.is_updated) {
             let connection = sqlite::open(database_filename)?;
             // For now, just set active for all the updated events.
-            let mut sql_cmd = format!(
+            let sql_cmd = format!(
                 "update events set status_id = {}, qualifier_id = {} where event_id = {};",
                 &status
                     .iter()

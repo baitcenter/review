@@ -5,10 +5,11 @@ authors = [
     "Atsushi Yoshioka <yoshioka@petabi.com>",
     "Min Kim <msk@petabi.com>",
 ]
+edition = "2018"
 publish = false
 
 [dependencies]
 clap = "2"
-cursive = "0.9"
+cursive = "0.10"
 sqlite = "0.24.0"
 quale = "1.0.0"
