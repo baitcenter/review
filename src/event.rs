@@ -270,10 +270,10 @@ impl EventView {
 
         let mut event_view = EventView {
             cursive: Cursive::default(),
-            event_view_tx: event_view_tx,
-            event_view_rx: event_view_rx,
+            event_view_tx,
+            event_view_rx,
             events: events.unwrap(),
-            status: status,
+            status,
             priority: priority.unwrap(),
             qualifier: qualifier.unwrap(),
             category: category.unwrap(),
