@@ -404,8 +404,8 @@ impl EventView {
                                 format!("Failed to save changes to database: {}", e);
                             EventView::create_popup_window(
                                 &mut self.cursive,
-                                Box::new(popup_message.as_str()),
-                                Box::new("Quit"),
+                                &popup_message.as_str(),
+                                &"Quit",
                             );
                         }
                     }
@@ -420,8 +420,8 @@ impl EventView {
                             if eventor_path.to_str().unwrap() == "not found" {
                                 EventView::create_popup_window(
                                     &mut self.cursive,
-                                    Box::new("Unable to find the path to eventor."),
-                                    Box::new("Quit without invoking Eventor process"),
+                                    &"Unable to find the path to eventor.",
+                                    &"Quit without invoking Eventor process",
                                 );
                             } else {
                                 let central_dbname_option =
@@ -442,8 +442,8 @@ impl EventView {
                                         );
                                         EventView::create_popup_window(
                                             &mut self.cursive,
-                                            Box::new(popup_message.as_str()),
-                                            Box::new("Quit"),
+                                            &popup_message.as_str(),
+                                            &"Quit",
                                         );
                                     }
                                     Err(e) => {
@@ -451,8 +451,8 @@ impl EventView {
                                             format!("Failed to execute eventor: {}", e);
                                         EventView::create_popup_window(
                                             &mut self.cursive,
-                                            Box::new(popup_message.as_str()),
-                                            Box::new("Quit"),
+                                            &popup_message.as_str(),
+                                            &"Quit",
                                         );
                                     }
                                 };
@@ -460,8 +460,8 @@ impl EventView {
                         } else {
                             EventView::create_popup_window(
                                 &mut self.cursive,
-                                Box::new("Nothing is saved!"),
-                                Box::new("Quit without invoking Eventor process"),
+                                &"Nothing is saved!".to_string(),
+                                &"Quit without invoking Eventor process",
                             );
                         }
                     }
@@ -489,19 +489,15 @@ impl EventView {
         }
     }
 
-    pub fn create_popup_window(
-        cursive: &mut Cursive,
-        popup_message: Box<&str>,
-        button_message: Box<&str>,
-    ) {
+    pub fn create_popup_window(cursive: &mut Cursive, popup_message: &str, button_message: &str) {
         cursive.screen_mut().add_layer_at(
             Position::new(
                 cursive::view::Offset::Center,
                 cursive::view::Offset::Parent(5),
             ),
             Dialog::new()
-                .content(TextView::new(*popup_message))
-                .dismiss_button(*button_message),
+                .content(TextView::new(popup_message))
+                .dismiss_button(button_message),
         );
         cursive.quit();
     }
