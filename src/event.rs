@@ -413,7 +413,7 @@ impl EventView {
                     EventViewMessage::InvokeEventorProcess() => {
                         EventView::insert_records_into_ready_table(&self);
 
-                        let is_updated = &self.events.iter().find(|&x| x.is_updated == true);
+                        let is_updated = &self.events.iter().find(|&x| x.is_updated);
                         if is_updated.is_some() {
                             let eventor_path = quale::which("eventor")
                                 .unwrap_or(Path::new("not found").to_path_buf());
