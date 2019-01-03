@@ -51,8 +51,8 @@ impl Event {
     }
 
     pub fn read_table_from_database(
-        database_name: &String,
-        table_name: &String,
+        database_name: &str,
+        table_name: &str,
     ) -> Result<HashMap<i64, String>, Box<Error>> {
         let connection = sqlite::open(database_name)?;
         let sql_cmd = format!("select * from {};", table_name);
@@ -81,7 +81,7 @@ impl Event {
     }
 
     pub fn read_events_from_database(
-        database_filename: &String,
+        database_filename: &str,
         status_review: &i64,
     ) -> Result<Vec<Event>, Box<Error>> {
         let connection = sqlite::open(database_filename)?;
@@ -155,7 +155,7 @@ impl Event {
 
     pub fn write_changes_to_database(
         cursive: &mut Cursive,
-        database_filename: &String,
+        database_filename: &str,
         events: &mut Vec<Event>,
         status: &HashMap<i64, String>,
     ) -> Result<usize, Box<Error>> {
