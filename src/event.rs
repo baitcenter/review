@@ -82,7 +82,7 @@ impl Event {
 
     pub fn read_events_from_database(
         database_filename: &str,
-        status_review: &i64,
+        status_review: i64,
     ) -> Result<Vec<Event>, Box<Error>> {
         let connection = sqlite::open(database_filename)?;
         let sql_cmd = format!("select * from events where status_id = {};", status_review);
@@ -257,7 +257,7 @@ impl EventView {
 
         let events = Event::read_events_from_database(
             &central_dbname.to_string(),
-            &status
+            *status
                 .iter()
                 .find(|&x| x.1.to_lowercase() == "review")
                 .unwrap()
