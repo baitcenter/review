@@ -372,7 +372,7 @@ impl EventView {
                         let event_view_tx_clone = self.event_view_tx.clone();
 
                         let mut qualifier_select = SelectView::new();
-                        for i in 1..self.qualifier.len() + 1 {
+                        for i in 1..=self.qualifier.len() {
                             let qualifier = self.qualifier.get(&(i as i64)).unwrap();
                             qualifier_select.add_item((*qualifier.clone()).to_string(), i as i64);
                         }
