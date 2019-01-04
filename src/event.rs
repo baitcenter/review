@@ -175,12 +175,11 @@ impl Event {
             connection.execute(sql_cmd)?;
         }
 
-        let popup_message: String;
-        if events.iter().any(|&ref x| x.is_updated) {
-            popup_message = "Saved!".to_string();
+        let popup_message = if events.iter().any(|&ref x| x.is_updated) {
+            "Saved!".to_string()
         } else {
-            popup_message = "Nothing to save!".to_string();
-        }
+            "Nothing to save!".to_string()
+        };
         cursive.screen_mut().add_layer_at(
             Position::new(
                 cursive::view::Offset::Center,
