@@ -175,7 +175,7 @@ impl Event {
             connection.execute(sql_cmd)?;
         }
 
-        let popup_message = if events.iter().any(|&ref x| x.is_updated) {
+        let popup_message = if events.iter().any(|x| x.is_updated) {
             "Saved!".to_string()
         } else {
             "Nothing to save!".to_string()
