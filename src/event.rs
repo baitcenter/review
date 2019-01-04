@@ -415,7 +415,7 @@ impl EventView {
                         let is_updated = &self.events.iter().find(|&x| x.is_updated);
                         if is_updated.is_some() {
                             let eventor_path = quale::which("eventor")
-                                .unwrap_or(Path::new("not found").to_path_buf());
+                                .unwrap_or_else(|| Path::new("not found").to_path_buf());
                             if eventor_path.to_str().unwrap() == "not found" {
                                 EventView::create_popup_window(
                                     &mut self.cursive,
