@@ -1,10 +1,6 @@
-extern crate clap;
-mod cluster;
-
-#[macro_use]
-extern crate serde_derive;
-
 use clap::{App, Arg};
+
+mod cluster;
 
 fn main() {
     let matches = App::new("REview")

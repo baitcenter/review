@@ -12,6 +12,5 @@ publish = false
 chrono = "0.4"
 clap = "2"
 cursive = "0.10"
-serde = "1"
-serde_derive = "1"
+serde = { version = "1",  features = ["derive"] }
 serde_json = "1"

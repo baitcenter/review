@@ -1,11 +1,10 @@
-extern crate cursive;
-
-use self::cursive::direction::Orientation;
-use self::cursive::traits::*;
-use self::cursive::view::{Position, SizeConstraint};
-use self::cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
-use self::cursive::Cursive;
 use chrono::Utc;
+use cursive::direction::Orientation;
+use cursive::traits::*;
+use cursive::view::{Position, SizeConstraint};
+use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
+use cursive::Cursive;
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::error::Error;
