@@ -49,7 +49,7 @@ impl Cluster {
 
     pub fn read_cluster_ids_from_json_files<P: AsRef<Path>>(
         path: P,
-        clusters: &Vec<Cluster>,
+        clusters: &[Cluster],
     ) -> Result<BTreeMap<String, Vec<u64>>, Box<std::error::Error>> {
         let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();
         let file = fs::File::open(path)?;
@@ -100,7 +100,7 @@ impl Cluster {
         Ok(json_files)
     }
 
-    pub fn write_benign_rules_to_file(path: &str, clusters: &Vec<Cluster>) -> std::io::Result<()> {
+    pub fn write_benign_rules_to_file(path: &str, clusters: &[Cluster]) -> std::io::Result<()> {
         let mut file = File::create(path)?;
         let mut buff = String::new();
         for cluster in clusters {
@@ -130,7 +130,7 @@ pub enum ClusterViewMessage {
 }
 
 impl ClusterView {
-    pub fn new(dir_paths: Vec<&str>) -> Result<ClusterView, Box<Error>> {
+    pub fn new(dir_paths: &[&str]) -> Result<ClusterView, Box<Error>> {
         let (cl_view_tx, cl_view_rx) = mpsc::channel::<ClusterViewMessage>();
         let mut clusters: Vec<Cluster> = Vec::new();
         let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();

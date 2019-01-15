@@ -19,7 +19,7 @@ fn main() {
         .get_matches();
 
     let dir_paths: Vec<_> = matches.values_of("dir_paths").unwrap().collect();
-    let cluster_view = cluster::ClusterView::new(dir_paths);
+    let cluster_view = cluster::ClusterView::new(&dir_paths);
 
     match cluster_view {
         Ok(mut cluster_view) => cluster_view.run(),
