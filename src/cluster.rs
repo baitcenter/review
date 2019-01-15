@@ -306,7 +306,7 @@ impl ClusterView {
 
                     ClusterViewMessage::WriteBenignRules() => {
                         let mut file_path: String = self.path.clone();
-                        if self.path.chars().last().unwrap() != '/' {
+                        if !self.path.ends_with('/') {
                             file_path.push_str("/");
                         }
                         file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
