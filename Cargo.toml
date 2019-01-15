@@ -9,9 +9,9 @@ edition = "2018"
 publish = false
 
 [dependencies]
-chrono = "0.4.0"
+chrono = "0.4"
 clap = "2"
 cursive = "0.10"
-serde = "1.0.84"
-serde_derive = "1.0.84"
-serde_json = "1.0.35"
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
