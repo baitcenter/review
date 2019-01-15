@@ -104,7 +104,7 @@ impl Cluster {
         let mut file = File::create(path)?;
         let mut buff = String::new();
         for cluster in clusters {
-            if cluster.suspicious == "Benign".to_string() {
+            if cluster.suspicious == "Benign" {
                 buff.push_str(&cluster.signature);
                 buff.push_str(&"\n");
             }
