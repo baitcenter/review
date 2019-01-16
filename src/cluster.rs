@@ -4,7 +4,7 @@ use cursive::traits::*;
 use cursive::view::{Position, SizeConstraint};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::Cursive;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -15,7 +15,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Cluster {
     name: String,
     signature: String,
@@ -76,6 +76,8 @@ impl Cluster {
 
         if let Some(cluster_details) = data.get("Cluster Details") {
             clusters = serde_json::from_value(cluster_details.clone()).unwrap();
+        } else if let Ok(data) = serde_json::from_value(data) {
+            clusters = data;
         }
 
         Ok(clusters)
@@ -110,6 +112,12 @@ impl Cluster {
             }
         }
         file.write_all(buff.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn write_results_of_auto_labeling(path: &str, clusters: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+        file.write_all(clusters.as_bytes())?;
         Ok(())
     }
 }
@@ -173,6 +181,7 @@ impl ClusterView {
             eprintln!("Could not find JSON files containing cluster information.");
             std::process::exit(1);
         }
+        clusters.sort_by(|a, b| b.size.cmp(&a.size));
 
         let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
@@ -253,7 +262,7 @@ impl ClusterView {
         Ok(cluster_view)
     }
 
-    pub fn run(&mut self) {
+    pub fn run_feedback_mode(&mut self) {
         while self.cursive.is_running() {
             while let Some(message) = self.cl_view_rx.try_iter().next() {
                 match message {
@@ -355,5 +364,102 @@ impl ClusterView {
                 .content(TextView::new(popup_message))
                 .dismiss_button("OK"),
         );
+    }
+
+    pub fn run_auto_labeling_mode(&mut self) {
+        let mut total_size: usize = 0;
+        let mut percentage: f32 = 100.0;
+        let mut benign_size: usize = 0;
+        let mut suspicious_size: usize = 0;
+
+        for cluster in &self.clusters {
+            total_size += cluster.size;
+        }
+        for cluster in &self.clusters {
+            percentage -= cluster.size as f32 / total_size as f32 * 100.0;
+            if percentage >= 10.0 {
+                benign_size = cluster.size + 1;
+            } else if percentage <= 0.1 {
+                if cluster.size > 1 {
+                    suspicious_size = cluster.size - 1;
+                } else {
+                    suspicious_size = 1;
+                }
+                break;
+            }
+        }
+        for mut cluster in &mut self.clusters {
+            if cluster.size >= benign_size {
+                cluster.suspicious = "benign".to_string();
+            } else if cluster.size <= suspicious_size {
+                cluster.suspicious = "suspicious".to_string();
+            }
+        }
+
+        let serialized_clusters = serde_json::to_string_pretty(&self.clusters);
+        match serialized_clusters {
+            Ok(serialized_clusters) => {
+                let mut file_path: String = self.path.clone();
+                if !self.path.ends_with('/') {
+                    file_path.push_str("/");
+                }
+                file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
+                file_path.push_str("_auto_labeling.json");
+
+                match Cluster::write_results_of_auto_labeling(
+                    &file_path.as_str(),
+                    &serialized_clusters.as_str(),
+                ) {
+                    Ok(_) => {
+                        self.cursive.pop_layer();
+                        self.cursive.add_layer(
+                            Dialog::new()
+                                .title("REview auto labeling mode")
+                                .content(
+                                    TextView::new(format!(
+                                        "The result of auto labeling has been saved to \n\n{:?}.",
+                                        file_path
+                                    ))
+                                    .center(),
+                                )
+                                .button("Quit", |s| s.quit()),
+                        );
+                        self.cursive.run();
+                    }
+                    Err(e) => {
+                        self.cursive.pop_layer();
+                        self.cursive.add_layer(
+                            Dialog::new()
+                                .title("REview auto labeling mode")
+                                .content(
+                                    TextView::new(format!(
+                                        "Failed to write the result of auto labeling to {:?}.\nError: {}",
+                                        file_path, e
+                                    ))
+                                    .center(),
+                                )
+                                .button("Quit", |s| s.quit()),
+                        );
+                        self.cursive.run();
+                    }
+                }
+            }
+            Err(e) => {
+                self.cursive.pop_layer();
+                self.cursive.add_layer(
+                    Dialog::new()
+                        .title("REview auto labeling mode")
+                        .content(
+                            TextView::new(format!(
+                                "Failed to process auto labeling mode.\nError: {}",
+                                e
+                            ))
+                            .center(),
+                        )
+                        .button("Quit", |s| s.quit()),
+                );
+                self.cursive.run();
+            }
+        }
     }
 }

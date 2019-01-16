@@ -13,19 +13,36 @@ fn main() {
                 .takes_value(true)
                 .value_name("dir01 dir02 dir03...")
                 .min_values(1)
-                .help("list of paths to directories containing cluster files in JSON format, separated by a space")
+                .help("A space-separated list of paths to directories containing cluster files in JSON format")
                 .required(true),
+        )
+        .arg(
+            Arg::with_name("auto_labeling")
+                .short("a")
+                .long("auto_labeling")
+                .takes_value(false)
+                .help("Runs REview in auto labeling mode")
         )
         .get_matches();
 
     let dir_paths: Vec<_> = matches.values_of("dir_paths").unwrap().collect();
     let cluster_view = cluster::ClusterView::new(&dir_paths);
 
-    match cluster_view {
-        Ok(mut cluster_view) => cluster_view.run(),
-        Err(e) => {
-            eprintln!("Failed to create a cluster_view: {}", e);
-            std::process::exit(1);
+    if matches.is_present("auto_labeling") {
+        match cluster_view {
+            Ok(mut cluster_view) => cluster_view.run_auto_labeling_mode(),
+            Err(e) => {
+                eprintln!("Failed to create a cluster_view: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        match cluster_view {
+            Ok(mut cluster_view) => cluster_view.run_feedback_mode(),
+            Err(e) => {
+                eprintln!("Failed to create a cluster_view: {}", e);
+                std::process::exit(1);
+            }
         }
     }
 }
