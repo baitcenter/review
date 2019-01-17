@@ -366,16 +366,59 @@ impl ClusterView {
         );
     }
 
-    pub fn run_auto_labeling_mode(&mut self) {
+    pub fn run_auto_labeling_mode(dir_paths: &[&str]) {
+        let mut clusters: Vec<Cluster> = Vec::new();
+        let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+        let mut path = String::new();
+
+        for dir_path in dir_paths.iter() {
+            match Cluster::check_dir(&dir_path) {
+                Ok(json_files) => {
+                    for f in json_files.iter() {
+                        if let Ok(mut c) = Cluster::read_clusters_from_json_files(f) {
+                            clusters.append(&mut c);
+                            if path.is_empty() {
+                                path = dir_path.to_string();
+                            }
+                        }
+                    }
+                }
+                Err(e) => eprintln!("{}: {}", dir_path, e),
+            }
+        }
+
+        if !clusters.is_empty() {
+            for dir_path in dir_paths.iter() {
+                match Cluster::check_dir(&dir_path) {
+                    Ok(json_files) => {
+                        for f in json_files.iter() {
+                            if let Ok(mut id) =
+                                Cluster::read_cluster_ids_from_json_files(f, &clusters)
+                            {
+                                cluster_ids.append(&mut id);
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("{}: {}", dir_path, e),
+                }
+            }
+        }
+
+        if clusters.is_empty() {
+            eprintln!("Could not find JSON files containing cluster information.");
+            std::process::exit(1);
+        }
+        clusters.sort_by(|a, b| b.size.cmp(&a.size));
+
         let mut total_size: usize = 0;
         let mut percentage: f32 = 100.0;
         let mut benign_size: usize = 0;
         let mut suspicious_size: usize = 0;
 
-        for cluster in &self.clusters {
+        for cluster in &clusters {
             total_size += cluster.size;
         }
-        for cluster in &self.clusters {
+        for cluster in &clusters {
             percentage -= cluster.size as f32 / total_size as f32 * 100.0;
             if percentage >= 10.0 {
                 benign_size = cluster.size + 1;
@@ -388,7 +431,7 @@ impl ClusterView {
                 break;
             }
         }
-        for mut cluster in &mut self.clusters {
+        for mut cluster in &mut clusters {
             if cluster.size >= benign_size {
                 cluster.suspicious = "benign".to_string();
             } else if cluster.size <= suspicious_size {
@@ -396,11 +439,11 @@ impl ClusterView {
             }
         }
 
-        let serialized_clusters = serde_json::to_string_pretty(&self.clusters);
+        let serialized_clusters = serde_json::to_string_pretty(&clusters);
         match serialized_clusters {
             Ok(serialized_clusters) => {
-                let mut file_path: String = self.path.clone();
-                if !self.path.ends_with('/') {
+                let mut file_path: String = path.clone();
+                if !path.ends_with('/') {
                     file_path.push_str("/");
                 }
                 file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
@@ -411,54 +454,21 @@ impl ClusterView {
                     &serialized_clusters.as_str(),
                 ) {
                     Ok(_) => {
-                        self.cursive.pop_layer();
-                        self.cursive.add_layer(
-                            Dialog::new()
-                                .title("REview auto labeling mode")
-                                .content(
-                                    TextView::new(format!(
-                                        "The result of auto labeling has been saved to \n\n{:?}.",
-                                        file_path
-                                    ))
-                                    .center(),
-                                )
-                                .button("Quit", |s| s.quit()),
+                        println!(
+                            "The result of auto labeling has been saved to \n\n{:?}.",
+                            file_path
                         );
-                        self.cursive.run();
                     }
                     Err(e) => {
-                        self.cursive.pop_layer();
-                        self.cursive.add_layer(
-                            Dialog::new()
-                                .title("REview auto labeling mode")
-                                .content(
-                                    TextView::new(format!(
-                                        "Failed to write the result of auto labeling to {:?}.\nError: {}",
-                                        file_path, e
-                                    ))
-                                    .center(),
-                                )
-                                .button("Quit", |s| s.quit()),
+                        eprintln!(
+                            "Failed to write the result of auto labeling to {:?}.\nError: {}",
+                            file_path, e
                         );
-                        self.cursive.run();
                     }
                 }
             }
             Err(e) => {
-                self.cursive.pop_layer();
-                self.cursive.add_layer(
-                    Dialog::new()
-                        .title("REview auto labeling mode")
-                        .content(
-                            TextView::new(format!(
-                                "Failed to process auto labeling mode.\nError: {}",
-                                e
-                            ))
-                            .center(),
-                        )
-                        .button("Quit", |s| s.quit()),
-                );
-                self.cursive.run();
+                eprintln!("Failed to process auto labeling mode.\nError: {}", e);
             }
         }
     }
