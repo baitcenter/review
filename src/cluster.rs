@@ -248,7 +248,8 @@ impl ClusterView {
         cluster_view.cursive.add_layer(
             LinearLayout::horizontal()
                 .child(cluster_prop_box1)
-                .child(cluster_prop_box2),
+                .child(cluster_prop_box2)
+                .scrollable(),
         );
 
         cluster_view.cursive.add_global_callback('q', |s| s.quit());
