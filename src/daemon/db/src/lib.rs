@@ -113,9 +113,7 @@ impl DB {
         let conn = self.pool.get().unwrap();
         DB::get_status_table(&self)
             .and_then(move |status_table| {
-                let active = status_table
-                    .iter()
-                    .find(|x| x.status == "active".to_string());
+                let active = status_table.iter().find(|x| x.status == "active");
                 let result = Events
                     .or_filter(schema::Events::dsl::event_id.eq(id))
                     .load::<EventsTable>(&conn)
