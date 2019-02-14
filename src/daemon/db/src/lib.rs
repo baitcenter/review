@@ -37,43 +37,61 @@ impl DB {
     }
 
     pub fn get_action_table(&self) -> impl Future<Item = Vec<ActionTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let action_table = Action.load::<ActionTable>(&conn).map_err(Into::into);
+        let action_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Action.load::<ActionTable>(&conn).map_err(Into::into));
 
         future::result(action_table)
     }
 
     pub fn get_category_table(&self) -> impl Future<Item = Vec<CategoryTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let category_table = Category.load::<CategoryTable>(&conn).map_err(Into::into);
+        let category_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Category.load::<CategoryTable>(&conn).map_err(Into::into));
 
         future::result(category_table)
     }
 
     pub fn get_event_table(&self) -> impl Future<Item = Vec<EventsTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let event_table = Events.load::<EventsTable>(&conn).map_err(Into::into);
+        let event_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Events.load::<EventsTable>(&conn).map_err(Into::into));
 
         future::result(event_table)
     }
 
     pub fn get_priority_table(&self) -> impl Future<Item = Vec<PriorityTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let priority_table = Priority.load::<PriorityTable>(&conn).map_err(Into::into);
+        let priority_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Priority.load::<PriorityTable>(&conn).map_err(Into::into));
 
         future::result(priority_table)
     }
 
     pub fn get_qualifier_table(&self) -> impl Future<Item = Vec<QualifierTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let qualifier_table = Qualifier.load::<QualifierTable>(&conn).map_err(Into::into);
+        let qualifier_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Qualifier.load::<QualifierTable>(&conn).map_err(Into::into));
 
         future::result(qualifier_table)
     }
 
     pub fn get_status_table(&self) -> impl Future<Item = Vec<StatusTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let status_table = Status.load::<StatusTable>(&conn).map_err(Into::into);
+        let status_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| Status.load::<StatusTable>(&conn).map_err(Into::into));
 
         future::result(status_table)
     }
@@ -82,11 +100,12 @@ impl DB {
         &self,
         s_id: i32,
     ) -> impl Future<Item = Vec<EventsTable>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let event = Events
-            .filter(schema::Events::dsl::status_id.eq(s_id))
-            .load::<EventsTable>(&conn)
-            .map_err(Into::into);
+        let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+            Events
+                .filter(schema::Events::dsl::status_id.eq(s_id))
+                .load::<EventsTable>(&conn)
+                .map_err(Into::into)
+        });
 
         future::result(event)
     }
@@ -95,12 +114,13 @@ impl DB {
         &self,
         q_id: i32,
     ) -> impl Future<Item = Vec<String>, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let event = Events
-            .select(schema::Events::dsl::signature)
-            .filter(schema::Events::dsl::qualifier_id.eq(q_id))
-            .load::<String>(&conn)
-            .map_err(Into::into);
+        let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+            Events
+                .select(schema::Events::dsl::signature)
+                .filter(schema::Events::dsl::qualifier_id.eq(q_id))
+                .load::<String>(&conn)
+                .map_err(Into::into)
+        });
 
         future::result(event)
     }
