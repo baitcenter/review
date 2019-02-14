@@ -67,19 +67,25 @@ fn main() {
             }
         }
     } else {
-        let dir_paths: Vec<_> = matches.values_of("dir_paths").unwrap().collect();
-
-        if matches.is_present("auto_labeling") {
-            cluster::ClusterView::run_auto_labeling_mode(&dir_paths);
-        } else {
-            let cluster_view = cluster::ClusterView::new(&dir_paths);
-            match cluster_view {
-                Ok(mut cluster_view) => cluster_view.run_feedback_mode(),
-                Err(e) => {
-                    eprintln!("Failed to create a cluster_view: {}", e);
-                    std::process::exit(1);
+        if let Some(dir_paths) = matches.values_of("dir_paths") {
+            let dir_paths: Vec<_> = dir_paths.collect();
+            if matches.is_present("auto_labeling") {
+                cluster::ClusterView::run_auto_labeling_mode(&dir_paths);
+            } else {
+                let cluster_view = cluster::ClusterView::new(&dir_paths);
+                match cluster_view {
+                    Ok(mut cluster_view) => cluster_view.run_feedback_mode(),
+                    Err(e) => {
+                        eprintln!("Failed to create a cluster_view: {}", e);
+                        std::process::exit(1);
+                    }
                 }
             }
+        } else {
+            eprintln!(
+                "Please specify options. To see the list of options, please run 'review --help'"
+            );
+            std::process::exit(1);
         }
     }
 }
