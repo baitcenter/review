@@ -110,6 +110,17 @@ impl DB {
         future::result(event)
     }
 
+    pub fn get_benign_id(&self) -> i32 {
+        if let Ok(conn) = self.pool.get() {
+            if let Ok(qualifier_table) = Qualifier.load::<QualifierTable>(&conn) {
+                if let Some(benign) = qualifier_table.iter().find(|x| x.qualifier == "benign") {
+                    return benign.qualifier_id.unwrap();
+                }
+            }
+        }
+        -1
+    }
+
     pub fn get_signature_by_qualifier(
         &self,
         q_id: i32,

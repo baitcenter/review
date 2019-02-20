@@ -1,9 +1,11 @@
+use curl::easy::Easy;
 use futures::future;
 use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 use serde_json::json;
 use std::collections::HashMap;
+use std::io::Read;
 
 mod error;
 use error::Error;
@@ -11,12 +13,34 @@ use error::Error;
 #[derive(Clone)]
 pub struct ApiService {
     db: db::DB,
+    reviewd_addr: String,
+    etcd_key: String,
+    etcd_url: String,
+    reviewd_url: String,
 }
 
 impl ApiService {
-    pub fn new(database_url: &str) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
+    pub fn new(
+        database_url: &str,
+        reviewd_addr: &str,
+        etcd_url: &str,
+        etcd_key: &str,
+    ) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
+        let reviewd_addr = reviewd_addr.to_string();
+        let etcd_key = etcd_key.to_string();
+        let etcd_url = etcd_url.to_string();
+        let reviewd_url = database_url.to_string();
+
         let fut = db::DB::new(database_url)
-            .and_then(move |db| future::ok(Self { db }))
+            .and_then(move |db| {
+                future::ok(Self {
+                    db,
+                    reviewd_addr,
+                    etcd_key,
+                    etcd_url,
+                    reviewd_url,
+                })
+            })
             .map_err(Into::into);
 
         Box::new(fut)
@@ -83,6 +107,45 @@ impl ApiService {
                         if let (Ok(event_id), Ok(qualifier_id)) =
                             (event_id.parse::<i32>(), qualifier_id.parse::<i32>())
                         {
+                            let benign_id = db::DB::get_benign_id(&self.db);
+                            if qualifier_id == benign_id {
+                                let value = format!(
+                                    "http://{}/event?qualifier_id={}",
+                                    &self.reviewd_addr, benign_id,
+                                );
+                                let data = format!(
+                                    "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                    base64::encode(&self.etcd_key),
+                                    base64::encode(&value)
+                                );
+                                let mut data = data.as_bytes();
+                                let mut easy = Easy::new();
+                                if (Ok(()), Ok(()), Ok(()))
+                                    == (
+                                        easy.url(&self.etcd_url),
+                                        easy.post(true),
+                                        easy.post_field_size(data.len() as u64),
+                                    )
+                                {
+                                    let mut transfer = easy.transfer();
+                                    if let Err(e) = transfer
+                                        .read_function(|buf| Ok(data.read(buf).unwrap_or(0)))
+                                    {
+                                        eprintln!("An error occurs while reading data: {}", e);
+                                    } else {
+                                        if let Err(e) = transfer.perform() {
+                                            eprintln!(
+                                                "An error occurs while connecting etcd server: {}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    eprintln!("An error occurred while updating ETCD server");
+                                }
+                            } else if benign_id == -1 {
+                                eprintln!("An error occurs while accessing database.");
+                            }
                             let result =
                                 db::DB::update_qualifier_id(&self.db, event_id, qualifier_id)
                                     .and_then(|_| {

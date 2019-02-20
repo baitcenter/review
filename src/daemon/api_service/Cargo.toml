@@ -5,6 +5,8 @@ authors = ["Atsushi Yoshioka <yoshioka@petabi.com>"]
 edition = "2018"
 
 [dependencies]
+base64 = "0.10"
+curl = "0.4"
 db = { path = "../db" }
 failure = "0.1"
 futures = "0.1"
