@@ -99,7 +99,7 @@ fn main() {
                     .long("config")
                     .takes_value(true)
                     .value_name("path to config file")
-                    .help("reviewd configration file")
+                    .help("reviewd configuration file")
                     .required(true)
             )
         ).get_matches();
