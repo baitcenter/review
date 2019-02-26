@@ -94,34 +94,6 @@ impl ApiService {
                         Box::new(future::ok(ApiService::build_http_404_response()))
                     }
                 }
-                /*
-                                (&Method::PUT, "api/update") => {
-                                    let fut = req.into_body()
-                                        .concat2()
-                                        .and_then(|buf| {
-
-                                        })
-
-                                    Box::new(future::ok(ApiService::build_http_404_response()))
-                                },
-                */
-                /*
-                            let fut = req.into_body()
-                                    .concat2()
-                                    .map_err(Into::into)
-                                    .and_then(|buf| {
-                                        serde_urlencoded::from_bytes(&buf)
-                                            .map(move | data: FormData| {
-                                                ctx.create(&data.username, &data.message)
-                                            })
-                                            .map_err(Into::into)
-                                    })
-                                    .and_then(|_| {
-                                        let _ = res.headers_mut().insert(LOCATION, HeaderValue::from_static("/"));
-                                        let _ = *res.status_mut() = StatusCode::SEE_OTHER;
-                                        future::ok(res)
-                                    });
-                */
                 (&Method::PUT, "/api/event") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
