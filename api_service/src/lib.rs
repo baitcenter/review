@@ -50,7 +50,7 @@ impl ApiService {
     ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
-                (&Method::GET, "/event") => {
+                (&Method::GET, "/api/event") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
@@ -94,8 +94,35 @@ impl ApiService {
                         Box::new(future::ok(ApiService::build_http_404_response()))
                     }
                 }
+                /*
+                                (&Method::PUT, "api/update") => {
+                                    let fut = req.into_body()
+                                        .concat2()
+                                        .and_then(|buf| {
 
-                (&Method::PUT, "/event") => {
+                                        })
+
+                                    Box::new(future::ok(ApiService::build_http_404_response()))
+                                },
+                */
+                /*
+                            let fut = req.into_body()
+                                    .concat2()
+                                    .map_err(Into::into)
+                                    .and_then(|buf| {
+                                        serde_urlencoded::from_bytes(&buf)
+                                            .map(move | data: FormData| {
+                                                ctx.create(&data.username, &data.message)
+                                            })
+                                            .map_err(Into::into)
+                                    })
+                                    .and_then(|_| {
+                                        let _ = res.headers_mut().insert(LOCATION, HeaderValue::from_static("/"));
+                                        let _ = *res.status_mut() = StatusCode::SEE_OTHER;
+                                        future::ok(res)
+                                    });
+                */
+                (&Method::PUT, "/api/event") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
@@ -108,7 +135,7 @@ impl ApiService {
                             let benign_id = db::DB::get_benign_id(&self.db);
                             if qualifier_id == benign_id {
                                 let value = format!(
-                                    "http://{}/event?qualifier_id={}",
+                                    "http://{}/api/event?qualifier_id={}",
                                     &self.reviewd_addr, benign_id,
                                 );
                                 let data = format!(
@@ -146,7 +173,7 @@ impl ApiService {
                 _ => Box::new(future::ok(ApiService::build_http_404_response())),
             },
             None => match (req.method(), req.uri().path()) {
-                (&Method::GET, "/action") => {
+                (&Method::GET, "/api/action") => {
                     let result = db::DB::get_action_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
@@ -162,7 +189,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/category") => {
+                (&Method::GET, "/api/category") => {
                     let result = db::DB::get_category_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
@@ -178,7 +205,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/event") => {
+                (&Method::GET, "/api/event") => {
                     let result = db::DB::get_event_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
@@ -194,7 +221,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/priority") => {
+                (&Method::GET, "/api/priority") => {
                     let result = db::DB::get_priority_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
@@ -210,8 +237,8 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/qualifier") => {
-                    let result = db::DB::get_action_table(&self.db)
+                (&Method::GET, "/api/qualifier") => {
+                    let result = db::DB::get_qualifier_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
                                 Response::builder()
@@ -226,7 +253,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/status") => {
+                (&Method::GET, "/api/status") => {
                     let result = db::DB::get_status_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(

@@ -1,0 +1,5 @@
+{
+    "reviewd_addr": "IP address and port number of Reviewd. The value should be in the form of <IP address>:<port number>",
+    "etcd_addr": "IP address and port number of etcd server. The value should be in the form of <IP address>:<port number>",
+    "etcd_key": "name of the key that confd is monitoring" 
+}
