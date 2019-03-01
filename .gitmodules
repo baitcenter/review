@@ -1,0 +1,3 @@
+[submodule "remake"]
+	path = remake
+	url = git@gitlab.com:resolutions/remake.git
