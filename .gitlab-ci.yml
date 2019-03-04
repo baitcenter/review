@@ -2,6 +2,9 @@ stages:
   - build
   - package
 
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 rust-latest:
   stage: build
   image: rust:latest
