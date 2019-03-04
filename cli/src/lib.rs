@@ -4,9 +4,10 @@ use cursive::traits::*;
 use cursive::view::{Position, SizeConstraint};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::Cursive;
+use remake::cluster::PrefixClustering;
+use remake::event::RawEventDatabase;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -410,89 +411,20 @@ impl<'a> EventView<'a> {
 
 #[derive(Deserialize, Serialize)]
 pub struct Cluster {
-    name: String,
+    cluster_id: usize,
     signature: String,
     size: usize,
     suspicious: String,
     examples: Vec<String>,
+    event_ids: Vec<u64>,
 }
 
 impl Cluster {
-    pub fn get_cluster_properties(
-        cluster: &Cluster,
-        cluster_ids: &BTreeMap<String, Vec<u64>>,
-    ) -> String {
-        if let Some(id) = cluster_ids.get(&cluster.name) {
-            let mut ids = id.to_vec();
-            if ids.len() >= 10 {
-                let (id_first, _id_last) = ids.split_at(10);
-                ids = id_first.to_vec();
-            }
-            format!(
-                "cluster name: {}\nsignature: {}\nqualifier: {}\nsize: {}\nexamples: {:#?}\nIDs: {:#?}\n\n",
-                cluster.name, cluster.signature, cluster.suspicious, cluster.size, cluster.examples, ids
-            )
-        } else {
-            format!(
-                "cluster name: {}\nsignature: {}\nqualifier: {}\nsize: {}\nexamples: {:#?}\nIDs: No information\n\n",
-                cluster.name, cluster.signature, cluster.suspicious, cluster.size, cluster.examples
-            )
-        }
-    }
-
-    pub fn read_cluster_ids_from_json_files<P: AsRef<Path>>(
-        path: P,
-        clusters: &[Cluster],
-    ) -> Result<BTreeMap<String, Vec<u64>>, Box<std::error::Error>> {
-        let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();
-        let file = fs::File::open(path)?;
-        let reader = BufReader::new(file);
-        let data: Value = serde_json::from_reader(reader)?;
-
-        for cluster in clusters {
-            if let Some(value) = data.get(&cluster.name) {
-                let ids: Vec<u64> = serde_json::from_value(value.clone()).unwrap();
-                cluster_ids.insert(cluster.name.clone(), ids);
-            }
-        }
-
-        Ok(cluster_ids)
-    }
-
-    pub fn read_clusters_from_json_files<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<Vec<Cluster>, Box<std::error::Error>> {
-        let mut clusters: Vec<Cluster> = Vec::new();
-        let file = fs::File::open(path)?;
-        let reader = BufReader::new(file);
-        let data: Value = serde_json::from_reader(reader)?;
-
-        if let Some(cluster_details) = data.get("Cluster Details") {
-            clusters = serde_json::from_value(cluster_details.clone()).unwrap();
-        } else if let Ok(data) = serde_json::from_value(data) {
-            clusters = data;
-        }
-
-        Ok(clusters)
-    }
-
-    pub fn check_dir(target_dir: &str) -> Result<Vec<std::path::PathBuf>, std::io::Error> {
-        let mut json_files: Vec<std::path::PathBuf> = Vec::new();
-        for entry in fs::read_dir(target_dir)? {
-            if let Ok(entry) = entry {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_file() {
-                        if let Some(extension) = entry.path().extension() {
-                            if extension.to_str() == Some("json") {
-                                json_files.push(entry.path());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(json_files)
+    pub fn get_cluster_properties(cluster: &Cluster) -> String {
+        format!(
+            "cluster id: {}\nsignature: {}\nqualifier: {}\nsize: {}\nexamples: {:#?}\nevent IDs: {:#?}\n\n",
+            cluster.cluster_id, cluster.signature, cluster.suspicious, cluster.size, cluster.examples, cluster.event_ids
+        )
     }
 
     pub fn write_benign_rules_to_file(path: &str, clusters: &[Cluster]) -> std::io::Result<()> {
@@ -507,12 +439,6 @@ impl Cluster {
         file.write_all(buff.as_bytes())?;
         Ok(())
     }
-
-    pub fn write_results_of_auto_labeling(path: &str, clusters: &str) -> std::io::Result<()> {
-        let mut file = File::create(path)?;
-        file.write_all(clusters.as_bytes())?;
-        Ok(())
-    }
 }
 
 pub struct ClusterView {
@@ -520,7 +446,6 @@ pub struct ClusterView {
     cl_view_rx: mpsc::Receiver<ClusterViewMessage>,
     cl_view_tx: mpsc::Sender<ClusterViewMessage>,
     clusters: Vec<Cluster>,
-    cluster_ids: BTreeMap<String, Vec<u64>>,
     path: String,
 }
 
@@ -531,64 +456,174 @@ pub enum ClusterViewMessage {
 }
 
 impl ClusterView {
-    pub fn new(dir_paths: &[&str]) -> Result<ClusterView, Box<Error>> {
+    pub fn new(
+        cluster_path: &str,
+        model_path: &str,
+        raw_db_path: &str,
+    ) -> Result<ClusterView, Box<Error>> {
         let (cl_view_tx, cl_view_rx) = mpsc::channel::<ClusterViewMessage>();
         let mut clusters: Vec<Cluster> = Vec::new();
-        let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();
-        let mut path = String::new();
 
-        for dir_path in dir_paths.iter() {
-            match Cluster::check_dir(&dir_path) {
-                Ok(json_files) => {
-                    for f in json_files.iter() {
-                        if let Ok(mut c) = Cluster::read_clusters_from_json_files(f) {
-                            clusters.append(&mut c);
-                            if path.is_empty() {
-                                path = dir_path.to_string();
+        let model = match ClusterView::read_model_file(model_path) {
+            Ok(model) => model,
+            Err(e) => {
+                eprintln!("Model file {} could not be opened: {}", model_path, e);
+                std::process::exit(1);
+            }
+        };
+        let index = PrefixClustering::index(&model);
+        let sigs = index
+            .iter()
+            .map(|(sig, id)| (id, sig))
+            .collect::<HashMap<_, _>>();
+        let cls = match ClusterView::read_clusters_file(cluster_path) {
+            Ok(cls) => cls,
+            Err(e) => {
+                eprintln!("Cluster file {} could not be opened: {}", cluster_path, e);
+                std::process::exit(1);
+            }
+        };
+        let raw_event_db = match RawEventDatabase::new(&Path::new(&raw_db_path)) {
+            Ok(raw_event_db) => raw_event_db,
+            Err(e) => {
+                eprintln!("Raw database {} could not be opened: {}", raw_db_path, e);
+                std::process::exit(1);
+            }
+        };
+        let ro_txn = match raw_event_db.begin_ro_txn() {
+            Ok(ro_txn) => ro_txn,
+            Err(e) => {
+                eprintln!("An error occurs while accessing raw database: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        for (cluster_id, events) in cls.iter() {
+            let signature = if let Some(sig) = sigs.get(cluster_id) {
+                if let Ok(sig) = std::str::from_utf8(&sig) {
+                    sig.to_string()
+                } else {
+                    "".to_string()
+                }
+            } else {
+                "".to_string()
+            };
+
+            let size = events.len();
+
+            // REview displays at most 10 event ids for each cluster
+            let event_ids = events.iter().take(10).cloned().collect::<Vec<_>>();
+            let mut examples = event_ids
+                .iter()
+                .map(|event_id| ro_txn.get(*event_id))
+                .filter_map(Result::ok)
+                .map(|event| std::str::from_utf8(event))
+                .filter_map(Result::ok)
+                .map(|event| event.to_string())
+                .collect::<Vec<_>>();
+
+            // if examples is empty, most likely analyzed logs are packets
+            if examples.is_empty() {
+                for event_id in &event_ids {
+                    if let Ok(event) = ro_txn.get(*event_id) {
+                        match etherparse::PacketHeaders::from_ethernet_slice(&event) {
+                            Err(_) => continue,
+                            Ok(value) => {
+                                if let Some(ip) = value.ip {
+                                    match ip {
+                                        etherparse::IpHeader::Version4(ip) => {
+                                            let source_ip_addr = format!(
+                                                "{}:{}:{}:{}",
+                                                ip.source[0],
+                                                ip.source[1],
+                                                ip.source[2],
+                                                ip.source[3]
+                                            );
+                                            let destination_ip_addr = format!(
+                                                "{}:{}:{}:{}",
+                                                ip.destination[0],
+                                                ip.destination[1],
+                                                ip.destination[2],
+                                                ip.destination[3]
+                                            );
+                                            let payload = match std::str::from_utf8(value.payload) {
+                                                Ok(payload) => payload,
+                                                Err(_) => "-",
+                                            };
+                                            let example = format!("source_ip_addr: {}, destination_ip_addr: {}, payload: {}", source_ip_addr, destination_ip_addr, payload);
+                                            examples.push(example);
+                                        }
+                                        etherparse::IpHeader::Version6(ip) => {
+                                            let payload = match std::str::from_utf8(value.payload) {
+                                                Ok(payload) => payload,
+                                                Err(_) => "-",
+                                            };
+                                            let example = format!("source_ip_addr: {:?}, destination_ip_addr: {:?}, payload: {}", ip.source, ip.destination, payload);
+                                            examples.push(example);
+                                        }
+                                    }
+                                } else {
+                                    let example = "<undecodable>".to_string();
+                                    examples.push(example);
+                                }
                             }
                         }
                     }
                 }
-                Err(e) => eprintln!("{}: {}", dir_path, e),
             }
-        }
 
-        if !clusters.is_empty() {
-            for dir_path in dir_paths.iter() {
-                match Cluster::check_dir(&dir_path) {
-                    Ok(json_files) => {
-                        for f in json_files.iter() {
-                            if let Ok(mut id) =
-                                Cluster::read_cluster_ids_from_json_files(f, &clusters)
-                            {
-                                cluster_ids.append(&mut id);
-                            }
-                        }
-                    }
-                    Err(e) => eprintln!("{}: {}", dir_path, e),
-                }
+            // REview displays at most 3 examples for each cluster
+            if examples.len() >= 4 {
+                let (examples, _) = examples.split_at(3);
+                let cluster = Cluster {
+                    cluster_id: *cluster_id,
+                    signature,
+                    size,
+                    suspicious: "unknown".to_string(),
+                    examples: examples.to_vec(),
+                    event_ids,
+                };
+                clusters.push(cluster);
+            } else {
+                let cluster = Cluster {
+                    cluster_id: *cluster_id,
+                    signature,
+                    size,
+                    suspicious: "unknown".to_string(),
+                    examples,
+                    event_ids,
+                };
+                clusters.push(cluster);
             }
-        }
-
-        if clusters.is_empty() {
-            eprintln!("Could not find JSON files containing cluster information.");
-            std::process::exit(1);
         }
         clusters.sort_by(|a, b| b.size.cmp(&a.size));
+
+        let path = match Path::new(cluster_path).parent() {
+            Some(path) => match path.to_str() {
+                Some(path) => path.to_string(),
+                None => {
+                    eprintln!("An error occurs while parsing {}", cluster_path);
+                    std::process::exit(1);
+                }
+            },
+            None => {
+                eprintln!("An error occurs while parsing {}", cluster_path);
+                std::process::exit(1);
+            }
+        };
 
         let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
             cl_view_tx,
             cl_view_rx,
             clusters,
-            cluster_ids,
             path,
         };
 
         let names: Vec<String> = cluster_view
             .clusters
             .iter()
-            .map(|c| c.name.clone())
+            .map(|c| c.signature.clone())
             .collect();
 
         let mut cluster_select = SelectView::new();
@@ -656,6 +691,26 @@ impl ClusterView {
         Ok(cluster_view)
     }
 
+    fn read_model_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<PrefixClustering, Box<std::error::Error>> {
+        let file = fs::File::open(path)?;
+        let reader = BufReader::new(file);
+        let prefix_clustering: PrefixClustering = rmp_serde::from_read(reader)?;
+
+        Ok(prefix_clustering)
+    }
+
+    fn read_clusters_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<HashMap<usize, HashSet<u64>>, Box<std::error::Error>> {
+        let file = fs::File::open(path)?;
+        let reader = BufReader::new(file);
+        let cluster: HashMap<usize, HashSet<u64>> = rmp_serde::from_read(reader)?;
+
+        Ok(cluster)
+    }
+
     pub fn run_feedback_mode(&mut self) {
         while self.cursive.is_running() {
             while let Some(message) = self.cl_view_rx.try_iter().next() {
@@ -665,10 +720,8 @@ impl ClusterView {
                             .cursive
                             .find_id::<TextView>("cluster_properties")
                             .unwrap();
-                        cluster_prop_window1.set_content(Cluster::get_cluster_properties(
-                            &self.clusters[item],
-                            &self.cluster_ids,
-                        ));
+                        cluster_prop_window1
+                            .set_content(Cluster::get_cluster_properties(&self.clusters[item]));
 
                         let mut cluster_prop_window2 = self
                             .cursive
@@ -731,7 +784,7 @@ impl ClusterView {
                             }
                             Err(e) => {
                                 let popup_message = format!(
-                                    "Failed to write benign rules to {:?}.\nError: {}",
+                                    "An error occurs while writing benign rules to {:?}.\nError: {}",
                                     file_path, e
                                 );
                                 ClusterView::create_popup_window(
@@ -758,112 +811,5 @@ impl ClusterView {
                 .content(TextView::new(popup_message))
                 .dismiss_button("OK"),
         );
-    }
-
-    pub fn run_auto_labeling_mode(dir_paths: &[&str]) {
-        let mut clusters: Vec<Cluster> = Vec::new();
-        let mut cluster_ids: BTreeMap<String, Vec<u64>> = BTreeMap::new();
-        let mut path = String::new();
-
-        for dir_path in dir_paths.iter() {
-            match Cluster::check_dir(&dir_path) {
-                Ok(json_files) => {
-                    for f in json_files.iter() {
-                        if let Ok(mut c) = Cluster::read_clusters_from_json_files(f) {
-                            clusters.append(&mut c);
-                            if path.is_empty() {
-                                path = dir_path.to_string();
-                            }
-                        }
-                    }
-                }
-                Err(e) => eprintln!("{}: {}", dir_path, e),
-            }
-        }
-
-        if !clusters.is_empty() {
-            for dir_path in dir_paths.iter() {
-                match Cluster::check_dir(&dir_path) {
-                    Ok(json_files) => {
-                        for f in json_files.iter() {
-                            if let Ok(mut id) =
-                                Cluster::read_cluster_ids_from_json_files(f, &clusters)
-                            {
-                                cluster_ids.append(&mut id);
-                            }
-                        }
-                    }
-                    Err(e) => eprintln!("{}: {}", dir_path, e),
-                }
-            }
-        }
-
-        if clusters.is_empty() {
-            eprintln!("Could not find JSON files containing cluster information.");
-            std::process::exit(1);
-        }
-        clusters.sort_by(|a, b| b.size.cmp(&a.size));
-
-        let mut total_size: usize = 0;
-        let mut percentage: f32 = 100.0;
-        let mut benign_size: usize = 0;
-        let mut suspicious_size: usize = 0;
-
-        for cluster in &clusters {
-            total_size += cluster.size;
-        }
-        for cluster in &clusters {
-            percentage -= cluster.size as f32 / total_size as f32 * 100.0;
-            if percentage >= 10.0 {
-                benign_size = cluster.size + 1;
-            } else if percentage <= 0.1 {
-                if cluster.size > 1 {
-                    suspicious_size = cluster.size - 1;
-                } else {
-                    suspicious_size = 1;
-                }
-                break;
-            }
-        }
-        for mut cluster in &mut clusters {
-            if cluster.size >= benign_size {
-                cluster.suspicious = "benign".to_string();
-            } else if cluster.size <= suspicious_size {
-                cluster.suspicious = "suspicious".to_string();
-            }
-        }
-
-        let serialized_clusters = serde_json::to_string_pretty(&clusters);
-        match serialized_clusters {
-            Ok(serialized_clusters) => {
-                let mut file_path: String = path.clone();
-                if !path.ends_with('/') {
-                    file_path.push_str("/");
-                }
-                file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
-                file_path.push_str("_auto_labeling.json");
-
-                match Cluster::write_results_of_auto_labeling(
-                    &file_path.as_str(),
-                    &serialized_clusters.as_str(),
-                ) {
-                    Ok(_) => {
-                        println!(
-                            "The result of auto labeling has been saved to \n\n{:?}.",
-                            file_path
-                        );
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to write the result of auto labeling to {:?}.\nError: {}",
-                            file_path, e
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to process auto labeling mode.\nError: {}", e);
-            }
-        }
     }
 }
