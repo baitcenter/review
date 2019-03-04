@@ -13,6 +13,9 @@ rust-latest:
   cache:
     paths:
       - target/
+  before_script:
+    - apt-get update -yqq
+    - apt-get install -yqq --no-install-recommends libhyperscan-dev
   script:
     - rustup component add rustfmt
     - cargo fmt -- --check
