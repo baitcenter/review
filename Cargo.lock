@@ -34,10 +34,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "api_service"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "db 0.3.1",
+ "db 0.3.2",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -166,7 +166,7 @@ dependencies = [
 
 [[package]]
 name = "cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "cursive 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "db"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "diesel 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1327,11 +1327,11 @@ dependencies = [
 
 [[package]]
 name = "review"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
- "api_service 0.3.1",
+ "api_service 0.3.2",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cli 0.3.1",
+ "cli 0.3.2",
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.24 (registry+https://github.com/rust-lang/crates.io-index)",
