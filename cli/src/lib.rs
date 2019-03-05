@@ -4,7 +4,7 @@ use cursive::traits::*;
 use cursive::view::{Position, SizeConstraint};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::Cursive;
-use remake::cluster::PrefixClustering;
+use remake::classification::EventClassifier;
 use remake::event::RawEventDatabase;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -471,7 +471,7 @@ impl ClusterView {
                 std::process::exit(1);
             }
         };
-        let index = PrefixClustering::index(&model);
+        let index = model.clustering.index();
         let sigs = index
             .iter()
             .map(|(sig, id)| (id, sig))
@@ -691,14 +691,12 @@ impl ClusterView {
         Ok(cluster_view)
     }
 
-    fn read_model_file<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<PrefixClustering, Box<std::error::Error>> {
+    fn read_model_file<P: AsRef<Path>>(path: P) -> Result<EventClassifier, Box<std::error::Error>> {
         let file = fs::File::open(path)?;
         let reader = BufReader::new(file);
-        let prefix_clustering: PrefixClustering = rmp_serde::from_read(reader)?;
+        let classifier: EventClassifier = rmp_serde::from_read(reader)?;
 
-        Ok(prefix_clustering)
+        Ok(classifier)
     }
 
     fn read_clusters_file<P: AsRef<Path>>(
