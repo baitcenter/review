@@ -55,6 +55,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
     libhyperscan4 \
     libsqlite3-0 \
+    libssl1.1 \
     ; \
     rm -rf /var/lib/apt/lists/*;
 
