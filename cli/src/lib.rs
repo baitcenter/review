@@ -441,26 +441,29 @@ impl Cluster {
     }
 }
 
-pub struct ClusterView {
+pub struct ClusterView<'a> {
     cursive: Cursive,
     cl_view_rx: mpsc::Receiver<ClusterViewMessage>,
     cl_view_tx: mpsc::Sender<ClusterViewMessage>,
     clusters: Vec<Cluster>,
-    path: String,
+    cluster_path: &'a str,
+    raw_db_path: &'a str,
 }
 
 pub enum ClusterViewMessage {
+    DeleteOldEvents(),
+    PopupQuitWindows(),
     PrintClusterProps(usize),
     SaveClusterQualifier((usize, i64)),
     WriteBenignRules(),
 }
 
-impl ClusterView {
+impl<'a> ClusterView<'a> {
     pub fn new(
-        cluster_path: &str,
+        cluster_path: &'a str,
         model_path: &str,
-        raw_db_path: &str,
-    ) -> Result<ClusterView, Box<Error>> {
+        raw_db_path: &'a str,
+    ) -> Result<ClusterView<'a>, Box<Error>> {
         let (cl_view_tx, cl_view_rx) = mpsc::channel::<ClusterViewMessage>();
         let mut clusters: Vec<Cluster> = Vec::new();
 
@@ -598,26 +601,13 @@ impl ClusterView {
         }
         clusters.sort_by(|a, b| b.size.cmp(&a.size));
 
-        let path = match Path::new(cluster_path).parent() {
-            Some(path) => match path.to_str() {
-                Some(path) => path.to_string(),
-                None => {
-                    eprintln!("An error occurs while parsing {}", cluster_path);
-                    std::process::exit(1);
-                }
-            },
-            None => {
-                eprintln!("An error occurs while parsing {}", cluster_path);
-                std::process::exit(1);
-            }
-        };
-
         let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
             cl_view_tx,
             cl_view_rx,
             clusters,
-            path,
+            cluster_path,
+            raw_db_path,
         };
 
         let names: Vec<String> = cluster_view
@@ -680,9 +670,14 @@ impl ClusterView {
                 .scrollable(),
         );
 
-        cluster_view.cursive.add_global_callback('q', |s| s.quit());
         let cl_view_tx_clone = cluster_view.cl_view_tx.clone();
-        cluster_view.cursive.add_global_callback('w', move |_s| {
+        cluster_view.cursive.add_global_callback('q', move |_| {
+            cl_view_tx_clone
+                .send(ClusterViewMessage::PopupQuitWindows())
+                .unwrap();
+        });
+        let cl_view_tx_clone = cluster_view.cl_view_tx.clone();
+        cluster_view.cursive.add_global_callback('w', move |_| {
             cl_view_tx_clone
                 .send(ClusterViewMessage::WriteBenignRules())
                 .unwrap();
@@ -709,10 +704,175 @@ impl ClusterView {
         Ok(cluster)
     }
 
+    fn write_clusters_file(
+        path: &str,
+        clusters: &HashMap<usize, HashSet<u64>>,
+    ) -> std::io::Result<()> {
+        let file = fs::File::create(path)?;
+        if let Err(e) = clusters.serialize(&mut rmp_serde::Serializer::new(file)) {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+        }
+        Ok(())
+    }
+
     pub fn run_feedback_mode(&mut self) {
         while self.cursive.is_running() {
             while let Some(message) = self.cl_view_rx.try_iter().next() {
                 match message {
+                    ClusterViewMessage::DeleteOldEvents() => {
+                        let mut cls = match ClusterView::read_clusters_file(self.cluster_path) {
+                            Ok(cls) => cls,
+                            Err(e) => {
+                                let err_msg = format!(
+                                    "Cluster file {} could not be opened: {}",
+                                    self.cluster_path, e
+                                );
+                                ClusterView::create_popup_window_then_quit(
+                                    &mut self.cursive,
+                                    err_msg.as_str(),
+                                );
+                                // If we use unreachable or panic here,
+                                // Cusive stops working without displaying
+                                // above err_msg
+                                HashMap::<usize, HashSet<u64>>::new()
+                            }
+                        };
+                        if let Ok(mut raw_event_db) =
+                            RawEventDatabase::new(&Path::new(self.raw_db_path))
+                        {
+                            let mut cluster_map: HashMap<usize, HashSet<u64>> = HashMap::new();
+                            for (cluster_id, events) in cls.iter() {
+                                if events.len() >= 25 {
+                                    use std::iter::FromIterator;
+
+                                    let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
+                                    events_vec.sort();
+                                    let (_, events_vec) =
+                                        events_vec.split_at(events_vec.len() - 25);
+                                    cluster_map.insert(
+                                        *cluster_id,
+                                        HashSet::from_iter(events_vec.to_vec()),
+                                    );
+                                } else {
+                                    cluster_map.insert(*cluster_id, events.clone());
+                                }
+                            }
+
+                            let mut event_ids_to_keep: Vec<u64> = Vec::new();
+                            for (cluster_id, events) in cluster_map.iter() {
+                                if events.len() == 25 {
+                                    cls.insert(*cluster_id, events.clone());
+                                }
+                                let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
+                                event_ids_to_keep.append(&mut events_vec);
+                            }
+                            event_ids_to_keep.sort();
+                            match RawEventDatabase::shrink_to_fit(
+                                &mut raw_event_db,
+                                &event_ids_to_keep,
+                            ) {
+                                Ok(_) => {
+                                    let mut file_path = match Path::new(self.cluster_path).parent()
+                                    {
+                                        Some(path) => match path.to_str() {
+                                            Some(path) => path.to_string(),
+                                            None => {
+                                                let err_msg = format!(
+                                                    "An error occurs while parsing {}",
+                                                    self.cluster_path
+                                                );
+                                                ClusterView::create_popup_window_then_quit(
+                                                    &mut self.cursive,
+                                                    err_msg.as_str(),
+                                                );
+                                                // If we use unreachable or panic here,
+                                                // Cusive stops working without displaying
+                                                // above err_msg
+                                                String::new()
+                                            }
+                                        },
+                                        None => {
+                                            let err_msg = format!(
+                                                "An error occurs while parsing {}",
+                                                self.cluster_path
+                                            );
+                                            ClusterView::create_popup_window_then_quit(
+                                                &mut self.cursive,
+                                                err_msg.as_str(),
+                                            );
+                                            // If we use unreachable or panic here,
+                                            // Cusive stops working without displaying
+                                            // above err_msg
+                                            String::new()
+                                        }
+                                    };
+                                    if !file_path.ends_with('/') {
+                                        file_path.push_str("/");
+                                    }
+                                    file_path
+                                        .push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
+                                    file_path.push_str("_clusters");
+
+                                    match ClusterView::write_clusters_file(
+                                        &file_path.as_str(),
+                                        &cls,
+                                    ) {
+                                        Ok(_) => {
+                                            let msg = format!("Old events has been successfully deleted.\nNew cluster file {} is created.", file_path);
+                                            ClusterView::create_popup_window_then_quit(
+                                                &mut self.cursive,
+                                                msg.as_str(),
+                                            );
+                                        }
+                                        Err(e) => {
+                                            let err_msg = format!(
+                                                "An error occurs while writing clusters to a file: {}",
+                                                e
+                                            );
+                                            ClusterView::create_popup_window_then_quit(
+                                                &mut self.cursive,
+                                                err_msg.as_str(),
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let err_msg =
+                                        format!("An error occurs while deleting events: {}", e);
+                                    ClusterView::create_popup_window_then_quit(
+                                        &mut self.cursive,
+                                        err_msg.as_str(),
+                                    );
+                                }
+                            }
+                        } else {
+                            let err_msg =
+                                format!("Raw database {} could not be opened", self.raw_db_path);
+                            ClusterView::create_popup_window_then_quit(
+                                &mut self.cursive,
+                                err_msg.as_str(),
+                            );
+                        }
+                    }
+                    ClusterViewMessage::PopupQuitWindows() => {
+                        let cl_view_tx_clone = self.cl_view_tx.clone();
+                        self.cursive.screen_mut().add_layer_at(
+                            Position::new(
+                                cursive::view::Offset::Center,
+                                cursive::view::Offset::Parent(5),
+                            ),
+                            Dialog::new()
+                                .content(TextView::new("Would you like to delete old events?\nThe most recent 25 events will be kept and the rest will be deleted from cluster file and database."))
+                                .dismiss_button("Back to the previous window")
+                                .button("No", |s| s.quit())
+                                .button("Yes", move |_| {
+                                    cl_view_tx_clone
+                                        .send(ClusterViewMessage::DeleteOldEvents())
+                                        .unwrap();
+                                })
+                        );
+                    }
+
                     ClusterViewMessage::PrintClusterProps(item) => {
                         let mut cluster_prop_window1 = self
                             .cursive
@@ -759,8 +919,38 @@ impl ClusterView {
                     }
 
                     ClusterViewMessage::WriteBenignRules() => {
-                        let mut file_path: String = self.path.clone();
-                        if !self.path.ends_with('/') {
+                        let mut file_path = match Path::new(self.cluster_path).parent() {
+                            Some(path) => match path.to_str() {
+                                Some(path) => path.to_string(),
+                                None => {
+                                    let err_msg = format!(
+                                        "An error occurs while parsing {}",
+                                        self.cluster_path
+                                    );
+                                    ClusterView::create_popup_window_then_quit(
+                                        &mut self.cursive,
+                                        err_msg.as_str(),
+                                    );
+                                    // If we use unreachable or panic here,
+                                    // Cusive stops working without displaying
+                                    // above err_msg
+                                    String::new()
+                                }
+                            },
+                            None => {
+                                let err_msg =
+                                    format!("An error occurs while parsing {}", self.cluster_path);
+                                ClusterView::create_popup_window_then_quit(
+                                    &mut self.cursive,
+                                    err_msg.as_str(),
+                                );
+                                // If we use unreachable or panic here,
+                                // Cusive stops working without displaying
+                                // above err_msg
+                                String::new()
+                            }
+                        };
+                        if !file_path.ends_with('/') {
                             file_path.push_str("/");
                         }
                         file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
@@ -799,7 +989,7 @@ impl ClusterView {
         }
     }
 
-    pub fn create_popup_window(cursive: &mut Cursive, popup_message: &str) {
+    fn create_popup_window(cursive: &mut Cursive, popup_message: &str) {
         cursive.screen_mut().add_layer_at(
             Position::new(
                 cursive::view::Offset::Center,
@@ -808,6 +998,18 @@ impl ClusterView {
             Dialog::new()
                 .content(TextView::new(popup_message))
                 .dismiss_button("OK"),
+        );
+    }
+
+    fn create_popup_window_then_quit(cursive: &mut Cursive, popup_message: &str) {
+        cursive.screen_mut().add_layer_at(
+            Position::new(
+                cursive::view::Offset::Center,
+                cursive::view::Offset::Parent(5),
+            ),
+            Dialog::new()
+                .content(TextView::new(popup_message))
+                .button("OK", |s| s.quit()),
         );
     }
 }
