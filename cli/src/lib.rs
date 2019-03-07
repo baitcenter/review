@@ -740,31 +740,26 @@ impl<'a> ClusterView<'a> {
                         if let Ok(mut raw_event_db) =
                             RawEventDatabase::new(&Path::new(self.raw_db_path))
                         {
-                            let mut cluster_map: HashMap<usize, HashSet<u64>> = HashMap::new();
+                            let mut shrink_clusters: HashMap<usize, HashSet<u64>> = HashMap::new();
+                            let mut event_ids_to_keep: Vec<u64> = Vec::new();
                             for (cluster_id, events) in cls.iter() {
-                                if events.len() >= 25 {
+                                let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
+                                if events.len() > 25 {
                                     use std::iter::FromIterator;
-
-                                    let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
                                     events_vec.sort();
                                     let (_, events_vec) =
                                         events_vec.split_at(events_vec.len() - 25);
-                                    cluster_map.insert(
+                                    shrink_clusters.insert(
                                         *cluster_id,
                                         HashSet::from_iter(events_vec.to_vec()),
                                     );
+                                    event_ids_to_keep.append(&mut events_vec.to_vec());
                                 } else {
-                                    cluster_map.insert(*cluster_id, events.clone());
+                                    event_ids_to_keep.append(&mut events_vec);
                                 }
                             }
-
-                            let mut event_ids_to_keep: Vec<u64> = Vec::new();
-                            for (cluster_id, events) in cluster_map.iter() {
-                                if events.len() == 25 {
-                                    cls.insert(*cluster_id, events.clone());
-                                }
-                                let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
-                                event_ids_to_keep.append(&mut events_vec);
+                            for (cluster_id, events) in shrink_clusters.iter() {
+                                cls.insert(*cluster_id, events.clone());
                             }
                             event_ids_to_keep.sort();
                             match RawEventDatabase::shrink_to_fit(
