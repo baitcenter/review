@@ -751,15 +751,15 @@ impl<'a> ClusterView<'a> {
                                         events_vec.split_at(events_vec.len() - 25);
                                     shrink_clusters.insert(
                                         *cluster_id,
-                                        HashSet::from_iter(events_vec.to_vec()),
+                                        HashSet::from_iter(events_vec.iter().map(|e| *e)),
                                     );
-                                    event_ids_to_keep.append(&mut events_vec.to_vec());
+                                    event_ids_to_keep.extend_from_slice(&events_vec);
                                 } else {
-                                    event_ids_to_keep.append(&mut events_vec);
+                                    event_ids_to_keep.extend_from_slice(&events_vec);
                                 }
                             }
-                            for (cluster_id, events) in shrink_clusters.iter() {
-                                cls.insert(*cluster_id, events.clone());
+                            for (cluster_id, events) in shrink_clusters {
+                                cls.insert(cluster_id, events);
                             }
                             event_ids_to_keep.sort();
                             match RawEventDatabase::shrink_to_fit(
