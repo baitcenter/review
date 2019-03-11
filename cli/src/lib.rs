@@ -542,56 +542,6 @@ impl<'a> ClusterView<'a> {
                 }
             }
 
-            // if examples is empty, most likely analyzed logs are packets
-            if examples.is_empty() {
-                for event_id in &event_ids {
-                    if let Ok(event) = ro_txn.get(*event_id) {
-                        match etherparse::PacketHeaders::from_ethernet_slice(&event) {
-                            Err(_) => continue,
-                            Ok(value) => {
-                                if let Some(ip) = value.ip {
-                                    match ip {
-                                        etherparse::IpHeader::Version4(ip) => {
-                                            let source_ip_addr = format!(
-                                                "{}:{}:{}:{}",
-                                                ip.source[0],
-                                                ip.source[1],
-                                                ip.source[2],
-                                                ip.source[3]
-                                            );
-                                            let destination_ip_addr = format!(
-                                                "{}:{}:{}:{}",
-                                                ip.destination[0],
-                                                ip.destination[1],
-                                                ip.destination[2],
-                                                ip.destination[3]
-                                            );
-                                            let payload = match std::str::from_utf8(value.payload) {
-                                                Ok(payload) => payload,
-                                                Err(_) => "-",
-                                            };
-                                            let example = format!("source_ip_addr: {}, destination_ip_addr: {}, payload: {}", source_ip_addr, destination_ip_addr, payload);
-                                            examples.push(example);
-                                        }
-                                        etherparse::IpHeader::Version6(ip) => {
-                                            let payload = match std::str::from_utf8(value.payload) {
-                                                Ok(payload) => payload,
-                                                Err(_) => "-",
-                                            };
-                                            let example = format!("source_ip_addr: {:?}, destination_ip_addr: {:?}, payload: {}", ip.source, ip.destination, payload);
-                                            examples.push(example);
-                                        }
-                                    }
-                                } else {
-                                    let example = "<undecodable>".to_string();
-                                    examples.push(example);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // REview displays at most 3 examples for each cluster
             if examples.len() >= 4 {
                 let (examples, _) = examples.split_at(3);

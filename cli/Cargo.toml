@@ -10,7 +10,6 @@ publish = false
 
 [dependencies]
 chrono = "0.4"
-etherparse = "0.8"
 remake = { path = "../remake/remake" }
 reqwest = "0.9"
 rmp-serde = "0.13"
