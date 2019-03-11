@@ -699,7 +699,7 @@ impl<'a> ClusterView<'a> {
                                     err_msg.as_str(),
                                 );
                                 // If we use unreachable or panic here,
-                                // Cusive stops working without displaying
+                                // Cursive stops working without displaying
                                 // above err_msg
                                 HashMap::<usize, HashSet<u64>>::new()
                             }
@@ -748,7 +748,7 @@ impl<'a> ClusterView<'a> {
                                                     err_msg.as_str(),
                                                 );
                                                 // If we use unreachable or panic here,
-                                                // Cusive stops working without displaying
+                                                // Cursive stops working without displaying
                                                 // above err_msg
                                                 String::new()
                                             }
@@ -763,7 +763,7 @@ impl<'a> ClusterView<'a> {
                                                 err_msg.as_str(),
                                             );
                                             // If we use unreachable or panic here,
-                                            // Cusive stops working without displaying
+                                            // Cursive stops working without displaying
                                             // above err_msg
                                             String::new()
                                         }
@@ -894,7 +894,7 @@ impl<'a> ClusterView<'a> {
                                         err_msg.as_str(),
                                     );
                                     // If we use unreachable or panic here,
-                                    // Cusive stops working without displaying
+                                    // Cursive stops working without displaying
                                     // above err_msg
                                     String::new()
                                 }
@@ -907,7 +907,7 @@ impl<'a> ClusterView<'a> {
                                     err_msg.as_str(),
                                 );
                                 // If we use unreachable or panic here,
-                                // Cusive stops working without displaying
+                                // Cursive stops working without displaying
                                 // above err_msg
                                 String::new()
                             }
