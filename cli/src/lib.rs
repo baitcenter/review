@@ -522,8 +522,25 @@ impl<'a> ClusterView<'a> {
                 .filter_map(Result::ok)
                 .map(|event| std::str::from_utf8(event))
                 .filter_map(Result::ok)
-                .map(|event| event.to_string())
+                .map(|event| {
+                    // if the length of an example is longer than 500,
+                    // REview only uses first 500
+                    if event.len() > 500 {
+                        ((event.split_at(500)).0).to_string()
+                    } else {
+                        event.to_string()
+                    }
+                })
                 .collect::<Vec<_>>();
+
+            if examples.len() < 3 {
+                loop {
+                    if examples.len() == size || examples.len() == 3 {
+                        break;
+                    }
+                    examples.push("<undecodable>".to_string());
+                }
+            }
 
             // if examples is empty, most likely analyzed logs are packets
             if examples.is_empty() {
