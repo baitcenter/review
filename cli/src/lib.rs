@@ -718,7 +718,7 @@ impl<'a> ClusterView<'a> {
                                         events_vec.split_at(events_vec.len() - 25);
                                     shrink_clusters.insert(
                                         *cluster_id,
-                                        HashSet::from_iter(events_vec.iter().map(|e| *e)),
+                                        HashSet::from_iter(events_vec.iter().cloned()),
                                     );
                                     event_ids_to_keep.extend_from_slice(&events_vec);
                                 } else {
