@@ -549,7 +549,7 @@ impl<'a> ClusterView<'a> {
                     cluster_id: *cluster_id,
                     signature,
                     size,
-                    suspicious: "unknown".to_string(),
+                    suspicious: "None".to_string(),
                     examples: examples.to_vec(),
                     event_ids,
                 };
@@ -559,7 +559,7 @@ impl<'a> ClusterView<'a> {
                     cluster_id: *cluster_id,
                     signature,
                     size,
-                    suspicious: "unknown".to_string(),
+                    suspicious: "None".to_string(),
                     examples,
                     event_ids,
                 };
