@@ -512,8 +512,6 @@ impl<'a> ClusterView<'a> {
                 "".to_string()
             };
 
-            let size = events.len();
-
             // REview displays at most 10 event ids for each cluster
             let event_ids = events.iter().take(10).cloned().collect::<Vec<_>>();
             let mut examples = event_ids
@@ -526,20 +524,17 @@ impl<'a> ClusterView<'a> {
                     // if the length of an example is longer than 500,
                     // REview only uses first 500
                     if event.len() > 500 {
-                        ((event.split_at(500)).0).to_string()
+                        event[..500].to_string()
                     } else {
                         event.to_string()
                     }
                 })
                 .collect::<Vec<_>>();
 
-            if examples.len() < 3 {
-                loop {
-                    if examples.len() == size || examples.len() == 3 {
-                        break;
-                    }
-                    examples.push("<undecodable>".to_string());
-                }
+            let size = events.len();
+            let min_example_count = std::cmp::min(events.len(), 3);
+            while examples.len() < min_example_count {
+                examples.push("<undecodable>".to_string());
             }
 
             // REview displays at most 3 examples for each cluster
