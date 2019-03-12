@@ -531,12 +531,12 @@ impl<'a> ClusterView<'a> {
                 })
                 .collect::<Vec<_>>();
 
-            let size = events.len();
             let min_example_count = std::cmp::min(events.len(), 3);
             while examples.len() < min_example_count {
                 examples.push("<undecodable>".to_string());
             }
 
+            let size = events.len();
             // REview displays at most 3 examples for each cluster
             if examples.len() >= 4 {
                 let (examples, _) = examples.split_at(3);
