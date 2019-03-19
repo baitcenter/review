@@ -144,7 +144,7 @@ impl DB {
         _size: Option<usize>,
         sig: &Option<String>,
         eg: &Option<Vec<String>>,
-    ) -> Box<Future<Item = (), Error = Error> + Send + 'static> {
+    ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
         let record_check = Events
             .filter(schema::Events::dsl::detector_id.eq(d_id))
