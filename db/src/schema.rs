@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 table! {
     Action (action_id) {
         action_id -> Nullable<Integer>,
