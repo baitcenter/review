@@ -168,9 +168,9 @@ fn main() {
                                 config.etcd_key.as_str(),
                             )
                             .map_err(|e| panic!("Initialization fails: {}", e))
-                            .and_then(|srv| {
+                            .and_then(move |srv| {
                                 service_fn(move |req| {
-                                    api_service::ApiService::request_handler(&srv.clone(), req)
+                                    api_service::ApiService::request_handler(srv.clone(), req)
                                         .then(api_service::ApiService::error_handler)
                                 })
                             });

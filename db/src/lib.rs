@@ -136,6 +136,95 @@ impl DB {
         future::result(event)
     }
 
+    pub fn update_cluster(
+        &self,
+        c_id: &str,
+        d_id: i32,
+        rule: &Option<String>,
+        _size: Option<usize>,
+        sig: &Option<String>,
+        eg: &Option<Vec<String>>,
+    ) -> Box<Future<Item = (), Error = Error> + Send + 'static> {
+        let conn = self.pool.get().unwrap();
+        let record_check = Events
+            .filter(schema::Events::dsl::detector_id.eq(d_id))
+            .filter(schema::Events::dsl::cluster_id.eq(c_id))
+            .load::<EventsTable>(&conn);
+
+        if record_check.is_ok() {
+            if record_check.unwrap().is_empty() {
+                let unknown = Qualifier.load::<QualifierTable>(&conn);
+                let review = Status.load::<StatusTable>(&conn);
+                let (review, unknown) = if let (Ok(review), Ok(unknown)) = (review, unknown) {
+                    (review, unknown)
+                } else {
+                    return Box::new(futures::future::ok(()));
+                };
+                let review = review.iter().find(|x| x.status == "review");
+                let unknown = unknown.iter().find(|x| x.qualifier == "unknown");
+
+                let example = if let Some(eg) = eg {
+                    Some(eg.join("\n"))
+                } else {
+                    None
+                };
+
+                // We always insert 1 for category_id and priority_id,
+                // "unknown" for qualifier_id, and "review" for status_id.
+                // We also assume that REconverge alway sends signatures
+                // for new clusters
+                let event = EventsTable {
+                    event_id: None,
+                    cluster_id: Some(c_id.to_string()),
+                    description: None,
+                    category_id: 1,
+                    detector_id: d_id,
+                    examples: example,
+                    priority_id: 1,
+                    qualifier_id: unknown.unwrap().qualifier_id.unwrap(),
+                    status_id: review.unwrap().status_id.unwrap(),
+                    rules: rule.clone(),
+                    signature: sig.clone().unwrap(),
+                    last_modification_time: None,
+                };
+                let _ = diesel::insert_into(Events).values(&event).execute(&conn);
+                return Box::new(futures::future::ok(()));
+            } else {
+                let target = Events
+                    .filter(schema::Events::dsl::detector_id.eq(d_id))
+                    .filter(schema::Events::dsl::cluster_id.eq(c_id));
+                let now = chrono::Utc::now();
+                let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+                if rule.is_some() {
+                    let _ = diesel::update(target)
+                        .set((
+                            schema::Events::dsl::rules.eq(rule.clone()),
+                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                        ))
+                        .execute(&conn);
+                }
+                if let Some(sig) = sig {
+                    let _ = diesel::update(target)
+                        .set((
+                            schema::Events::dsl::signature.eq(sig.clone()),
+                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                        ))
+                        .execute(&conn);
+                }
+                if let Some(example) = eg {
+                    let example = Some(example.join("\n"));
+                    let _ = diesel::update(target)
+                        .set((
+                            schema::Events::dsl::examples.eq(example),
+                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                        ))
+                        .execute(&conn);
+                }
+            }
+        }
+        Box::new(futures::future::ok(()))
+    }
+
     pub fn update_qualifier_id(
         &self,
         id: i32,
@@ -146,15 +235,16 @@ impl DB {
             .and_then(move |status_table| {
                 let active = status_table.iter().find(|x| x.status == "active");
                 let result = Events
-                    .or_filter(schema::Events::dsl::event_id.eq(id))
+                    .filter(schema::Events::dsl::event_id.eq(id))
                     .load::<EventsTable>(&conn)
                     .map_err(Into::into)
                     .and_then(|mut event| {
                         event[0].event_id = None;
                         event[0].qualifier_id = new_qualifier_id;
                         event[0].status_id = active.unwrap().status_id.unwrap();
+                        let now = chrono::Utc::now();
                         event[0].last_modification_time =
-                            Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
+                            Some(chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0));
                         diesel::update(Events.find(id))
                             .set(&event[0])
                             .execute(&conn)

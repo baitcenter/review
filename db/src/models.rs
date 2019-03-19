@@ -17,7 +17,7 @@ pub struct CategoryTable {
 pub struct _DetectorsTable {
     pub detector_id: Option<i32>,
     pub detector_type: i32,
-    pub description: String,
+    pub description: Option<String>,
     pub input: Option<String>,
     pub local_db: Option<String>,
     pub output: String,
@@ -29,7 +29,7 @@ pub struct _DetectorsTable {
     pub last_modification_time: Option<String>,
 }
 
-#[derive(AsChangeset, Queryable, Serialize)]
+#[derive(Debug, AsChangeset, Insertable, Queryable, Serialize)]
 #[table_name = "Events"]
 pub struct EventsTable {
     pub event_id: Option<i32>,
@@ -43,7 +43,7 @@ pub struct EventsTable {
     pub status_id: i32,
     pub rules: Option<String>,
     pub signature: String,
-    pub last_modification_time: Option<String>,
+    pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Queryable, Serialize)]

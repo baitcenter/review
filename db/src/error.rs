@@ -1,4 +1,5 @@
 use diesel::result::Error as QueryResultError;
+use diesel::ConnectionError;
 use failure::{Backtrace, Context, Fail};
 use r2d2::Error as R2D2Error;
 use std::fmt;
@@ -10,6 +11,16 @@ pub enum ErrorKind {
     Query,
     #[fail(display = "An error occurred while connecting database")]
     R2D2,
+    #[fail(display = "diesel connection error")]
+    Connection,
+}
+
+impl From<ConnectionError> for Error {
+    fn from(error: ConnectionError) -> Error {
+        Error {
+            inner: error.context(ErrorKind::Connection),
+        }
+    }
 }
 
 impl From<QueryResultError> for Error {

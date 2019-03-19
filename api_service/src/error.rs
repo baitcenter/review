@@ -1,6 +1,7 @@
 use db::Error as DBError;
 use failure::{Backtrace, Context, Fail};
 use hyper::Error as HyperError;
+use serde_json::error::Error as JsonDeserializationError;
 use std::fmt;
 use std::fmt::Display;
 
@@ -10,6 +11,8 @@ pub enum ErrorKind {
     Hyper,
     #[fail(display = "An error occurred on database")]
     DB,
+    #[fail(display = "An error occurred while deserializing data in JSON format")]
+    SerdeJson,
 }
 
 impl From<DBError> for Error {
@@ -24,6 +27,14 @@ impl From<HyperError> for Error {
     fn from(error: HyperError) -> Error {
         Error {
             inner: error.context(ErrorKind::Hyper),
+        }
+    }
+}
+
+impl From<JsonDeserializationError> for Error {
+    fn from(error: JsonDeserializationError) -> Error {
+        Error {
+            inner: error.context(ErrorKind::SerdeJson),
         }
     }
 }

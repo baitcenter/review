@@ -1,7 +1,9 @@
 use futures::future;
 use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
+use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -45,7 +47,7 @@ impl ApiService {
     }
 
     pub fn request_handler(
-        &self,
+        self,
         req: Request<Body>,
     ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
@@ -134,17 +136,56 @@ impl ApiService {
                                     })
                                     .map_err(Into::into);
 
-                            Box::new(result)
-                        } else {
-                            Box::new(future::ok(ApiService::build_http_404_response()))
+                            return Box::new(result);
                         }
-                    } else {
-                        Box::new(future::ok(ApiService::build_http_404_response()))
                     }
+                    Box::new(future::ok(ApiService::build_http_404_response()))
                 }
                 _ => Box::new(future::ok(ApiService::build_http_404_response())),
             },
             None => match (req.method(), req.uri().path()) {
+                (&Method::POST, "/api/event") => {
+                    #[derive(Debug, Deserialize)]
+                    struct Cluster {
+                        cluster_id: String,
+                        detector_id: i32,
+                        rules: Option<String>,
+                        size: Option<usize>,
+                        signature: Option<String>,
+                        examples: Option<Vec<String>>,
+                    }
+                    let result = req
+                        .into_body()
+                        .concat2()
+                        .map_err(Into::into)
+                        .and_then(|buf| {
+                            serde_json::from_slice(&buf)
+                                .map(move |data: Vec<Cluster>| {
+                                    for d in &data {
+                                        db::DB::update_cluster(
+                                            &self.db,
+                                            &d.cluster_id.as_str(),
+                                            d.detector_id,
+                                            &d.rules,
+                                            d.size,
+                                            &d.signature,
+                                            &d.examples,
+                                        );
+                                    }
+                                })
+                                .map_err(Into::into)
+                        })
+                        .and_then(|_| {
+                            future::ok(
+                                Response::builder()
+                                    .status(StatusCode::OK)
+                                    .body(Body::from("Cluster information has been updated"))
+                                    .unwrap(),
+                            )
+                        });
+
+                    Box::new(result)
+                }
                 (&Method::GET, "/api/action") => {
                     let result = db::DB::get_action_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
