@@ -29,6 +29,13 @@ pub struct _DetectorsTable {
     pub last_modification_time: Option<String>,
 }
 
+#[derive(Debug, Queryable, QueryableByName, Serialize)]
+#[table_name = "Events"]
+pub struct ClusterExample {
+    cluster_id: Option<String>,
+    examples: Option<String>,
+}
+
 #[derive(Debug, AsChangeset, Insertable, Queryable, Serialize)]
 #[table_name = "Events"]
 pub struct EventsTable {

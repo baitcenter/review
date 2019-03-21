@@ -92,8 +92,107 @@ impl ApiService {
                         } else {
                             Box::new(future::ok(ApiService::build_http_404_response()))
                         }
+                    } else if let (Some(cluster_id), Some(max_cluster_count)) = (
+                        hash_query.get("cluster_id"),
+                        hash_query.get("max_cluster_count"),
+                    ) {
+                        if cluster_id == "all" && max_cluster_count == "all" {
+                            Box::new(future::ok(
+                                Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .body(Body::from("Invalid request"))
+                                    .unwrap(),
+                            ))
+                        } else if cluster_id == "all" {
+                            if let Ok(max_cluster_count) = max_cluster_count.parse::<usize>() {
+                                if max_cluster_count == 0 {
+                                    return Box::new(future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::BAD_REQUEST)
+                                            .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
+                                            .unwrap(),
+                                    ));
+                                }
+
+                                let result = db::DB::get_all_clusters_with_limit_num(
+                                    &self.db,
+                                    max_cluster_count,
+                                )
+                                .and_then(|clusters| match serde_json::to_string(&clusters) {
+                                    Ok(json) => future::ok(
+                                        Response::builder()
+                                            .header(header::CONTENT_TYPE, "application/json")
+                                            .body(Body::from(json))
+                                            .unwrap(),
+                                    ),
+                                    Err(_) => future::ok(ApiService::build_http_500_response()),
+                                })
+                                .map_err(Into::into);
+
+                                Box::new(result)
+                            } else {
+                                return Box::new(future::ok(
+                                    Response::builder()
+                                        .status(StatusCode::BAD_REQUEST)
+                                        .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
+                                        .unwrap(),
+                                ));
+                            }
+                        } else if max_cluster_count == "all" {
+                            let result = db::DB::get_cluster(&self.db, cluster_id)
+                                .and_then(|clusters| match serde_json::to_string(&clusters) {
+                                    Ok(json) => future::ok(
+                                        Response::builder()
+                                            .header(header::CONTENT_TYPE, "application/json")
+                                            .body(Body::from(json))
+                                            .unwrap(),
+                                    ),
+                                    Err(_) => future::ok(ApiService::build_http_500_response()),
+                                })
+                                .map_err(Into::into);
+
+                            Box::new(result)
+                        } else if let Ok(max_cluster_count) = max_cluster_count.parse::<usize>() {
+                            if max_cluster_count == 0 {
+                                return Box::new(future::ok(
+                                    Response::builder()
+                                        .status(StatusCode::BAD_REQUEST)
+                                        .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
+                                        .unwrap(),
+                                ));
+                            }
+                            let result = db::DB::get_cluster_with_limit_num(
+                                &self.db,
+                                cluster_id,
+                                max_cluster_count,
+                            )
+                            .and_then(|clusters| match serde_json::to_string(&clusters) {
+                                Ok(json) => future::ok(
+                                    Response::builder()
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Body::from(json))
+                                        .unwrap(),
+                                ),
+                                Err(_) => future::ok(ApiService::build_http_500_response()),
+                            })
+                            .map_err(Into::into);
+
+                            Box::new(result)
+                        } else {
+                            Box::new(future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::BAD_REQUEST)
+                                            .body(Body::from("cluster_id and max_cluster_count must be a positive integer value or 'all'"))
+                                            .unwrap(),
+                                    ))
+                        }
                     } else {
-                        Box::new(future::ok(ApiService::build_http_404_response()))
+                        Box::new(future::ok(
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from("Invalid request"))
+                                .unwrap(),
+                        ))
                     }
                 }
                 (&Method::PUT, "/api/event") => {
@@ -139,7 +238,12 @@ impl ApiService {
                             return Box::new(result);
                         }
                     }
-                    Box::new(future::ok(ApiService::build_http_404_response()))
+                    Box::new(future::ok(
+                        Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from("Invalid request"))
+                            .unwrap(),
+                    ))
                 }
                 _ => Box::new(future::ok(ApiService::build_http_404_response())),
             },

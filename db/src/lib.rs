@@ -121,6 +121,58 @@ impl DB {
         -1
     }
 
+    pub fn get_cluster(
+        &self,
+        c_id: &str,
+    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
+        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let query = format!(
+                "SELECT cluster_id, examples FROM Events WHERE cluster_id = '{}'",
+                c_id
+            );
+            diesel::sql_query(query)
+                .load::<ClusterExample>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(cluster)
+    }
+
+    pub fn get_cluster_with_limit_num(
+        &self,
+        c_id: &str,
+        limit_num: usize,
+    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
+        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let query = format!(
+                "SELECT cluster_id, examples FROM Events WHERE cluster_id = '{}' LIMIT {}",
+                c_id, limit_num
+            );
+            diesel::sql_query(query)
+                .load::<ClusterExample>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(cluster)
+    }
+
+    pub fn get_all_clusters_with_limit_num(
+        &self,
+        limit_num: usize,
+    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
+        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let query = format!(
+                "SELECT cluster_id, examples FROM Events LIMIT {}",
+                limit_num
+            );
+            diesel::sql_query(query)
+                .load::<ClusterExample>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(cluster)
+    }
+
     pub fn get_signature_by_qualifier(
         &self,
         q_id: i32,
