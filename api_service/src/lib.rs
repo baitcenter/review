@@ -52,7 +52,7 @@ impl ApiService {
     ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
-                (&Method::GET, "/api/event") => {
+                (&Method::GET, "/api/cluster") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
@@ -195,7 +195,7 @@ impl ApiService {
                         ))
                     }
                 }
-                (&Method::PUT, "/api/event") => {
+                (&Method::PUT, "/api/cluster") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
@@ -248,7 +248,7 @@ impl ApiService {
                 _ => Box::new(future::ok(ApiService::build_http_404_response())),
             },
             None => match (req.method(), req.uri().path()) {
-                (&Method::POST, "/api/event") => {
+                (&Method::POST, "/api/cluster") => {
                     #[derive(Debug, Deserialize)]
                     struct Cluster {
                         cluster_id: String,
@@ -322,7 +322,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/api/event") => {
+                (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_event_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
