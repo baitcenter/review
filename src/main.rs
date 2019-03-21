@@ -49,7 +49,7 @@ fn main() {
     //               |
     //  ----------------------------
     //   |                        |
-    // reviewd                   cli          LEVEL 1
+    // reviewd                 client         LEVEL 1
     //   |                     /     \
     // config           remake_files  url     LEVEL 2
     //
@@ -58,7 +58,7 @@ fn main() {
         .author("Petabi, Inc.")
         .setting(AppSettings::SubcommandRequired)
         .subcommand(
-            SubCommand::with_name("cli")
+            SubCommand::with_name("client")
                 .about("Runs REview client modes")
                 .arg(
                     Arg::with_name("cluster")
@@ -128,10 +128,10 @@ fn main() {
         )
         .get_matches();
 
-    if let Some(review_matches) = matches.subcommand_matches("cli") {
+    if let Some(review_matches) = matches.subcommand_matches("client") {
         if let Some(url) = review_matches.value_of("url") {
             validate_url(url);
-            let event_view = cli::EventView::new(&url);
+            let event_view = client::EventView::new(&url);
             match event_view {
                 Ok(mut event_view) => event_view.run(),
                 Err(e) => {
@@ -142,7 +142,7 @@ fn main() {
         } else if let Some(cluster) = review_matches.value_of("cluster") {
             let model = review_matches.value_of("model").unwrap();
             let raw = review_matches.value_of("raw").unwrap();
-            let cluster_view = cli::ClusterView::new(cluster, model, raw);
+            let cluster_view = client::ClusterView::new(cluster, model, raw);
             match cluster_view {
                 Ok(mut cluster_view) => cluster_view.run_feedback_mode(),
                 Err(e) => {

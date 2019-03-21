@@ -171,7 +171,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
+name = "client"
 version = "0.3.4"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1331,7 +1331,7 @@ version = "0.3.4"
 dependencies = [
  "api_service 0.3.4",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cli 0.3.4",
+ "client 0.3.4",
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.25 (registry+https://github.com/rust-lang/crates.io-index)",
