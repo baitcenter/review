@@ -709,56 +709,14 @@ impl<'a> ClusterView<'a> {
                                 &event_ids_to_keep,
                             ) {
                                 Ok(_) => {
-                                    let mut file_path = match Path::new(self.cluster_path).parent()
-                                    {
-                                        Some(path) => match path.to_str() {
-                                            Some(path) => path.to_string(),
-                                            None => {
-                                                let err_msg = format!(
-                                                    "An error occurs while parsing {}",
-                                                    self.cluster_path
-                                                );
-                                                ClusterView::create_popup_window_then_quit(
-                                                    &mut self.cursive,
-                                                    err_msg.as_str(),
-                                                );
-                                                // If we use unreachable or panic here,
-                                                // Cursive stops working without displaying
-                                                // above err_msg
-                                                String::new()
-                                            }
-                                        },
-                                        None => {
-                                            let err_msg = format!(
-                                                "An error occurs while parsing {}",
-                                                self.cluster_path
-                                            );
-                                            ClusterView::create_popup_window_then_quit(
-                                                &mut self.cursive,
-                                                err_msg.as_str(),
-                                            );
-                                            // If we use unreachable or panic here,
-                                            // Cursive stops working without displaying
-                                            // above err_msg
-                                            String::new()
-                                        }
-                                    };
-                                    if !file_path.ends_with('/') {
-                                        file_path.push_str("/");
-                                    }
-                                    file_path
-                                        .push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
-                                    file_path.push_str("_clusters");
-
                                     match ClusterView::write_clusters_file(
-                                        &file_path.as_str(),
+                                        &self.cluster_path,
                                         &cls,
                                     ) {
                                         Ok(_) => {
-                                            let msg = format!("Old events has been successfully deleted.\nNew cluster file {} is created.", file_path);
                                             ClusterView::create_popup_window_then_quit(
                                                 &mut self.cursive,
-                                                msg.as_str(),
+                                                "Old events has been successfully deleted.",
                                             );
                                         }
                                         Err(e) => {
