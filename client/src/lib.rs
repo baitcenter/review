@@ -702,28 +702,8 @@ impl<'a> ClusterView<'a> {
                         if let Ok(mut raw_event_db) =
                             RawEventDatabase::new(&Path::new(self.raw_db_path))
                         {
-                            let mut shrink_clusters: HashMap<usize, HashSet<u64>> = HashMap::new();
-                            let mut event_ids_to_keep: Vec<u64> = Vec::new();
-                            for (cluster_id, events) in cls.iter() {
-                                let mut events_vec = events.iter().cloned().collect::<Vec<_>>();
-                                if events.len() > 25 {
-                                    use std::iter::FromIterator;
-                                    events_vec.sort();
-                                    let (_, events_vec) =
-                                        events_vec.split_at(events_vec.len() - 25);
-                                    shrink_clusters.insert(
-                                        *cluster_id,
-                                        HashSet::from_iter(events_vec.iter().cloned()),
-                                    );
-                                    event_ids_to_keep.extend_from_slice(&events_vec);
-                                } else {
-                                    event_ids_to_keep.extend_from_slice(&events_vec);
-                                }
-                            }
-                            for (cluster_id, events) in shrink_clusters {
-                                cls.insert(cluster_id, events);
-                            }
-                            event_ids_to_keep.sort();
+                            let (cls, event_ids_to_keep) =
+                                remake::cluster::delete_old_events(&mut cls, 25);
                             match RawEventDatabase::shrink_to_fit(
                                 &mut raw_event_db,
                                 &event_ids_to_keep,
