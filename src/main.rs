@@ -154,6 +154,18 @@ fn main() {
     } else if let Some(reviewd_matches) = matches.subcommand_matches("reviewd") {
         dotenv::dotenv().ok();
         let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is not set.");
+        if std::fs::metadata(&database_url).is_err() {
+            if std::fs::metadata("/central_repo.db").is_ok() {
+                if fs::copy("/central_repo.db", &database_url).is_err() {
+                    eprintln!("cannot find the database file: {} and failed to copy database from /central_repo.db", database_url);
+                    std::process::exit(1);
+                }
+            } else {
+                eprintln!("cannot find the database file: {}", database_url);
+                std::process::exit(1);
+            }
+        }
+
         let config = reviewd_matches.value_of("config").unwrap();
         match read_config_file(config) {
             Ok(config) => {
@@ -168,7 +180,7 @@ fn main() {
                                 config.etcd_key.as_str(),
                             )
                             .map_err(|e| panic!("Initialization fails: {}", e))
-                            .and_then(move |srv| {
+                            .and_then(|srv| {
                                 service_fn(move |req| {
                                     api_service::ApiService::request_handler(srv.clone(), req)
                                         .then(api_service::ApiService::error_handler)
