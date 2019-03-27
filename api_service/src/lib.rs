@@ -225,13 +225,22 @@ impl ApiService {
                             }
                             let result =
                                 db::DB::update_qualifier_id(&self.db, event_id, qualifier_id)
-                                    .and_then(|_| {
-                                        future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::OK)
-                                                .body(Body::from("Database has been updated"))
-                                                .unwrap(),
-                                        )
+                                    .and_then(|return_value| {
+                                        if return_value != -1 {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::OK)
+                                                    .body(Body::from("Database has been updated"))
+                                                    .unwrap(),
+                                            )
+                                        } else {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::BAD_REQUEST)
+                                                    .body(Body::from("Invalid request"))
+                                                    .unwrap(),
+                                            )
+                                        }
                                     })
                                     .map_err(Into::into);
 

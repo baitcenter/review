@@ -221,10 +221,16 @@ impl DB {
                     None
                 };
 
+                // Signature is required field in central repo database
+                // but if new cluster information does not have signature field,
+                // we use '-' as a signature
+                let sig = match sig {
+                    Some(sig) => sig.clone(),
+                    None => "-".to_string(),
+                };
+
                 // We always insert 1 for category_id and priority_id,
                 // "unknown" for qualifier_id, and "review" for status_id.
-                // We also assume that REconverge alway sends signatures
-                // for new clusters
                 let event = EventsTable {
                     event_id: None,
                     cluster_id: Some(c_id.to_string()),
@@ -236,7 +242,7 @@ impl DB {
                     qualifier_id: unknown.unwrap().qualifier_id.unwrap(),
                     status_id: review.unwrap().status_id.unwrap(),
                     rules: rule.clone(),
-                    signature: sig.clone().unwrap(),
+                    signature: sig,
                     last_modification_time: None,
                 };
                 let _ = diesel::insert_into(Events).values(&event).execute(&conn);
@@ -279,32 +285,44 @@ impl DB {
 
     pub fn update_qualifier_id(
         &self,
-        id: i32,
+        e_id: i32,
         new_qualifier_id: i32,
-    ) -> impl Future<Item = usize, Error = Error> {
+    ) -> Box<Future<Item = i8, Error = Error> + Send + 'static> {
         let conn = self.pool.get().unwrap();
-        DB::get_status_table(&self)
-            .and_then(move |status_table| {
-                let active = status_table.iter().find(|x| x.status == "active");
-                let result = Events
-                    .filter(schema::Events::dsl::event_id.eq(id))
-                    .load::<EventsTable>(&conn)
-                    .map_err(Into::into)
-                    .and_then(|mut event| {
-                        event[0].event_id = None;
-                        event[0].qualifier_id = new_qualifier_id;
-                        event[0].status_id = active.unwrap().status_id.unwrap();
-                        let now = chrono::Utc::now();
-                        event[0].last_modification_time =
-                            Some(chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0));
-                        diesel::update(Events.find(id))
-                            .set(&event[0])
-                            .execute(&conn)
-                            .map_err(Into::into)
-                    });
 
-                future::result(result)
-            })
-            .map_err(Into::into)
+        let q_id_check = Qualifier
+            .filter(schema::Qualifier::dsl::qualifier_id.eq(new_qualifier_id))
+            .load::<QualifierTable>(&conn);
+        if q_id_check.is_ok() && q_id_check.unwrap().is_empty() {
+            return Box::new(futures::future::ok(-1));
+        }
+
+        let active = match Status.load::<StatusTable>(&conn) {
+            Ok(status_table) => {
+                let active = status_table.iter().find(|x| x.status == "active");
+                active.unwrap().status_id.unwrap()
+            }
+            Err(_) => return Box::new(futures::future::ok(-1)),
+        };
+        let record_check = Events
+            .filter(schema::Events::dsl::detector_id.eq(e_id))
+            .load::<EventsTable>(&conn);
+
+        if record_check.is_ok() && !record_check.unwrap().is_empty() {
+            let target = Events.filter(schema::Events::dsl::event_id.eq(e_id));
+            let now = chrono::Utc::now();
+            let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+            let _ = diesel::update(target)
+                .set((
+                    schema::Events::dsl::qualifier_id.eq(new_qualifier_id),
+                    schema::Events::dsl::status_id.eq(active),
+                    schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                ))
+                .execute(&conn);
+
+            return Box::new(futures::future::ok(0));
+        }
+
+        Box::new(futures::future::ok(-1))
     }
 }
