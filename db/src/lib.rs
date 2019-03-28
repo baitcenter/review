@@ -204,7 +204,8 @@ impl DB {
             .load::<EventsTable>(&conn);
 
         if record_check.is_ok() {
-            if record_check.unwrap().is_empty() {
+            let record_check = record_check.unwrap();
+            if record_check.is_empty() {
                 let unknown = Qualifier.load::<QualifierTable>(&conn);
                 let review = Status.load::<StatusTable>(&conn);
                 let (review, unknown) = if let (Ok(review), Ok(unknown)) = (review, unknown) {
@@ -253,31 +254,27 @@ impl DB {
                     .filter(schema::Events::dsl::cluster_id.eq(c_id));
                 let now = chrono::Utc::now();
                 let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                if rule.is_some() {
-                    let _ = diesel::update(target)
-                        .set((
-                            schema::Events::dsl::rules.eq(rule.clone()),
-                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
-                        ))
-                        .execute(&conn);
-                }
-                if let Some(sig) = sig {
-                    let _ = diesel::update(target)
-                        .set((
-                            schema::Events::dsl::signature.eq(sig.clone()),
-                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
-                        ))
-                        .execute(&conn);
-                }
-                if let Some(example) = eg {
-                    let example = Some(example.join("\n"));
-                    let _ = diesel::update(target)
-                        .set((
-                            schema::Events::dsl::examples.eq(example),
-                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
-                        ))
-                        .execute(&conn);
-                }
+                let rule = match rule {
+                    Some(rule) => Some(rule.clone()),
+                    None => record_check[0].rules.clone(),
+                };
+                let sig = match sig {
+                    Some(sig) => sig.clone(),
+                    None => record_check[0].signature.clone(),
+                };
+                let example = match eg {
+                    Some(example) => Some(example.join("\n")),
+                    None => record_check[0].examples.clone(),
+                };
+
+                let _ = diesel::update(target)
+                    .set((
+                        schema::Events::dsl::rules.eq(rule),
+                        schema::Events::dsl::signature.eq(sig),
+                        schema::Events::dsl::examples.eq(example),
+                        schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                    ))
+                    .execute(&conn);
             }
         }
         Box::new(futures::future::ok(()))
