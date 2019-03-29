@@ -13,22 +13,6 @@ pub struct CategoryTable {
     pub category: String,
 }
 
-#[derive(Queryable, Serialize)]
-pub struct _DetectorsTable {
-    pub detector_id: Option<i32>,
-    pub detector_type: i32,
-    pub description: Option<String>,
-    pub input: Option<String>,
-    pub local_db: Option<String>,
-    pub output: String,
-    pub status_id: i32,
-    pub suspicious_token: Option<String>,
-    pub target_detector_id: Option<i32>,
-    pub time_regex: Option<String>,
-    pub time_format: Option<String>,
-    pub last_modification_time: Option<String>,
-}
-
 #[derive(Debug, Queryable, QueryableByName, Serialize)]
 #[table_name = "Events"]
 pub struct ClusterExample {
@@ -63,15 +47,6 @@ pub struct PriorityTable {
 pub struct QualifierTable {
     pub qualifier_id: Option<i32>,
     pub qualifier: String,
-}
-
-#[derive(Queryable, Serialize)]
-pub struct _ReadyTable {
-    pub publish_id: Option<i32>,
-    pub action_id: i32,
-    pub event_id: Option<i32>,
-    pub detector_id: Option<i32>,
-    pub time_published: Option<i32>,
 }
 
 #[derive(Queryable, Serialize)]

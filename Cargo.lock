@@ -37,7 +37,7 @@ name = "api_service"
 version = "0.3.4"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "db 0.3.4",
+ "db 0.3.5",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -292,7 +292,7 @@ dependencies = [
 
 [[package]]
 name = "db"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "diesel 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1327,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "review"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "api_service 0.3.4",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
