@@ -175,7 +175,7 @@ fn main() {
                 if let Ok(reviewd_addr) = config.reviewd_addr.parse() {
                     let server = Server::bind(&reviewd_addr)
                         .serve(move || {
-                            let etcd_url = format!("http://{}/v3/kv/put", config.etcd_addr);
+                            let etcd_url = format!("http://{}/v3beta/kv/put", config.etcd_addr);
                             let api_service = api_service::ApiService::new(
                                 &database_url,
                                 config.reviewd_addr.as_str(),
