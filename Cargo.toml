@@ -1,6 +1,6 @@
 [package]
 name = "review"
-version = "0.3.7"
+version = "0.3.8"
 authors = [
     "Atsushi Yoshioka <yoshioka@petabi.com>",
     "Min Kim <msk@petabi.com>",

@@ -709,10 +709,8 @@ impl<'a> ClusterView<'a> {
                                 &event_ids_to_keep,
                             ) {
                                 Ok(_) => {
-                                    match ClusterView::write_clusters_file(
-                                        &self.cluster_path,
-                                        &cls,
-                                    ) {
+                                    match ClusterView::write_clusters_file(&self.cluster_path, &cls)
+                                    {
                                         Ok(_) => {
                                             ClusterView::create_popup_window_then_quit(
                                                 &mut self.cursive,
