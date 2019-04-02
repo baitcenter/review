@@ -203,7 +203,7 @@ impl<'a> EventView<'a> {
             .find(|&x| x.1.to_lowercase() == "review")
             .unwrap()
             .0;
-        let event_url = format!("{}/api/event?status_id={}", url, review_id);
+        let event_url = format!("{}/api/cluster?status_id={}", url, review_id);
         match reqwest::get(event_url.as_str()) {
             Ok(mut resp) => match resp.json() as Result<Vec<Event>, reqwest::Error> {
                 Ok(data) => {
@@ -354,7 +354,7 @@ impl<'a> EventView<'a> {
                         let mut send_err: Vec<u32> = Vec::new();
                         for (event_id, qualifier_id) in &self.is_event_updated {
                             let url = format!(
-                                "{}/api/event?event_id={}&qualifier_id={}",
+                                "{}/api/cluster?event_id={}&qualifier_id={}",
                                 self.url, event_id, qualifier_id
                             );
                             let client = reqwest::Client::new();

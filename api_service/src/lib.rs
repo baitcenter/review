@@ -208,7 +208,7 @@ impl ApiService {
                             let benign_id = db::DB::get_benign_id(&self.db);
                             if qualifier_id == benign_id {
                                 let value = format!(
-                                    "http://{}/api/event?qualifier_id={}",
+                                    "http://{}/api/cluster?qualifier_id={}",
                                     &self.reviewd_addr, benign_id,
                                 );
                                 let data = format!(
