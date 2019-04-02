@@ -307,7 +307,7 @@ impl DB {
             Err(_) => return Box::new(futures::future::ok(-1)),
         };
         let record_check = Events
-            .filter(schema::Events::dsl::detector_id.eq(e_id))
+            .filter(schema::Events::dsl::event_id.eq(e_id))
             .load::<EventsTable>(&conn);
 
         if record_check.is_ok() && !record_check.unwrap().is_empty() {
