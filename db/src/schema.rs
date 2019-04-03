@@ -27,6 +27,7 @@ table! {
         status_id -> Integer,
         rules -> Nullable<Text>,
         signature -> Text,
+        size -> Text,
         last_modification_time -> Nullable<Timestamp>,
     }
 }

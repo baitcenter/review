@@ -193,7 +193,7 @@ impl DB {
         c_id: &str,
         d_id: i32,
         rule: &Option<String>,
-        _size: Option<usize>,
+        cluster_size: Option<usize>,
         sig: &Option<String>,
         eg: &Option<Vec<String>>,
     ) -> Box<Future<Item = (), Error = Error>> {
@@ -228,7 +228,10 @@ impl DB {
                     Some(sig) => sig.clone(),
                     None => "-".to_string(),
                 };
-
+                let cluster_size = match cluster_size {
+                    Some(cluster_size) => cluster_size.to_string(),
+                    None => "1".to_string(),
+                };
                 // We always insert 1 for category_id and priority_id,
                 // "unknown" for qualifier_id, and "review" for status_id.
                 let event = EventsTable {
@@ -243,6 +246,7 @@ impl DB {
                     status_id: review.unwrap().status_id.unwrap(),
                     rules: rule.clone(),
                     signature: sig,
+                    size: cluster_size,
                     last_modification_time: None,
                 };
                 let _ = diesel::insert_into(Events).values(&event).execute(&conn);
@@ -253,7 +257,7 @@ impl DB {
                     .filter(schema::Events::dsl::cluster_id.eq(c_id));
                 let now = chrono::Utc::now();
                 let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                if rule.is_some() || sig.is_some() || eg.is_some() {
+                if rule.is_some() || sig.is_some() || eg.is_some() || cluster_size.is_some() {
                     let rule = match rule {
                         Some(rule) => Some(rule.clone()),
                         None => record_check[0].rules.clone(),
@@ -266,19 +270,32 @@ impl DB {
                         Some(example) => Some(example.join("\n")),
                         None => record_check[0].examples.clone(),
                     };
-                    if rule != record_check[0].rules
-                        || sig != record_check[0].signature
-                        || example != record_check[0].examples
-                    {
-                        let _ = diesel::update(target)
-                            .set((
-                                schema::Events::dsl::rules.eq(rule),
-                                schema::Events::dsl::signature.eq(sig),
-                                schema::Events::dsl::examples.eq(example),
-                                schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
-                            ))
-                            .execute(&conn);
-                    }
+                    let cluster_size = match cluster_size {
+                        Some(new_size) => {
+                            if let Ok(current_size) = record_check[0].size.clone().parse::<usize>()
+                            {
+                                // check if sum of new_size and current_size exceeds max_value
+                                // if it does, we cannot calculate sum anymore, so reset the value of size
+                                if new_size > usize::max_value() - current_size {
+                                    new_size.to_string()
+                                } else {
+                                    (current_size + new_size).to_string()
+                                }
+                            } else {
+                                record_check[0].size.clone()
+                            }
+                        }
+                        None => record_check[0].size.clone(),
+                    };
+                    let _ = diesel::update(target)
+                        .set((
+                            schema::Events::dsl::rules.eq(rule),
+                            schema::Events::dsl::signature.eq(sig),
+                            schema::Events::dsl::examples.eq(example),
+                            schema::Events::dsl::size.eq(cluster_size),
+                            schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+                        ))
+                        .execute(&conn);
                 }
             }
         }

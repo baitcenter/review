@@ -58,6 +58,7 @@ CREATE TABLE Events (
   status_id INTEGER NOT NULL,
   rules TEXT,
   signature TEXT NOT NULL,
+  size TEXT NOT NULL DEFAULT "1",
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
   FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,

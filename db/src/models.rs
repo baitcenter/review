@@ -34,6 +34,7 @@ pub struct EventsTable {
     pub status_id: i32,
     pub rules: Option<String>,
     pub signature: String,
+    pub size: String,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
