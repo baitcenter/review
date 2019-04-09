@@ -16,8 +16,8 @@ pub struct CategoryTable {
 #[derive(Debug, Queryable, QueryableByName, Serialize)]
 #[table_name = "Events"]
 pub struct ClusterExample {
-    cluster_id: Option<String>,
-    examples: Option<String>,
+    pub cluster_id: Option<String>,
+    pub examples: Option<Vec<u8>>,
 }
 
 #[derive(Debug, AsChangeset, Insertable, Queryable, Serialize)]
@@ -28,7 +28,7 @@ pub struct EventsTable {
     pub description: Option<String>,
     pub category_id: i32,
     pub detector_id: i32,
-    pub examples: Option<String>,
+    pub examples: Option<Vec<u8>>,
     pub priority_id: i32,
     pub qualifier_id: i32,
     pub status_id: i32,

@@ -52,7 +52,7 @@ CREATE TABLE Events (
   description TEXT,
   category_id INTEGER NOT NULL,
   detector_id INTEGER NOT NULL,
-  examples TEXT,
+  examples BLOB,
   priority_id INTEGER NOT NULL,
   qualifier_id INTEGER NOT NULL,
   status_id INTEGER NOT NULL,

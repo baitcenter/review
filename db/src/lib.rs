@@ -195,7 +195,7 @@ impl DB {
         rule: &Option<String>,
         cluster_size: Option<usize>,
         sig: &Option<String>,
-        eg: &Option<Vec<String>>,
+        eg: &Option<Vec<(usize, String)>>,
     ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
         let record_check = Events
@@ -214,11 +214,12 @@ impl DB {
                 };
                 let review = review.iter().find(|x| x.status == "review");
                 let unknown = unknown.iter().find(|x| x.qualifier == "unknown");
-
-                let example = if let Some(eg) = eg {
-                    Some(eg.join("\n"))
-                } else {
-                    None
+                let example = match eg {
+                    Some(eg) => match rmp_serde::encode::to_vec(eg) {
+                        Ok(eg) => Some(eg),
+                        Err(_) => None,
+                    },
+                    None => None,
                 };
 
                 // Signature is required field in central repo database
@@ -266,10 +267,7 @@ impl DB {
                         Some(sig) => sig.clone(),
                         None => record_check[0].signature.clone(),
                     };
-                    let example = match eg {
-                        Some(example) => Some(example.join("\n")),
-                        None => record_check[0].examples.clone(),
-                    };
+                    let example = DB::merge_examples(record_check[0].examples.clone(), eg.clone());
                     let cluster_size = match cluster_size {
                         Some(new_size) => {
                             if let Ok(current_size) = record_check[0].size.clone().parse::<usize>()
@@ -300,6 +298,51 @@ impl DB {
             }
         }
         Box::new(futures::future::ok(()))
+    }
+
+    fn merge_examples(
+        current_examples: Option<Vec<u8>>,
+        new_examples: Option<Vec<(usize, String)>>,
+    ) -> Option<Vec<u8>> {
+        const MAX_EXAMPLES_NUM: usize = 25;
+
+        match new_examples {
+            Some(new_eg) => {
+                if new_eg.len() >= MAX_EXAMPLES_NUM {
+                    match rmp_serde::encode::to_vec(&new_eg) {
+                        Ok(new_eg) => Some(new_eg),
+                        Err(_) => current_examples,
+                    }
+                } else if let Some(current_eg) = current_examples.clone() {
+                    match rmp_serde::decode::from_slice(&current_eg)
+                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
+                    {
+                        Ok(mut current_eg) => {
+                            current_eg.extend(new_eg);
+                            if current_eg.len() > MAX_EXAMPLES_NUM {
+                                current_eg.sort();
+                                let (_, current_eg) =
+                                    current_eg.split_at(current_eg.len() - MAX_EXAMPLES_NUM);
+
+                                match rmp_serde::encode::to_vec(&current_eg) {
+                                    Ok(eg) => Some(eg),
+                                    Err(_) => current_examples,
+                                }
+                            } else {
+                                match rmp_serde::encode::to_vec(&current_eg) {
+                                    Ok(eg) => Some(eg),
+                                    Err(_) => current_examples,
+                                }
+                            }
+                        }
+                        Err(_) => current_examples,
+                    }
+                } else {
+                    None
+                }
+            }
+            None => current_examples,
+        }
     }
 
     pub fn update_qualifier_id(

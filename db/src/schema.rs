@@ -21,7 +21,7 @@ table! {
         description -> Nullable<Text>,
         category_id -> Integer,
         detector_id -> Integer,
-        examples -> Nullable<Text>,
+        examples -> Nullable<Binary>,
         priority_id -> Integer,
         qualifier_id -> Integer,
         status_id -> Integer,

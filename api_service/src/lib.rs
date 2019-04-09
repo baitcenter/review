@@ -3,7 +3,7 @@ use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -96,6 +96,11 @@ impl ApiService {
                         hash_query.get("cluster_id"),
                         hash_query.get("max_cluster_count"),
                     ) {
+                        #[derive(Debug, Serialize)]
+                        struct Clusters {
+                            cluster_id: Option<String>,
+                            examples: Option<Vec<(usize, String)>>,
+                        }
                         if cluster_id == "all" && max_cluster_count == "all" {
                             Box::new(future::ok(
                                 Response::builder()
@@ -118,14 +123,36 @@ impl ApiService {
                                     &self.db,
                                     max_cluster_count,
                                 )
-                                .and_then(|clusters| match serde_json::to_string(&clusters) {
-                                    Ok(json) => future::ok(
-                                        Response::builder()
-                                            .header(header::CONTENT_TYPE, "application/json")
-                                            .body(Body::from(json))
-                                            .unwrap(),
-                                    ),
-                                    Err(_) => future::ok(ApiService::build_http_500_response()),
+                                .and_then(|data| {
+                                    let mut clusters: Vec<Clusters> = Vec::new();
+                                    for d in data {
+                                        let eg = match d.examples {
+                                            Some(eg) => {
+                                                match rmp_serde::decode::from_slice(&eg)
+                                                    as Result<
+                                                        Vec<(usize, String)>,
+                                                        rmp_serde::decode::Error,
+                                                    > {
+                                                    Ok(eg) => Some(eg),
+                                                    Err(_) => None,
+                                                }
+                                            }
+                                            None => None,
+                                        };
+                                        clusters.push(Clusters {
+                                            cluster_id: d.cluster_id,
+                                            examples: eg,
+                                        });
+                                    }
+                                    match serde_json::to_string(&clusters) {
+                                        Ok(json) => future::ok(
+                                            Response::builder()
+                                                .header(header::CONTENT_TYPE, "application/json")
+                                                .body(Body::from(json))
+                                                .unwrap(),
+                                        ),
+                                        Err(_) => future::ok(ApiService::build_http_500_response()),
+                                    }
                                 })
                                 .map_err(Into::into);
 
@@ -140,14 +167,36 @@ impl ApiService {
                             }
                         } else if max_cluster_count == "all" {
                             let result = db::DB::get_cluster(&self.db, cluster_id)
-                                .and_then(|clusters| match serde_json::to_string(&clusters) {
-                                    Ok(json) => future::ok(
-                                        Response::builder()
-                                            .header(header::CONTENT_TYPE, "application/json")
-                                            .body(Body::from(json))
-                                            .unwrap(),
-                                    ),
-                                    Err(_) => future::ok(ApiService::build_http_500_response()),
+                                .and_then(|data| {
+                                    let mut clusters: Vec<Clusters> = Vec::new();
+                                    for d in data {
+                                        let eg = match d.examples {
+                                            Some(eg) => {
+                                                match rmp_serde::decode::from_slice(&eg)
+                                                    as Result<
+                                                        Vec<(usize, String)>,
+                                                        rmp_serde::decode::Error,
+                                                    > {
+                                                    Ok(eg) => Some(eg),
+                                                    Err(_) => None,
+                                                }
+                                            }
+                                            None => None,
+                                        };
+                                        clusters.push(Clusters {
+                                            cluster_id: d.cluster_id,
+                                            examples: eg,
+                                        });
+                                    }
+                                    match serde_json::to_string(&clusters) {
+                                        Ok(json) => future::ok(
+                                            Response::builder()
+                                                .header(header::CONTENT_TYPE, "application/json")
+                                                .body(Body::from(json))
+                                                .unwrap(),
+                                        ),
+                                        Err(_) => future::ok(ApiService::build_http_500_response()),
+                                    }
                                 })
                                 .map_err(Into::into);
 
@@ -166,14 +215,36 @@ impl ApiService {
                                 cluster_id,
                                 max_cluster_count,
                             )
-                            .and_then(|clusters| match serde_json::to_string(&clusters) {
-                                Ok(json) => future::ok(
-                                    Response::builder()
-                                        .header(header::CONTENT_TYPE, "application/json")
-                                        .body(Body::from(json))
-                                        .unwrap(),
-                                ),
-                                Err(_) => future::ok(ApiService::build_http_500_response()),
+                            .and_then(|data| {
+                                let mut clusters: Vec<Clusters> = Vec::new();
+                                for d in data {
+                                    let eg = match d.examples {
+                                        Some(eg) => {
+                                            match rmp_serde::decode::from_slice(&eg)
+                                                as Result<
+                                                    Vec<(usize, String)>,
+                                                    rmp_serde::decode::Error,
+                                                > {
+                                                Ok(eg) => Some(eg),
+                                                Err(_) => None,
+                                            }
+                                        }
+                                        None => None,
+                                    };
+                                    clusters.push(Clusters {
+                                        cluster_id: d.cluster_id,
+                                        examples: eg,
+                                    });
+                                }
+                                match serde_json::to_string(&clusters) {
+                                    Ok(json) => future::ok(
+                                        Response::builder()
+                                            .header(header::CONTENT_TYPE, "application/json")
+                                            .body(Body::from(json))
+                                            .unwrap(),
+                                    ),
+                                    Err(_) => future::ok(ApiService::build_http_500_response()),
+                                }
                             })
                             .map_err(Into::into);
 
@@ -265,7 +336,7 @@ impl ApiService {
                         rules: Option<String>,
                         size: Option<usize>,
                         signature: Option<String>,
-                        examples: Option<Vec<String>>,
+                        examples: Option<Vec<(usize, String)>>,
                     }
                     let result = req
                         .into_body()
@@ -333,14 +404,57 @@ impl ApiService {
 
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_event_table(&self.db)
-                        .and_then(|data| match serde_json::to_string(&data) {
-                            Ok(json) => future::ok(
-                                Response::builder()
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Body::from(json))
-                                    .unwrap(),
-                            ),
-                            Err(_) => future::ok(ApiService::build_http_500_response()),
+                        .and_then(|data| {
+                            #[derive(Debug, Serialize)]
+                            struct Clusters {
+                                cluster_id: Option<String>,
+                                description: Option<String>,
+                                detector_id: i32,
+                                qualifier_id: i32,
+                                status_id: i32,
+                                rules: Option<String>,
+                                signature: String,
+                                examples: Option<Vec<(usize, String)>>,
+                                size: String,
+                                last_modification_time: Option<chrono::NaiveDateTime>,
+                            }
+                            let mut clusters: Vec<Clusters> = Vec::new();
+                            for d in data {
+                                let eg = match d.examples {
+                                    Some(eg) => {
+                                        match rmp_serde::decode::from_slice(&eg)
+                                            as Result<
+                                                Vec<(usize, String)>,
+                                                rmp_serde::decode::Error,
+                                            > {
+                                            Ok(eg) => Some(eg),
+                                            Err(_) => None,
+                                        }
+                                    }
+                                    None => None,
+                                };
+                                clusters.push(Clusters {
+                                    cluster_id: d.cluster_id,
+                                    description: d.description,
+                                    detector_id: d.detector_id,
+                                    qualifier_id: d.qualifier_id,
+                                    status_id: d.status_id,
+                                    rules: d.rules,
+                                    signature: d.signature,
+                                    examples: eg,
+                                    size: d.size,
+                                    last_modification_time: d.last_modification_time,
+                                });
+                            }
+                            match serde_json::to_string(&clusters) {
+                                Ok(json) => future::ok(
+                                    Response::builder()
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Body::from(json))
+                                        .unwrap(),
+                                ),
+                                Err(_) => future::ok(ApiService::build_http_500_response()),
+                            }
                         })
                         .map_err(Into::into);
 
