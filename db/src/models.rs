@@ -43,10 +43,8 @@ pub struct EventsTable {
 #[table_name = "Outliers"]
 pub struct OutliersTable {
     pub outlier_id: Option<i32>,
-    pub outlier_name: Vec<u8>,
+    pub outlier_raw_event: Vec<u8>,
     pub data_source: String,
-    pub examples: Option<Vec<u8>>,
-    pub size: String,
 }
 
 #[derive(Queryable, Serialize)]

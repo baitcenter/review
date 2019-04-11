@@ -203,53 +203,21 @@ impl DB {
         &self,
         outlier: &[u8],
         outlier_data_source: &str,
-        outlier_examples: &[(usize, String)],
     ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
         let record_check = Outliers
-            .filter(schema::Outliers::dsl::outlier_name.eq(outlier))
+            .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
             .filter(schema::Outliers::dsl::data_source.eq(data_source))
             .load::<OutliersTable>(&conn);
 
         if let Ok(record_check) = record_check {
             if record_check.is_empty() {
-                let outlier_egs = match rmp_serde::encode::to_vec(&outlier_examples) {
-                    Ok(ids) => Some(ids),
-                    Err(_) => None,
-                };
-                let outlier_size = outlier_examples.len().to_string();
-                let outlier = OutliersTable {
+                let o = OutliersTable {
                     outlier_id: None,
-                    outlier_name: outlier.to_vec(),
-                    examples: outlier_egs,
+                    outlier_raw_event: outlier.to_vec(),
                     data_source: outlier_data_source.to_string(),
-                    size: outlier_size,
                 };
-                let _ = diesel::insert_into(Outliers)
-                    .values(&outlier)
-                    .execute(&conn);
-            } else {
-                let new_size = outlier_examples.len();
-                let new_size =
-                    if let Ok(current_size) = record_check[0].size.clone().parse::<usize>() {
-                        DB::calc_new_size(new_size, current_size)
-                    } else {
-                        new_size.to_string()
-                    };
-                let example = DB::merge_examples(
-                    record_check[0].examples.clone(),
-                    Some(outlier_examples.to_vec()),
-                );
-                let target = Outliers
-                    .filter(schema::Outliers::dsl::outlier_name.eq(outlier))
-                    .filter(schema::Outliers::dsl::data_source.eq(outlier_data_source));
-
-                let _ = diesel::update(target)
-                    .set((
-                        schema::Outliers::dsl::examples.eq(example),
-                        schema::Outliers::dsl::size.eq(new_size),
-                    ))
-                    .execute(&conn);
+                let _ = diesel::insert_into(Outliers).values(&o).execute(&conn);
             }
         }
         Box::new(futures::future::ok(()))
@@ -339,7 +307,13 @@ impl DB {
                         Some(new_size) => {
                             if let Ok(current_size) = record_check[0].size.clone().parse::<usize>()
                             {
-                                DB::calc_new_size(new_size, current_size)
+                                // check if sum of new_size and current_size exceeds max_value
+                                // if it does, we cannot calculate sum anymore, so reset the value of size
+                                if new_size > usize::max_value() - current_size {
+                                    new_size.to_string()
+                                } else {
+                                    (current_size + new_size).to_string()
+                                }
                             } else {
                                 record_check[0].size.clone()
                             }
@@ -359,16 +333,6 @@ impl DB {
             }
         }
         Box::new(futures::future::ok(()))
-    }
-
-    fn calc_new_size(new_size: usize, current_size: usize) -> String {
-        // check if sum of new_size and current_size exceeds max_value
-        // if it does, we cannot calculate sum anymore, so reset the value of size
-        if new_size > usize::max_value() - current_size {
-            new_size.to_string()
-        } else {
-            (current_size + new_size).to_string()
-        }
     }
 
     fn merge_examples(

@@ -35,10 +35,8 @@ table! {
 table! {
     Outliers (outlier_id) {
         outlier_id -> Nullable<Integer>,
-        outlier_name -> Binary,
+        outlier_raw_event -> Binary,
         data_source -> Text,
-        examples -> Nullable<Binary>,
-        size -> Text,
     }
 }
 

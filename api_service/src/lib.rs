@@ -373,9 +373,8 @@ impl ApiService {
                 (&Method::POST, "/api/outlier") => {
                     #[derive(Debug, Deserialize)]
                     struct Outliers {
-                        outlier_name: Vec<u8>,
+                        outlier: Vec<u8>,
                         data_source: String,
-                        examples: Vec<(usize, String)>,
                     }
                     let result = req
                         .into_body()
@@ -387,9 +386,8 @@ impl ApiService {
                                     for d in &data {
                                         db::DB::update_outlier(
                                             &self.db,
-                                            &d.outlier_name,
+                                            &d.outlier,
                                             &d.data_source,
-                                            &d.examples,
                                         );
                                     }
                                 })
@@ -502,28 +500,14 @@ impl ApiService {
                         .and_then(|data| {
                             #[derive(Debug, Serialize)]
                             struct Outliers {
-                                outlier_name: String,
+                                outlier: String,
                                 data_source: String,
-                                size: String,
-                                examples: Option<Vec<(usize, String)>>,
                             }
                             let mut outliers: Vec<Outliers> = Vec::new();
                             for d in data {
-                                let examples = if let Some(egs) = &d.examples {
-                                    match rmp_serde::decode::from_slice(&egs)
-                                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
-                                    {
-                                        Ok(ids) => Some(ids),
-                                        Err(_) => None,
-                                    }
-                                } else {
-                                    None
-                                };
                                 outliers.push(Outliers {
-                                    outlier_name: ApiService::bytes_to_string(&d.outlier_name),
+                                    outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
                                     data_source: d.data_source,
-                                    size: d.size,
-                                    examples,
                                 });
                             }
 
