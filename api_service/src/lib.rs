@@ -370,6 +370,42 @@ impl ApiService {
 
                     Box::new(result)
                 }
+                (&Method::POST, "/api/outlier") => {
+                    #[derive(Debug, Deserialize)]
+                    struct Outliers {
+                        outlier_name: Vec<u8>,
+                        data_source: String,
+                        examples: Vec<(usize, String)>,
+                    }
+                    let result = req
+                        .into_body()
+                        .concat2()
+                        .map_err(Into::into)
+                        .and_then(|buf| {
+                            serde_json::from_slice(&buf)
+                                .map(move |data: Vec<Outliers>| {
+                                    for d in &data {
+                                        db::DB::update_outlier(
+                                            &self.db,
+                                            &d.outlier_name,
+                                            &d.data_source,
+                                            &d.examples,
+                                        );
+                                    }
+                                })
+                                .map_err(Into::into)
+                        })
+                        .and_then(|_| {
+                            future::ok(
+                                Response::builder()
+                                    .status(StatusCode::OK)
+                                    .body(Body::from("Outlier information has been updated"))
+                                    .unwrap(),
+                            )
+                        });
+
+                    Box::new(result)
+                }
                 (&Method::GET, "/api/action") => {
                     let result = db::DB::get_action_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
@@ -461,6 +497,51 @@ impl ApiService {
                     Box::new(result)
                 }
 
+                (&Method::GET, "/api/outlier") => {
+                    let result = db::DB::get_outliers_table(&self.db)
+                        .and_then(|data| {
+                            #[derive(Debug, Serialize)]
+                            struct Outliers {
+                                outlier_name: String,
+                                data_source: String,
+                                size: String,
+                                examples: Option<Vec<(usize, String)>>,
+                            }
+                            let mut outliers: Vec<Outliers> = Vec::new();
+                            for d in data {
+                                let examples = if let Some(egs) = &d.examples {
+                                    match rmp_serde::decode::from_slice(&egs)
+                                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
+                                    {
+                                        Ok(ids) => Some(ids),
+                                        Err(_) => None,
+                                    }
+                                } else {
+                                    None
+                                };
+                                outliers.push(Outliers {
+                                    outlier_name: ApiService::bytes_to_string(&d.outlier_name),
+                                    data_source: d.data_source,
+                                    size: d.size,
+                                    examples,
+                                });
+                            }
+
+                            match serde_json::to_string(&outliers) {
+                                Ok(json) => future::ok(
+                                    Response::builder()
+                                        .header(header::CONTENT_TYPE, "application/json")
+                                        .body(Body::from(json))
+                                        .unwrap(),
+                                ),
+                                Err(_) => future::ok(ApiService::build_http_500_response()),
+                            }
+                        })
+                        .map_err(Into::into);
+
+                    Box::new(result)
+                }
+
                 (&Method::GET, "/api/priority") => {
                     let result = db::DB::get_priority_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
@@ -536,6 +617,10 @@ impl ApiService {
                 Box::new(future::ok(res.map(Into::into)))
             }
         }
+    }
+
+    fn bytes_to_string(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| char::from(*b)).collect()
     }
 
     fn build_http_500_response() -> Response<Body> {

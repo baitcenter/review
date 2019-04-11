@@ -1,4 +1,5 @@
 use super::schema::Events;
+use super::schema::Outliers;
 use serde::Serialize;
 
 #[derive(Queryable, Serialize)]
@@ -36,6 +37,16 @@ pub struct EventsTable {
     pub signature: String,
     pub size: String,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(Insertable, AsChangeset, Queryable, Serialize)]
+#[table_name = "Outliers"]
+pub struct OutliersTable {
+    pub outlier_id: Option<i32>,
+    pub outlier_name: Vec<u8>,
+    pub data_source: String,
+    pub examples: Option<Vec<u8>>,
+    pub size: String,
 }
 
 #[derive(Queryable, Serialize)]

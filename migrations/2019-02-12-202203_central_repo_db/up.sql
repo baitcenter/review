@@ -65,3 +65,11 @@ CREATE TABLE Events (
   FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
   FOREIGN KEY(status_id) REFERENCES Status(status_id) ON UPDATE CASCADE
 );
+
+CREATE TABLE Outliers (
+  outlier_id INTEGER PRIMARY KEY,
+  outlier_name BLOB NOT NULL,
+  data_source TEXT NOT NULL,
+  examples BLOB,
+  size TEXT NOT NULL
+);

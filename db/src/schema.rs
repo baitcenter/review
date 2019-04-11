@@ -33,6 +33,16 @@ table! {
 }
 
 table! {
+    Outliers (outlier_id) {
+        outlier_id -> Nullable<Integer>,
+        outlier_name -> Binary,
+        data_source -> Text,
+        examples -> Nullable<Binary>,
+        size -> Text,
+    }
+}
+
+table! {
     Priority (priority_id) {
         priority_id -> Nullable<Integer>,
         priority -> Text,
@@ -58,4 +68,6 @@ joinable!(Events -> Priority (priority_id));
 joinable!(Events -> Qualifier (qualifier_id));
 joinable!(Events -> Status (status_id));
 
-allow_tables_to_appear_in_same_query!(Action, Category, Events, Priority, Qualifier, Status,);
+allow_tables_to_appear_in_same_query!(
+    Action, Category, Events, Outliers, Priority, Qualifier, Status,
+);
