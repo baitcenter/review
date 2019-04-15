@@ -13,7 +13,6 @@ use schema::Outliers::dsl::*;
 use schema::Priority::dsl::*;
 use schema::Qualifier::dsl::*;
 use schema::Status::dsl::*;
-use std::collections::HashSet;
 
 pub mod error;
 pub use error::Error;
@@ -204,7 +203,7 @@ impl DB {
         &self,
         outlier: &[u8],
         datasource: &str,
-        new_event_ids: &HashSet<u64>,
+        new_event_ids: &[u64],
     ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
         let record_check = Outliers
@@ -214,6 +213,7 @@ impl DB {
 
         if let Ok(record_check) = record_check {
             if record_check.is_empty() {
+                let o_size = Some(new_event_ids.len().to_string());
                 let event_ids = match rmp_serde::encode::to_vec(new_event_ids) {
                     Ok(event_ids) => Some(event_ids),
                     Err(_) => None,
@@ -223,22 +223,48 @@ impl DB {
                     outlier_raw_event: outlier.to_vec(),
                     outlier_data_source: datasource.to_string(),
                     outlier_event_ids: event_ids,
+                    outlier_size: o_size,
                 };
                 let _ = diesel::insert_into(Outliers).values(&o).execute(&conn);
             } else {
+                let new_size = new_event_ids.len();
+                let o_size = match &record_check[0].outlier_size {
+                    Some(current_size) => {
+                        if let Ok(current_size) = current_size.parse::<usize>() {
+                            // check if sum of new_size and current_size exceeds max_value
+                            // if it does, we cannot calculate sum anymore, so reset the value of size
+                            if new_size > usize::max_value() - current_size {
+                                new_size.to_string()
+                            } else {
+                                (current_size + new_size).to_string()
+                            }
+                        } else {
+                            new_size.to_string()
+                        }
+                    }
+                    None => new_size.to_string(),
+                };
                 let mut event_ids = match &record_check[0].outlier_event_ids {
                     Some(event_ids) => {
                         match rmp_serde::decode::from_slice(&event_ids)
-                            as Result<HashSet<u64>, rmp_serde::decode::Error>
+                            as Result<Vec<u64>, rmp_serde::decode::Error>
                         {
                             Ok(event_ids) => event_ids,
-                            Err(_) => HashSet::<u64>::new(),
+                            Err(_) => Vec::<u64>::new(),
                         }
                     }
-                    None => HashSet::<u64>::new(),
+                    None => Vec::<u64>::new(),
                 };
                 event_ids.extend(new_event_ids);
-                let event_ids = match rmp_serde::encode::to_vec(&event_ids) {
+                // only store most recent 100 event_ids per outlier
+                let event_ids = if event_ids.len() > 100 {
+                    event_ids.sort();
+                    let (_, event_ids) = event_ids.split_at(event_ids.len() - 100);
+                    event_ids
+                } else {
+                    &event_ids
+                };
+                let event_ids = match rmp_serde::encode::to_vec(event_ids) {
                     Ok(event_ids) => Some(event_ids),
                     Err(_) => None,
                 };
@@ -246,7 +272,10 @@ impl DB {
                     .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
                     .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource));
                 let _ = diesel::update(target)
-                    .set(schema::Outliers::dsl::outlier_event_ids.eq(event_ids))
+                    .set((
+                        schema::Outliers::dsl::outlier_event_ids.eq(event_ids),
+                        schema::Outliers::dsl::outlier_size.eq(o_size),
+                    ))
                     .execute(&conn);
             }
         }
@@ -329,7 +358,8 @@ impl DB {
                         Some(sig) => sig.clone(),
                         None => record_check[0].signature.clone(),
                     };
-                    let example = DB::merge_examples(record_check[0].examples.clone(), eg.clone());
+                    let example =
+                        DB::merge_cluster_examples(record_check[0].examples.clone(), eg.clone());
                     let cluster_size = match cluster_size {
                         Some(new_size) => {
                             if let Ok(current_size) = record_check[0].size.clone().parse::<usize>()
@@ -362,7 +392,7 @@ impl DB {
         Box::new(futures::future::ok(()))
     }
 
-    fn merge_examples(
+    fn merge_cluster_examples(
         current_examples: Option<Vec<u8>>,
         new_examples: Option<Vec<(usize, String)>>,
     ) -> Option<Vec<u8>> {

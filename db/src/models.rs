@@ -47,6 +47,7 @@ pub struct OutliersTable {
     pub outlier_raw_event: Vec<u8>,
     pub outlier_data_source: String,
     pub outlier_event_ids: Option<Vec<u8>>,
+    pub outlier_size: Option<String>,
 }
 
 #[derive(Queryable, Serialize)]

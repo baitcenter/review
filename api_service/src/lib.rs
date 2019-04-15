@@ -5,7 +5,7 @@ use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod error;
 use error::Error;
@@ -375,7 +375,7 @@ impl ApiService {
                     struct Outliers {
                         outlier: Vec<u8>,
                         data_source: String,
-                        event_ids: HashSet<u64>,
+                        event_ids: Vec<u64>,
                     }
                     let result = req
                         .into_body()
@@ -450,7 +450,7 @@ impl ApiService {
                                 rules: Option<String>,
                                 signature: String,
                                 data_source: String,
-                                size: String,
+                                size: usize,
                                 examples: Option<Vec<(usize, String)>>,
                                 last_modification_time: Option<chrono::NaiveDateTime>,
                             }
@@ -469,6 +469,10 @@ impl ApiService {
                                     }
                                     None => None,
                                 };
+                                let size = match d.size.parse::<usize>() {
+                                    Ok(size) => size,
+                                    Err(_) => 0,
+                                };
                                 clusters.push(Clusters {
                                     cluster_id: d.cluster_id,
                                     detector_id: d.detector_id,
@@ -477,7 +481,7 @@ impl ApiService {
                                     rules: d.rules,
                                     signature: d.signature,
                                     data_source: d.data_source,
-                                    size: d.size,
+                                    size,
                                     examples: eg,
                                     last_modification_time: d.last_modification_time,
                                 });
@@ -504,25 +508,33 @@ impl ApiService {
                             struct Outliers {
                                 outlier: String,
                                 data_source: String,
-                                event_ids: HashSet<u64>,
+                                size: usize,
+                                event_ids: Vec<u64>,
                             }
                             let mut outliers: Vec<Outliers> = Vec::new();
                             for d in data {
                                 let event_ids = match d.outlier_event_ids {
                                     Some(event_ids) => {
                                         match rmp_serde::decode::from_slice(&event_ids)
-                                            as Result<HashSet<u64>, rmp_serde::decode::Error>
+                                            as Result<Vec<u64>, rmp_serde::decode::Error>
                                         {
                                             Ok(event_ids) => event_ids,
-                                            Err(_) => HashSet::<u64>::new(),
+                                            Err(_) => Vec::<u64>::new(),
                                         }
                                     }
-                                    None => HashSet::<u64>::new(),
+                                    None => Vec::<u64>::new(),
                                 };
-
+                                let size = match d.outlier_size {
+                                    Some(size) => match size.parse::<usize>() {
+                                        Ok(size) => size,
+                                        Err(_) => 0,
+                                    },
+                                    None => 0,
+                                };
                                 outliers.push(Outliers {
                                     outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
                                     data_source: d.outlier_data_source,
+                                    size,
                                     event_ids,
                                 });
                             }

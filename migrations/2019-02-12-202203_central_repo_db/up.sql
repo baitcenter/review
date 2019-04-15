@@ -71,5 +71,6 @@ CREATE TABLE Outliers (
   outlier_id INTEGER PRIMARY KEY,
   outlier_raw_event BLOB NOT NULL,
   outlier_data_source TEXT NOT NULL,
-  outlier_event_ids BLOB
+  outlier_event_ids BLOB,
+  outlier_size TEXT
 );

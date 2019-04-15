@@ -39,6 +39,7 @@ table! {
         outlier_raw_event -> Binary,
         outlier_data_source -> Text,
         outlier_event_ids -> Nullable<Binary>,
+        outlier_size -> Nullable<Text>,
     }
 }
 
