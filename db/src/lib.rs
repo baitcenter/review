@@ -13,6 +13,7 @@ use schema::Outliers::dsl::*;
 use schema::Priority::dsl::*;
 use schema::Qualifier::dsl::*;
 use schema::Status::dsl::*;
+use std::collections::HashSet;
 
 pub mod error;
 pub use error::Error;
@@ -202,22 +203,51 @@ impl DB {
     pub fn update_outlier(
         &self,
         outlier: &[u8],
-        outlier_data_source: &str,
+        datasource: &str,
+        new_event_ids: &HashSet<u64>,
     ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
         let record_check = Outliers
             .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
-            .filter(schema::Outliers::dsl::data_source.eq(data_source))
+            .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource))
             .load::<OutliersTable>(&conn);
 
         if let Ok(record_check) = record_check {
             if record_check.is_empty() {
+                let event_ids = match rmp_serde::encode::to_vec(new_event_ids) {
+                    Ok(event_ids) => Some(event_ids),
+                    Err(_) => None,
+                };
                 let o = OutliersTable {
                     outlier_id: None,
                     outlier_raw_event: outlier.to_vec(),
-                    data_source: outlier_data_source.to_string(),
+                    outlier_data_source: datasource.to_string(),
+                    outlier_event_ids: event_ids,
                 };
                 let _ = diesel::insert_into(Outliers).values(&o).execute(&conn);
+            } else {
+                let mut event_ids = match &record_check[0].outlier_event_ids {
+                    Some(event_ids) => {
+                        match rmp_serde::decode::from_slice(&event_ids)
+                            as Result<HashSet<u64>, rmp_serde::decode::Error>
+                        {
+                            Ok(event_ids) => event_ids,
+                            Err(_) => HashSet::<u64>::new(),
+                        }
+                    }
+                    None => HashSet::<u64>::new(),
+                };
+                event_ids.extend(new_event_ids);
+                let event_ids = match rmp_serde::encode::to_vec(&event_ids) {
+                    Ok(event_ids) => Some(event_ids),
+                    Err(_) => None,
+                };
+                let target = Outliers
+                    .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
+                    .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource));
+                let _ = diesel::update(target)
+                    .set(schema::Outliers::dsl::outlier_event_ids.eq(event_ids))
+                    .execute(&conn);
             }
         }
         Box::new(futures::future::ok(()))
@@ -227,8 +257,9 @@ impl DB {
         &self,
         c_id: &str,
         d_id: i32,
-        cluster_size: Option<usize>,
         sig: &Option<String>,
+        datasource: &str,
+        cluster_size: Option<usize>,
         eg: &Option<Vec<(usize, String)>>,
     ) -> Box<Future<Item = (), Error = Error>> {
         let conn = self.pool.get().unwrap();
@@ -282,6 +313,7 @@ impl DB {
                     rules: Some(sig.clone()),
                     signature: sig,
                     size: cluster_size,
+                    data_source: datasource.to_string(),
                     last_modification_time: None,
                 };
                 let _ = diesel::insert_into(Events).values(&event).execute(&conn);

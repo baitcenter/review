@@ -36,6 +36,7 @@ pub struct EventsTable {
     pub rules: Option<String>,
     pub signature: String,
     pub size: String,
+    pub data_source: String,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
@@ -44,7 +45,8 @@ pub struct EventsTable {
 pub struct OutliersTable {
     pub outlier_id: Option<i32>,
     pub outlier_raw_event: Vec<u8>,
-    pub data_source: String,
+    pub outlier_data_source: String,
+    pub outlier_event_ids: Option<Vec<u8>>,
 }
 
 #[derive(Queryable, Serialize)]

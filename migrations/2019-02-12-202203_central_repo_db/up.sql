@@ -59,6 +59,7 @@ CREATE TABLE Events (
   rules TEXT,
   signature TEXT NOT NULL,
   size TEXT NOT NULL DEFAULT "1",
+  data_source TEXT NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
   FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
@@ -69,5 +70,6 @@ CREATE TABLE Events (
 CREATE TABLE Outliers (
   outlier_id INTEGER PRIMARY KEY,
   outlier_raw_event BLOB NOT NULL,
-  data_source TEXT NOT NULL
+  outlier_data_source TEXT NOT NULL,
+  outlier_event_ids BLOB
 );

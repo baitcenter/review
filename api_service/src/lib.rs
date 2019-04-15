@@ -5,7 +5,7 @@ use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 mod error;
 use error::Error;
@@ -333,8 +333,9 @@ impl ApiService {
                     struct Cluster {
                         cluster_id: String,
                         detector_id: i32,
-                        size: Option<usize>,
                         signature: Option<String>,
+                        data_source: String,
+                        size: Option<usize>,
                         examples: Option<Vec<(usize, String)>>,
                     }
                     let result = req
@@ -349,8 +350,9 @@ impl ApiService {
                                             &self.db,
                                             &d.cluster_id.as_str(),
                                             d.detector_id,
-                                            d.size,
                                             &d.signature,
+                                            &d.data_source,
+                                            d.size,
                                             &d.examples,
                                         );
                                     }
@@ -373,6 +375,7 @@ impl ApiService {
                     struct Outliers {
                         outlier: Vec<u8>,
                         data_source: String,
+                        event_ids: HashSet<u64>,
                     }
                     let result = req
                         .into_body()
@@ -386,6 +389,7 @@ impl ApiService {
                                             &self.db,
                                             &d.outlier,
                                             &d.data_source,
+                                            &d.event_ids,
                                         );
                                     }
                                 })
@@ -440,14 +444,14 @@ impl ApiService {
                             #[derive(Debug, Serialize)]
                             struct Clusters {
                                 cluster_id: Option<String>,
-                                description: Option<String>,
                                 detector_id: i32,
                                 qualifier_id: i32,
                                 status_id: i32,
                                 rules: Option<String>,
                                 signature: String,
-                                examples: Option<Vec<(usize, String)>>,
+                                data_source: String,
                                 size: String,
+                                examples: Option<Vec<(usize, String)>>,
                                 last_modification_time: Option<chrono::NaiveDateTime>,
                             }
                             let mut clusters: Vec<Clusters> = Vec::new();
@@ -467,14 +471,14 @@ impl ApiService {
                                 };
                                 clusters.push(Clusters {
                                     cluster_id: d.cluster_id,
-                                    description: d.description,
                                     detector_id: d.detector_id,
                                     qualifier_id: d.qualifier_id,
                                     status_id: d.status_id,
                                     rules: d.rules,
                                     signature: d.signature,
-                                    examples: eg,
+                                    data_source: d.data_source,
                                     size: d.size,
+                                    examples: eg,
                                     last_modification_time: d.last_modification_time,
                                 });
                             }
@@ -500,12 +504,26 @@ impl ApiService {
                             struct Outliers {
                                 outlier: String,
                                 data_source: String,
+                                event_ids: HashSet<u64>,
                             }
                             let mut outliers: Vec<Outliers> = Vec::new();
                             for d in data {
+                                let event_ids = match d.outlier_event_ids {
+                                    Some(event_ids) => {
+                                        match rmp_serde::decode::from_slice(&event_ids)
+                                            as Result<HashSet<u64>, rmp_serde::decode::Error>
+                                        {
+                                            Ok(event_ids) => event_ids,
+                                            Err(_) => HashSet::<u64>::new(),
+                                        }
+                                    }
+                                    None => HashSet::<u64>::new(),
+                                };
+
                                 outliers.push(Outliers {
                                     outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
-                                    data_source: d.data_source,
+                                    data_source: d.outlier_data_source,
+                                    event_ids,
                                 });
                             }
 

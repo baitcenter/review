@@ -28,6 +28,7 @@ table! {
         rules -> Nullable<Text>,
         signature -> Text,
         size -> Text,
+        data_source -> Text,
         last_modification_time -> Nullable<Timestamp>,
     }
 }
@@ -36,7 +37,8 @@ table! {
     Outliers (outlier_id) {
         outlier_id -> Nullable<Integer>,
         outlier_raw_event -> Binary,
-        data_source -> Text,
+        outlier_data_source -> Text,
+        outlier_event_ids -> Nullable<Binary>,
     }
 }
 
