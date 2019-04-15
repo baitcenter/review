@@ -227,7 +227,6 @@ impl DB {
         &self,
         c_id: &str,
         d_id: i32,
-        rule: &Option<String>,
         cluster_size: Option<usize>,
         sig: &Option<String>,
         eg: &Option<Vec<(usize, String)>>,
@@ -280,7 +279,7 @@ impl DB {
                     priority_id: 1,
                     qualifier_id: unknown.unwrap().qualifier_id.unwrap(),
                     status_id: review.unwrap().status_id.unwrap(),
-                    rules: rule.clone(),
+                    rules: Some(sig.clone()),
                     signature: sig,
                     size: cluster_size,
                     last_modification_time: None,
@@ -293,11 +292,7 @@ impl DB {
                     .filter(schema::Events::dsl::cluster_id.eq(c_id));
                 let now = chrono::Utc::now();
                 let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                if rule.is_some() || sig.is_some() || eg.is_some() || cluster_size.is_some() {
-                    let rule = match rule {
-                        Some(rule) => Some(rule.clone()),
-                        None => record_check[0].rules.clone(),
-                    };
+                if sig.is_some() || eg.is_some() || cluster_size.is_some() {
                     let sig = match sig {
                         Some(sig) => sig.clone(),
                         None => record_check[0].signature.clone(),
@@ -322,7 +317,7 @@ impl DB {
                     };
                     let _ = diesel::update(target)
                         .set((
-                            schema::Events::dsl::rules.eq(rule),
+                            schema::Events::dsl::rules.eq(sig.clone()),
                             schema::Events::dsl::signature.eq(sig),
                             schema::Events::dsl::examples.eq(example),
                             schema::Events::dsl::size.eq(cluster_size),

@@ -333,7 +333,6 @@ impl ApiService {
                     struct Cluster {
                         cluster_id: String,
                         detector_id: i32,
-                        rules: Option<String>,
                         size: Option<usize>,
                         signature: Option<String>,
                         examples: Option<Vec<(usize, String)>>,
@@ -350,7 +349,6 @@ impl ApiService {
                                             &self.db,
                                             &d.cluster_id.as_str(),
                                             d.detector_id,
-                                            &d.rules,
                                             d.size,
                                             &d.signature,
                                             &d.examples,
