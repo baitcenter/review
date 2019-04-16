@@ -469,10 +469,7 @@ impl ApiService {
                                     }
                                     None => None,
                                 };
-                                let size = match d.size.parse::<usize>() {
-                                    Ok(size) => size,
-                                    Err(_) => 0,
-                                };
+                                let size = d.size.parse::<usize>().unwrap_or(0);
                                 clusters.push(Clusters {
                                     cluster_id: d.cluster_id,
                                     detector_id: d.detector_id,
@@ -525,10 +522,7 @@ impl ApiService {
                                     None => Vec::<u64>::new(),
                                 };
                                 let size = match d.outlier_size {
-                                    Some(size) => match size.parse::<usize>() {
-                                        Ok(size) => size,
-                                        Err(_) => 0,
-                                    },
+                                    Some(size) => size.parse::<usize>().unwrap_or(0),
                                     None => 0,
                                 };
                                 outliers.push(Outliers {
