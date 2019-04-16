@@ -214,10 +214,7 @@ impl DB {
         if let Ok(record_check) = record_check {
             if record_check.is_empty() {
                 let o_size = Some(new_event_ids.len().to_string());
-                let event_ids = match rmp_serde::encode::to_vec(new_event_ids) {
-                    Ok(event_ids) => Some(event_ids),
-                    Err(_) => None,
-                };
+                let event_ids = rmp_serde::encode::to_vec(new_event_ids).ok();
                 let o = OutliersTable {
                     outlier_id: None,
                     outlier_raw_event: outlier.to_vec(),
@@ -264,10 +261,7 @@ impl DB {
                 } else {
                     &event_ids
                 };
-                let event_ids = match rmp_serde::encode::to_vec(event_ids) {
-                    Ok(event_ids) => Some(event_ids),
-                    Err(_) => None,
-                };
+                let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
                 let target = Outliers
                     .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
                     .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource));
@@ -309,10 +303,7 @@ impl DB {
                 let review = review.iter().find(|x| x.status == "review");
                 let unknown = unknown.iter().find(|x| x.qualifier == "unknown");
                 let example = match eg {
-                    Some(eg) => match rmp_serde::encode::to_vec(eg) {
-                        Ok(eg) => Some(eg),
-                        Err(_) => None,
-                    },
+                    Some(eg) => rmp_serde::encode::to_vec(eg).ok(),
                     None => None,
                 };
 
