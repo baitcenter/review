@@ -2,25 +2,7 @@ use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use futures::prelude::*;
 use hyper::service::service_fn;
 use hyper::Server;
-use serde::Deserialize;
 use std::fs;
-use std::io::BufReader;
-use std::path::Path;
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    reviewd_addr: String,
-    etcd_addr: String,
-    etcd_key: String,
-}
-
-fn read_config_file<P: AsRef<Path>>(path: P) -> Result<Config, Box<std::error::Error>> {
-    let file = fs::File::open(path)?;
-    let reader = BufReader::new(file);
-    let config: Config = serde_json::from_reader(reader)?;
-
-    Ok(config)
-}
 
 fn validate_url(url: &str) {
     if let Ok(url) = url::Url::parse(url) {
@@ -50,8 +32,8 @@ fn main() {
     //  ----------------------------
     //   |                        |
     // reviewd                 client         LEVEL 1
-    //   |                     /     \
-    // config           remake_files  url     LEVEL 2
+    //                         /     \
+    //                  remake_files  url     LEVEL 2
     //
     let matches = App::new("REview")
         .version(env!("CARGO_PKG_VERSION"))
@@ -62,7 +44,7 @@ fn main() {
                 .about("Runs REview client modes")
                 .arg(
                     Arg::with_name("cluster")
-                        .short("cl")
+                        .short("c")
                         .long("cluster")
                         .takes_value(true)
                         .value_name("cluster_file")
@@ -113,19 +95,7 @@ fn main() {
                         .required(true),
                 ),
         )
-        .subcommand(
-            SubCommand::with_name("reviewd")
-                .about("Runs REviewd (http server mode)")
-                .arg(
-                    Arg::with_name("config")
-                        .short("c")
-                        .long("config")
-                        .takes_value(true)
-                        .value_name("path to config file")
-                        .help("reviewd configuration file")
-                        .required(true),
-                ),
-        )
+        .subcommand(SubCommand::with_name("reviewd").about("Runs REviewd (http server mode)"))
         .get_matches();
 
     if let Some(review_matches) = matches.subcommand_matches("client") {
@@ -151,7 +121,7 @@ fn main() {
                 }
             }
         }
-    } else if let Some(reviewd_matches) = matches.subcommand_matches("reviewd") {
+    } else if matches.subcommand_matches("reviewd").is_some() {
         dotenv::dotenv().ok();
         let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is not set.");
         if fs::metadata(&database_url).is_err() {
@@ -168,41 +138,37 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        let reviewd_addr = std::env::var("REVIEWD_ADDR").expect("REVIEWD_ADDR is not set");
+        let etcd_addr = std::env::var("ETCD_ADDR").expect("ETCD_ADDR is not set");
+        let etcd_sig_key = std::env::var("ETCD_SIG_KEY").expect("ETCD_SIG_KEY is not set");
+        let docker_host_ip = std::env::var("DOCKER_HOST_IP").expect("DOCKER_HOST_IP is not set");
+        let docker_host_addr = format!("{}:8080", docker_host_ip);
 
-        let config = reviewd_matches.value_of("config").unwrap();
-        match read_config_file(config) {
-            Ok(config) => {
-                if let Ok(reviewd_addr) = config.reviewd_addr.parse() {
-                    let server = Server::bind(&reviewd_addr)
-                        .serve(move || {
-                            let etcd_url = format!("http://{}/v3beta/kv/put", config.etcd_addr);
-                            let api_service = api_service::ApiService::new(
-                                &database_url,
-                                config.reviewd_addr.as_str(),
-                                etcd_url.as_str(),
-                                config.etcd_key.as_str(),
-                            )
-                            .map_err(|e| panic!("Initialization fails: {}", e))
-                            .and_then(|srv| {
-                                service_fn(move |req| {
-                                    api_service::ApiService::request_handler(srv.clone(), req)
-                                        .then(api_service::ApiService::error_handler)
-                                })
-                            });
-                            Box::new(api_service)
+        if let Ok(reviewd_addr) = reviewd_addr.parse() {
+            let server = Server::bind(&reviewd_addr)
+                .serve(move || {
+                    let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
+                    let api_service = api_service::ApiService::new(
+                        &database_url,
+                        docker_host_addr.as_str(),
+                        etcd_url.as_str(),
+                        etcd_sig_key.as_str(),
+                    )
+                    .map_err(|e| panic!("Initialization fails: {}", e))
+                    .and_then(|srv| {
+                        service_fn(move |req| {
+                            api_service::ApiService::request_handler(srv.clone(), req)
+                                .then(api_service::ApiService::error_handler)
                         })
-                        .map_err(|e| panic!("Failed to build server: {}", e));
+                    });
+                    Box::new(api_service)
+                })
+                .map_err(|e| panic!("Failed to build server: {}", e));
 
-                    hyper::rt::run(server);
-                } else {
-                    eprintln!("IP address and/or port number for reviewd is bad/illegal format.");
-                    std::process::exit(1);
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to parse reviewd configuration file: {}", e);
-                std::process::exit(1);
-            }
+            hyper::rt::run(server);
+        } else {
+            eprintln!("IP address and/or port number for reviewd is bad/illegal format.");
+            std::process::exit(1);
         }
     }
 }

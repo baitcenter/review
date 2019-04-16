@@ -13,7 +13,7 @@ use error::Error;
 #[derive(Clone)]
 pub struct ApiService {
     db: db::DB,
-    reviewd_addr: String,
+    docker_host_addr: String,
     etcd_key: String,
     etcd_url: String,
     reviewd_url: String,
@@ -22,11 +22,11 @@ pub struct ApiService {
 impl ApiService {
     pub fn new(
         database_url: &str,
-        reviewd_addr: &str,
+        docker_host_addr: &str,
         etcd_url: &str,
         etcd_key: &str,
     ) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
-        let reviewd_addr = reviewd_addr.to_string();
+        let docker_host_addr = docker_host_addr.to_string();
         let etcd_key = etcd_key.to_string();
         let etcd_url = etcd_url.to_string();
         let reviewd_url = database_url.to_string();
@@ -35,7 +35,7 @@ impl ApiService {
             .and_then(move |db| {
                 future::ok(Self {
                     db,
-                    reviewd_addr,
+                    docker_host_addr,
                     etcd_key,
                     etcd_url,
                     reviewd_url,
@@ -280,7 +280,7 @@ impl ApiService {
                             if qualifier_id == benign_id {
                                 let value = format!(
                                     "http://{}/api/cluster?qualifier_id={}",
-                                    &self.reviewd_addr, benign_id,
+                                    &self.docker_host_addr, benign_id,
                                 );
                                 let data = format!(
                                     "{{\"key\": \"{}\", \"value\": \"{}\"}}",

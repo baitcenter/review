@@ -1,6 +1,6 @@
 [package]
 name = "review"
-version = "0.3.9"
+version = "0.4.0"
 authors = [
     "Atsushi Yoshioka <yoshioka@petabi.com>",
     "Min Kim <msk@petabi.com>",
@@ -15,6 +15,4 @@ dotenv = "0.13"
 futures = "0.1"
 hyper = "0.12"
 client = { path = "./client" }
-serde = { version = "1",  features = ["derive"] }
-serde_json = "1"
 url = "1.7"
