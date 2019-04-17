@@ -270,12 +270,10 @@ impl ApiService {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
-                    if let (Some(event_id), Some(qualifier_id)) =
-                        (hash_query.get("event_id"), hash_query.get("qualifier_id"))
+                    if let (Some(cluster_id), Some(qualifier_id)) =
+                        (hash_query.get("cluster_id"), hash_query.get("qualifier_id"))
                     {
-                        if let (Ok(event_id), Ok(qualifier_id)) =
-                            (event_id.parse::<i32>(), qualifier_id.parse::<i32>())
-                        {
+                        if let Ok(qualifier_id) = qualifier_id.parse::<i32>() {
                             let benign_id = db::DB::get_benign_id(&self.db);
                             if qualifier_id == benign_id {
                                 let value = format!(
@@ -295,7 +293,7 @@ impl ApiService {
                                 eprintln!("An error occurs while accessing database.");
                             }
                             let result =
-                                db::DB::update_qualifier_id(&self.db, event_id, qualifier_id)
+                                db::DB::update_qualifier_id(&self.db, &cluster_id, qualifier_id)
                                     .and_then(|return_value| {
                                         if return_value != -1 {
                                             future::ok(
@@ -445,9 +443,8 @@ impl ApiService {
                             struct Clusters {
                                 cluster_id: Option<String>,
                                 detector_id: i32,
-                                qualifier_id: i32,
-                                status_id: i32,
-                                rules: Option<String>,
+                                qualifier: String,
+                                status: String,
                                 signature: String,
                                 data_source: String,
                                 size: usize,
@@ -456,7 +453,7 @@ impl ApiService {
                             }
                             let mut clusters: Vec<Clusters> = Vec::new();
                             for d in data {
-                                let eg = match d.examples {
+                                let eg = match d.0.examples {
                                     Some(eg) => {
                                         match rmp_serde::decode::from_slice(&eg)
                                             as Result<
@@ -469,18 +466,17 @@ impl ApiService {
                                     }
                                     None => None,
                                 };
-                                let size = d.size.parse::<usize>().unwrap_or(0);
+                                let size = d.0.size.parse::<usize>().unwrap_or(0);
                                 clusters.push(Clusters {
-                                    cluster_id: d.cluster_id,
-                                    detector_id: d.detector_id,
-                                    qualifier_id: d.qualifier_id,
-                                    status_id: d.status_id,
-                                    rules: d.rules,
-                                    signature: d.signature,
-                                    data_source: d.data_source,
+                                    cluster_id: d.0.cluster_id,
+                                    detector_id: d.0.detector_id,
+                                    qualifier: d.2.qualifier,
+                                    status: d.1.status,
+                                    signature: d.0.signature,
+                                    data_source: d.0.data_source,
                                     size,
                                     examples: eg,
-                                    last_modification_time: d.last_modification_time,
+                                    last_modification_time: d.0.last_modification_time,
                                 });
                             }
                             match serde_json::to_string(&clusters) {

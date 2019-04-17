@@ -57,12 +57,16 @@ impl DB {
         future::result(category_table)
     }
 
-    pub fn get_event_table(&self) -> impl Future<Item = Vec<EventsTable>, Error = Error> {
-        let event_table = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| Events.load::<EventsTable>(&conn).map_err(Into::into));
+    pub fn get_event_table(
+        &self,
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
+        let event_table = self.pool.get().map_err(Into::into).and_then(|conn| {
+            Events
+                .inner_join(Status)
+                .inner_join(Qualifier)
+                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
+                .map_err(Into::into)
+        });
 
         future::result(event_table)
     }
@@ -300,7 +304,7 @@ impl DB {
                 } else {
                     return Box::new(futures::future::ok(()));
                 };
-                let review = review.iter().find(|x| x.status == "review");
+                let review = review.iter().find(|x| x.status == "pending review");
                 let unknown = unknown.iter().find(|x| x.qualifier == "unknown");
                 let example = match eg {
                     Some(eg) => rmp_serde::encode::to_vec(eg).ok(),
@@ -430,7 +434,7 @@ impl DB {
 
     pub fn update_qualifier_id(
         &self,
-        e_id: i32,
+        c_id: &str,
         new_qualifier_id: i32,
     ) -> Box<Future<Item = i8, Error = Error> + Send + 'static> {
         let conn = self.pool.get().unwrap();
@@ -442,25 +446,25 @@ impl DB {
             return Box::new(futures::future::ok(-1));
         }
 
-        let active = match Status.load::<StatusTable>(&conn) {
+        let reviewed = match Status.load::<StatusTable>(&conn) {
             Ok(status_table) => {
-                let active = status_table.iter().find(|x| x.status == "active");
-                active.unwrap().status_id.unwrap()
+                let reviewed = status_table.iter().find(|x| x.status == "reviewed");
+                reviewed.unwrap().status_id.unwrap()
             }
             Err(_) => return Box::new(futures::future::ok(-1)),
         };
         let record_check = Events
-            .filter(schema::Events::dsl::event_id.eq(e_id))
+            .filter(schema::Events::dsl::cluster_id.eq(c_id))
             .load::<EventsTable>(&conn);
 
         if record_check.is_ok() && !record_check.unwrap().is_empty() {
-            let target = Events.filter(schema::Events::dsl::event_id.eq(e_id));
+            let target = Events.filter(schema::Events::dsl::cluster_id.eq(c_id));
             let now = chrono::Utc::now();
             let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
             let _ = diesel::update(target)
                 .set((
                     schema::Events::dsl::qualifier_id.eq(new_qualifier_id),
-                    schema::Events::dsl::status_id.eq(active),
+                    schema::Events::dsl::status_id.eq(reviewed),
                     schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
                 ))
                 .execute(&conn);

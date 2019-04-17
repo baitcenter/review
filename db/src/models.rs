@@ -1,5 +1,4 @@
-use super::schema::Events;
-use super::schema::Outliers;
+use super::schema::*;
 use serde::Serialize;
 
 #[derive(Queryable, Serialize)]
@@ -21,8 +20,11 @@ pub struct ClusterExample {
     pub examples: Option<Vec<u8>>,
 }
 
-#[derive(Debug, AsChangeset, Insertable, Queryable, Serialize)]
+#[derive(Debug, AsChangeset, Associations, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "Events"]
+#[primary_key(event_id)]
+#[belongs_to(StatusTable, foreign_key = "status_id")]
+#[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
 pub struct EventsTable {
     pub event_id: Option<i32>,
     pub cluster_id: Option<String>,
@@ -56,13 +58,17 @@ pub struct PriorityTable {
     pub priority: String,
 }
 
-#[derive(Queryable, Serialize)]
+#[derive(Debug, Identifiable, Queryable, Serialize)]
+#[table_name = "Qualifier"]
+#[primary_key(qualifier_id)]
 pub struct QualifierTable {
     pub qualifier_id: Option<i32>,
     pub qualifier: String,
 }
 
-#[derive(Queryable, Serialize)]
+#[derive(Debug, Identifiable, Queryable, Serialize)]
+#[table_name = "Status"]
+#[primary_key(status_id)]
 pub struct StatusTable {
     pub status_id: Option<i32>,
     pub status: String,
