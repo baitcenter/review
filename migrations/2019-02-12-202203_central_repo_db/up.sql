@@ -40,8 +40,8 @@ CREATE TABLE Status (
   status_id INTEGER PRIMARY KEY,
   status TEXT NOT NULL
 );
-INSERT INTO Status VALUES(1,'active');
-INSERT INTO Status VALUES(2,'review');
+INSERT INTO Status VALUES(1,'reviewed');
+INSERT INTO Status VALUES(2,'pending review');
 INSERT INTO Status VALUES(3,'disabled');
 
 -- Events represent rules that have been crafted from particular --
