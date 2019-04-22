@@ -280,6 +280,19 @@ impl DB {
         Box::new(futures::future::ok(()))
     }
 
+    fn check_db_query_result<T>(result: Result<Vec<T>, diesel::result::Error>) -> Option<Vec<T>> {
+        match result {
+            Ok(result) => {
+                if result.is_empty() {
+                    None
+                } else {
+                    Some(result)
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
     pub fn update_cluster(
         &self,
         c_id: &str,
@@ -295,54 +308,8 @@ impl DB {
             .filter(schema::Events::dsl::cluster_id.eq(c_id))
             .load::<EventsTable>(&conn);
 
-        if let Ok(record_check) = record_check {
-            if record_check.is_empty() {
-                let unknown = Qualifier.load::<QualifierTable>(&conn);
-                let review = Status.load::<StatusTable>(&conn);
-                let (review, unknown) = if let (Ok(review), Ok(unknown)) = (review, unknown) {
-                    (review, unknown)
-                } else {
-                    return Box::new(futures::future::ok(()));
-                };
-                let review = review.iter().find(|x| x.status == "pending review");
-                let unknown = unknown.iter().find(|x| x.qualifier == "unknown");
-                let example = match eg {
-                    Some(eg) => rmp_serde::encode::to_vec(eg).ok(),
-                    None => None,
-                };
-
-                // Signature is required field in central repo database
-                // but if new cluster information does not have signature field,
-                // we use '-' as a signature
-                let sig = match sig {
-                    Some(sig) => sig.clone(),
-                    None => "-".to_string(),
-                };
-                let cluster_size = match cluster_size {
-                    Some(cluster_size) => cluster_size.to_string(),
-                    None => "1".to_string(),
-                };
-                // We always insert 1 for category_id and priority_id,
-                // "unknown" for qualifier_id, and "review" for status_id.
-                let event = EventsTable {
-                    event_id: None,
-                    cluster_id: Some(c_id.to_string()),
-                    description: None,
-                    category_id: 1,
-                    detector_id: d_id,
-                    examples: example,
-                    priority_id: 1,
-                    qualifier_id: unknown.unwrap().qualifier_id.unwrap(),
-                    status_id: review.unwrap().status_id.unwrap(),
-                    rules: Some(sig.clone()),
-                    signature: sig,
-                    size: cluster_size,
-                    data_source: datasource.to_string(),
-                    last_modification_time: None,
-                };
-                let _ = diesel::insert_into(Events).values(&event).execute(&conn);
-                return Box::new(futures::future::ok(()));
-            } else {
+        match DB::check_db_query_result(record_check) {
+            Some(record_check) => {
                 let target = Events
                     .filter(schema::Events::dsl::detector_id.eq(d_id))
                     .filter(schema::Events::dsl::cluster_id.eq(c_id));
@@ -382,6 +349,84 @@ impl DB {
                         ))
                         .execute(&conn);
                 }
+            }
+            None => {
+                let unknown = Qualifier
+                    .filter(schema::Qualifier::dsl::qualifier.eq("unknown"))
+                    .load::<QualifierTable>(&conn);
+                let unknown = match DB::check_db_query_result(unknown) {
+                    Some(unknown) => unknown[0].qualifier_id.unwrap(),
+                    None => {
+                        let q = QualifierTable {
+                            qualifier_id: None,
+                            qualifier: "unknown".to_string(),
+                        };
+                        let _ = diesel::insert_into(Qualifier).values(&q).execute(&conn);
+                        let unknown = Qualifier
+                            .filter(schema::Qualifier::dsl::qualifier.eq("unknown"))
+                            .load::<QualifierTable>(&conn);
+                        match DB::check_db_query_result(unknown) {
+                            Some(unknown) => unknown[0].qualifier_id.unwrap(),
+                            None => return Box::new(futures::future::ok(())),
+                        }
+                    }
+                };
+                let review = Status
+                    .filter(schema::Status::dsl::status.eq("pending review"))
+                    .load::<StatusTable>(&conn);
+                let review = match DB::check_db_query_result(review) {
+                    Some(review) => review[0].status_id.unwrap(),
+                    None => {
+                        let s = StatusTable {
+                            status_id: None,
+                            status: "pending review".to_string(),
+                        };
+                        let _ = diesel::insert_into(Status).values(&s).execute(&conn);
+                        let review = Status
+                            .filter(schema::Status::dsl::status.eq("pending review"))
+                            .load::<StatusTable>(&conn);
+                        match DB::check_db_query_result(review) {
+                            Some(review) => review[0].status_id.unwrap(),
+                            None => return Box::new(futures::future::ok(())),
+                        }
+                    }
+                };
+
+                let example = match eg {
+                    Some(eg) => rmp_serde::encode::to_vec(eg).ok(),
+                    None => None,
+                };
+
+                // Signature is required field in central repo database
+                // but if new cluster information does not have signature field,
+                // we use '-' as a signature
+                let sig = match sig {
+                    Some(sig) => sig.clone(),
+                    None => "-".to_string(),
+                };
+                let cluster_size = match cluster_size {
+                    Some(cluster_size) => cluster_size.to_string(),
+                    None => "1".to_string(),
+                };
+                // We always insert 1 for category_id and priority_id,
+                // "unknown" for qualifier_id, and "review" for status_id.
+                let event = EventsTable {
+                    event_id: None,
+                    cluster_id: Some(c_id.to_string()),
+                    description: None,
+                    category_id: 1,
+                    detector_id: d_id,
+                    examples: example,
+                    priority_id: 1,
+                    qualifier_id: unknown,
+                    status_id: review,
+                    rules: Some(sig.clone()),
+                    signature: sig,
+                    size: cluster_size,
+                    data_source: datasource.to_string(),
+                    last_modification_time: None,
+                };
+                let _ = diesel::insert_into(Events).values(&event).execute(&conn);
             }
         }
         Box::new(futures::future::ok(()))
@@ -442,21 +487,20 @@ impl DB {
         let q_id_check = Qualifier
             .filter(schema::Qualifier::dsl::qualifier_id.eq(new_qualifier_id))
             .load::<QualifierTable>(&conn);
-        if q_id_check.is_ok() && q_id_check.unwrap().is_empty() {
+        if DB::check_db_query_result(q_id_check).is_none() {
             return Box::new(futures::future::ok(-1));
         }
-
-        let reviewed = match Status.load::<StatusTable>(&conn) {
-            Ok(status_table) => {
-                let reviewed = status_table.iter().find(|x| x.status == "reviewed");
-                reviewed.unwrap().status_id.unwrap()
-            }
-            Err(_) => return Box::new(futures::future::ok(-1)),
+        let reviewed = Status
+            .filter(schema::Status::dsl::status.eq("reviewed"))
+            .load::<StatusTable>(&conn);
+        let reviewed = match DB::check_db_query_result(reviewed) {
+            Some(reviewed) => reviewed[0].status_id.unwrap(),
+            None => return Box::new(futures::future::ok(-1)),
         };
+
         let record_check = Events
             .filter(schema::Events::dsl::cluster_id.eq(c_id))
             .load::<EventsTable>(&conn);
-
         if record_check.is_ok() && !record_check.unwrap().is_empty() {
             let target = Events.filter(schema::Events::dsl::cluster_id.eq(c_id));
             let now = chrono::Utc::now();

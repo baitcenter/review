@@ -42,7 +42,7 @@ pub struct EventsTable {
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
-#[derive(Insertable, AsChangeset, Queryable, Serialize)]
+#[derive(Debug, Insertable, AsChangeset, Queryable, Serialize)]
 #[table_name = "Outliers"]
 pub struct OutliersTable {
     pub outlier_id: Option<i32>,
@@ -58,7 +58,7 @@ pub struct PriorityTable {
     pub priority: String,
 }
 
-#[derive(Debug, Identifiable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "Qualifier"]
 #[primary_key(qualifier_id)]
 pub struct QualifierTable {
@@ -66,7 +66,7 @@ pub struct QualifierTable {
     pub qualifier: String,
 }
 
-#[derive(Debug, Identifiable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "Status"]
 #[primary_key(status_id)]
 pub struct StatusTable {
