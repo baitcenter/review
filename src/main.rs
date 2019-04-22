@@ -38,7 +38,7 @@ fn main() {
     let matches = App::new("REview")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Petabi, Inc.")
-        .setting(AppSettings::SubcommandRequired)
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("client")
                 .about("Runs REview client modes")
