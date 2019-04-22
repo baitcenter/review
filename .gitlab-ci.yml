@@ -7,6 +7,8 @@ variables:
 
 rust-latest:
   stage: build
+  only:
+  - merge_requests
   image: rust:latest
   except:
   - tags
