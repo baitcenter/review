@@ -323,6 +323,59 @@ impl ApiService {
                             .unwrap(),
                     ))
                 }
+                (&Method::PUT, "/api/suspicious_tokens") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let Some(etcd_key) = hash_query.get("etcd_key") {
+                        let etcd_key_cloned = etcd_key.clone();
+                        let result =
+                            req.into_body()
+                                .concat2()
+                                .map_err(Into::into)
+                                .and_then(move |buf| {
+                                    let data = format!(
+                                        "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                        base64::encode(&etcd_key_cloned),
+                                        base64::encode(&buf)
+                                    );
+                                    let client = reqwest::Client::new();
+                                    match client.post(&self.etcd_url).body(data).send() {
+                                        Ok(_) => {
+                                            let msg =
+                                                format!("{} has been updated.", etcd_key_cloned);
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::OK)
+                                                    .body(Body::from(msg))
+                                                    .unwrap(),
+                                            )
+                                        }
+                                        Err(e) => {
+                                            let err_msg = format!(
+                                                "An error occurs while updating etcd value: {}",
+                                                e
+                                            );
+                                            eprintln!("{}", err_msg);
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                                    .body(Body::from(err_msg))
+                                                    .unwrap(),
+                                            )
+                                        }
+                                    }
+                                });
+                        Box::new(result)
+                    } else {
+                        Box::new(future::ok(
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from("Invalid request"))
+                                .unwrap(),
+                        ))
+                    }
+                }
                 _ => Box::new(future::ok(ApiService::build_http_404_response())),
             },
             None => match (req.method(), req.uri().path()) {
