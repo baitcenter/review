@@ -17,7 +17,7 @@ use schema::Status::dsl::*;
 pub mod error;
 pub use error::Error;
 
-mod models;
+pub mod models;
 mod schema;
 
 type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
@@ -104,11 +104,29 @@ impl DB {
     pub fn get_event_by_status(
         &self,
         s_id: i32,
-    ) -> impl Future<Item = Vec<EventsTable>, Error = Error> {
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
         let event = self.pool.get().map_err(Into::into).and_then(|conn| {
             Events
                 .filter(schema::Events::dsl::status_id.eq(s_id))
-                .load::<EventsTable>(&conn)
+                .inner_join(Status)
+                .inner_join(Qualifier)
+                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(event)
+    }
+
+    pub fn get_event_by_data_source(
+        &self,
+        datasource: &str,
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
+        let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+            Events
+                .filter(schema::Events::dsl::data_source.eq(datasource))
+                .inner_join(Status)
+                .inner_join(Qualifier)
+                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
                 .map_err(Into::into)
         });
 
@@ -475,6 +493,33 @@ impl DB {
             }
             None => current_examples,
         }
+    }
+
+    pub fn update_cluster_id(
+        &self,
+        c_id: &str,
+        new_c_id: &str,
+    ) -> Box<Future<Item = String, Error = Error> + Send + 'static> {
+        let conn = self.pool.get().unwrap();
+        let c_id_check = Events
+            .filter(schema::Events::dsl::cluster_id.eq(c_id))
+            .load::<EventsTable>(&conn);
+        let datasource = match DB::check_db_query_result(c_id_check) {
+            Some(event) => event[0].data_source.clone(),
+            None => return Box::new(futures::future::ok("No entry found".to_string())),
+        };
+
+        let target = Events.filter(schema::Events::dsl::cluster_id.eq(c_id));
+        let now = chrono::Utc::now();
+        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+        let _ = diesel::update(target)
+            .set((
+                schema::Events::dsl::cluster_id.eq(new_c_id),
+                schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+            ))
+            .execute(&conn);
+
+        Box::new(futures::future::ok(datasource))
     }
 
     pub fn update_qualifier_id(

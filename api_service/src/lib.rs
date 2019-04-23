@@ -59,15 +59,7 @@ impl ApiService {
                     if let Some(status_id) = hash_query.get("status_id") {
                         if let Ok(status_id) = status_id.parse::<i32>() {
                             let result = db::DB::get_event_by_status(&self.db, status_id)
-                                .and_then(|data| match serde_json::to_string(&data) {
-                                    Ok(json) => future::ok(
-                                        Response::builder()
-                                            .header(header::CONTENT_TYPE, "application/json")
-                                            .body(Body::from(json))
-                                            .unwrap(),
-                                    ),
-                                    Err(_) => future::ok(ApiService::build_http_500_response()),
-                                })
+                                .and_then(|data| future::ok(ApiService::process_events(&data)))
                                 .map_err(Into::into);
 
                             Box::new(result)
@@ -257,6 +249,11 @@ impl ApiService {
                                             .unwrap(),
                                     ))
                         }
+                    } else if let Some(data_source) = hash_query.get("data_source") {
+                        let result = db::DB::get_event_by_data_source(&self.db, data_source)
+                            .and_then(|data| future::ok(ApiService::process_events(&data)))
+                            .map_err(Into::into);
+                        Box::new(result)
                     } else {
                         Box::new(future::ok(
                             Response::builder()
@@ -315,6 +312,50 @@ impl ApiService {
 
                             return Box::new(result);
                         }
+                    } else if let (Some(cluster_id), Some(new_cluster_id)) = (
+                        hash_query.get("cluster_id"),
+                        hash_query.get("new_cluster_id"),
+                    ) {
+                        let result =
+                            db::DB::update_cluster_id(&self.db, &cluster_id, &new_cluster_id)
+                                .and_then(move |data_source| {
+                                    if data_source != "No entry found" {
+                                        let value = format!(
+                                            "http://{}/api/cluster?data_source={}",
+                                            &self.docker_host_addr, data_source,
+                                        );
+                                        let etcd_key = format!("clusters_{}", data_source);
+                                        let data = format!(
+                                            "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                            base64::encode(&etcd_key),
+                                            base64::encode(&value)
+                                        );
+                                        let client = reqwest::Client::new();
+                                        if let Err(e) =
+                                            client.post(&self.etcd_url).body(data).send()
+                                        {
+                                            eprintln!("An error occurs while updating etcd: {}", e);
+                                        }
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::OK)
+                                                .body(Body::from("Database has been updated"))
+                                                .unwrap(),
+                                        )
+                                    } else {
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::BAD_REQUEST)
+                                                .body(Body::from(
+                                                    "cluster_id does not exist in database",
+                                                ))
+                                                .unwrap(),
+                                        )
+                                    }
+                                })
+                                .map_err(Into::into);
+
+                        return Box::new(result);
                     }
                     Box::new(future::ok(
                         Response::builder()
@@ -491,59 +532,8 @@ impl ApiService {
 
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_event_table(&self.db)
-                        .and_then(|data| {
-                            #[derive(Debug, Serialize)]
-                            struct Clusters {
-                                cluster_id: Option<String>,
-                                detector_id: i32,
-                                qualifier: String,
-                                status: String,
-                                signature: String,
-                                data_source: String,
-                                size: usize,
-                                examples: Option<Vec<(usize, String)>>,
-                                last_modification_time: Option<chrono::NaiveDateTime>,
-                            }
-                            let mut clusters: Vec<Clusters> = Vec::new();
-                            for d in data {
-                                let eg = match d.0.examples {
-                                    Some(eg) => {
-                                        match rmp_serde::decode::from_slice(&eg)
-                                            as Result<
-                                                Vec<(usize, String)>,
-                                                rmp_serde::decode::Error,
-                                            > {
-                                            Ok(eg) => Some(eg),
-                                            Err(_) => None,
-                                        }
-                                    }
-                                    None => None,
-                                };
-                                let size = d.0.size.parse::<usize>().unwrap_or(0);
-                                clusters.push(Clusters {
-                                    cluster_id: d.0.cluster_id,
-                                    detector_id: d.0.detector_id,
-                                    qualifier: d.2.qualifier,
-                                    status: d.1.status,
-                                    signature: d.0.signature,
-                                    data_source: d.0.data_source,
-                                    size,
-                                    examples: eg,
-                                    last_modification_time: d.0.last_modification_time,
-                                });
-                            }
-                            match serde_json::to_string(&clusters) {
-                                Ok(json) => future::ok(
-                                    Response::builder()
-                                        .header(header::CONTENT_TYPE, "application/json")
-                                        .body(Body::from(json))
-                                        .unwrap(),
-                                ),
-                                Err(_) => future::ok(ApiService::build_http_500_response()),
-                            }
-                        })
+                        .and_then(|data| future::ok(ApiService::process_events(&data)))
                         .map_err(Into::into);
-
                     Box::new(result)
                 }
 
@@ -691,5 +681,59 @@ impl ApiService {
             .status(StatusCode::NOT_FOUND)
             .body(body)
             .unwrap()
+    }
+
+    fn process_events(
+        data: &[(
+            db::models::EventsTable,
+            db::models::StatusTable,
+            db::models::QualifierTable,
+        )],
+    ) -> Response<Body> {
+        #[derive(Debug, Serialize)]
+        struct Clusters {
+            cluster_id: Option<String>,
+            detector_id: i32,
+            qualifier: String,
+            status: String,
+            signature: String,
+            data_source: String,
+            size: usize,
+            examples: Option<Vec<(usize, String)>>,
+            last_modification_time: Option<chrono::NaiveDateTime>,
+        }
+        let mut clusters: Vec<Clusters> = Vec::new();
+        for d in data {
+            let eg = match &d.0.examples {
+                Some(eg) => {
+                    match rmp_serde::decode::from_slice(&eg)
+                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
+                    {
+                        Ok(eg) => Some(eg),
+                        Err(_) => None,
+                    }
+                }
+                None => None,
+            };
+            let size = d.0.size.parse::<usize>().unwrap_or(0);
+            clusters.push(Clusters {
+                cluster_id: d.0.cluster_id.clone(),
+                detector_id: d.0.detector_id,
+                qualifier: d.2.qualifier.clone(),
+                status: d.1.status.clone(),
+                signature: d.0.signature.clone(),
+                data_source: d.0.data_source.clone(),
+                size,
+                examples: eg,
+                last_modification_time: d.0.last_modification_time,
+            });
+        }
+        match serde_json::to_string(&clusters) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => ApiService::build_http_500_response(),
+        }
     }
 }
