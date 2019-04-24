@@ -197,7 +197,7 @@ impl<'a> ClusterView<'a> {
         }
 
         let cl_view_tx_clone = cluster_view.cl_view_tx.clone();
-        cluster_select.set_on_submit(move |_s, i| {
+        cluster_select.set_on_submit(move |_, i| {
             cl_view_tx_clone
                 .send(ClusterViewMessage::PrintClusterProps(*i))
                 .unwrap();
@@ -365,7 +365,7 @@ impl<'a> ClusterView<'a> {
                             Dialog::new()
                                 .content(TextView::new("Would you like to delete old events?\nThe most recent 25 events will be kept and the rest will be deleted from cluster file and database."))
                                 .dismiss_button("Back to the previous window")
-                                .button("No", |s| s.quit())
+                                .button("No", Cursive::quit)
                                 .button("Yes", move |_| {
                                     cl_view_tx_clone
                                         .send(ClusterViewMessage::DeleteOldEvents())
@@ -394,7 +394,7 @@ impl<'a> ClusterView<'a> {
                         qualifier_select.add_item("None".to_string(), 3);
 
                         cluster_prop_window2.set_content(qualifier_select.on_submit(
-                            move |_s, qualifier: &i64| {
+                            move |_, qualifier: &i64| {
                                 cl_view_tx_clone
                                     .send(ClusterViewMessage::SaveClusterQualifier((
                                         item, *qualifier,
@@ -510,7 +510,7 @@ impl<'a> ClusterView<'a> {
             ),
             Dialog::new()
                 .content(TextView::new(popup_message))
-                .button("OK", |s| s.quit()),
+                .button("OK", Cursive::quit),
         );
     }
 }
