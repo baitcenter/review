@@ -3,6 +3,7 @@ extern crate diesel;
 
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
+use failure::Fail;
 use futures::future;
 use futures::prelude::*;
 use models::*;
@@ -15,8 +16,7 @@ use schema::Qualifier::dsl::*;
 use schema::Status::dsl::*;
 
 pub mod error;
-pub use error::Error;
-
+pub use self::error::{DatabaseError, Error, ErrorKind};
 pub mod models;
 mod schema;
 
@@ -226,26 +226,15 @@ impl DB {
         outlier: &[u8],
         datasource: &str,
         new_event_ids: &[u64],
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         let conn = self.pool.get().unwrap();
         let record_check = Outliers
             .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
             .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource))
             .load::<OutliersTable>(&conn);
 
-        if let Ok(record_check) = record_check {
-            if record_check.is_empty() {
-                let o_size = Some(new_event_ids.len().to_string());
-                let event_ids = rmp_serde::encode::to_vec(new_event_ids).ok();
-                let o = OutliersTable {
-                    outlier_id: None,
-                    outlier_raw_event: outlier.to_vec(),
-                    outlier_data_source: datasource.to_string(),
-                    outlier_event_ids: event_ids,
-                    outlier_size: o_size,
-                };
-                let _ = diesel::insert_into(Outliers).values(&o).execute(&conn);
-            } else {
+        let execute_result = match DB::check_db_query_result(record_check) {
+            Some(record_check) => {
                 let new_size = new_event_ids.len();
                 let o_size = match &record_check[0].outlier_size {
                     Some(current_size) => {
@@ -287,15 +276,34 @@ impl DB {
                 let target = Outliers
                     .filter(schema::Outliers::dsl::outlier_raw_event.eq(outlier))
                     .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource));
-                let _ = diesel::update(target)
+                match diesel::update(target)
                     .set((
                         schema::Outliers::dsl::outlier_event_ids.eq(event_ids),
                         schema::Outliers::dsl::outlier_size.eq(o_size),
                     ))
-                    .execute(&conn);
+                    .execute(&conn)
+                {
+                    Ok(_) => Ok(()),
+                    Err(e) => DB::error_handling(e),
+                }
             }
-        }
-        Box::new(futures::future::ok(()))
+            None => {
+                let o_size = Some(new_event_ids.len().to_string());
+                let event_ids = rmp_serde::encode::to_vec(new_event_ids).ok();
+                let o = OutliersTable {
+                    outlier_id: None,
+                    outlier_raw_event: outlier.to_vec(),
+                    outlier_data_source: datasource.to_string(),
+                    outlier_event_ids: event_ids,
+                    outlier_size: o_size,
+                };
+                match diesel::insert_into(Outliers).values(&o).execute(&conn) {
+                    Ok(_) => Ok(()),
+                    Err(e) => DB::error_handling(e),
+                }
+            }
+        };
+        future::result(execute_result)
     }
 
     fn check_db_query_result<T>(result: Result<Vec<T>, diesel::result::Error>) -> Option<Vec<T>> {
@@ -319,14 +327,14 @@ impl DB {
         datasource: &str,
         cluster_size: Option<usize>,
         eg: &Option<Vec<(usize, String)>>,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         let conn = self.pool.get().unwrap();
         let record_check = Events
             .filter(schema::Events::dsl::detector_id.eq(d_id))
             .filter(schema::Events::dsl::cluster_id.eq(c_id))
             .load::<EventsTable>(&conn);
 
-        match DB::check_db_query_result(record_check) {
+        let execute_result = match DB::check_db_query_result(record_check) {
             Some(record_check) => {
                 let target = Events
                     .filter(schema::Events::dsl::detector_id.eq(d_id))
@@ -357,7 +365,7 @@ impl DB {
                         }
                         None => record_check[0].size.clone(),
                     };
-                    let _ = diesel::update(target)
+                    match diesel::update(target)
                         .set((
                             schema::Events::dsl::rules.eq(sig.clone()),
                             schema::Events::dsl::signature.eq(sig),
@@ -365,7 +373,13 @@ impl DB {
                             schema::Events::dsl::size.eq(cluster_size),
                             schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
                         ))
-                        .execute(&conn);
+                        .execute(&conn)
+                    {
+                        Ok(_) => Ok(()),
+                        Err(e) => DB::error_handling(e),
+                    }
+                } else {
+                    Ok(())
                 }
             }
             None => {
@@ -379,13 +393,14 @@ impl DB {
                             qualifier_id: None,
                             qualifier: "unknown".to_string(),
                         };
-                        let _ = diesel::insert_into(Qualifier).values(&q).execute(&conn);
-                        let unknown = Qualifier
-                            .filter(schema::Qualifier::dsl::qualifier.eq("unknown"))
-                            .load::<QualifierTable>(&conn);
-                        match DB::check_db_query_result(unknown) {
-                            Some(unknown) => unknown[0].qualifier_id.unwrap(),
-                            None => return Box::new(futures::future::ok(())),
+                        match diesel::insert_into(Qualifier).values(&q).execute(&conn) {
+                            Ok(_) => {
+                                let unknown = Qualifier
+                                    .filter(schema::Qualifier::dsl::qualifier.eq("unknown"))
+                                    .load::<QualifierTable>(&conn);
+                                unknown.unwrap()[0].qualifier_id.unwrap()
+                            }
+                            Err(e) => return future::result(DB::error_handling(e)),
                         }
                     }
                 };
@@ -399,17 +414,17 @@ impl DB {
                             status_id: None,
                             status: "pending review".to_string(),
                         };
-                        let _ = diesel::insert_into(Status).values(&s).execute(&conn);
-                        let review = Status
-                            .filter(schema::Status::dsl::status.eq("pending review"))
-                            .load::<StatusTable>(&conn);
-                        match DB::check_db_query_result(review) {
-                            Some(review) => review[0].status_id.unwrap(),
-                            None => return Box::new(futures::future::ok(())),
+                        match diesel::insert_into(Status).values(&s).execute(&conn) {
+                            Ok(_) => {
+                                let review = Status
+                                    .filter(schema::Status::dsl::status.eq("pending review"))
+                                    .load::<StatusTable>(&conn);
+                                review.unwrap()[0].status_id.unwrap()
+                            }
+                            Err(e) => return future::result(DB::error_handling(e)),
                         }
                     }
                 };
-
                 let example = match eg {
                     Some(eg) => rmp_serde::encode::to_vec(eg).ok(),
                     None => None,
@@ -444,10 +459,32 @@ impl DB {
                     data_source: datasource.to_string(),
                     last_modification_time: None,
                 };
-                let _ = diesel::insert_into(Events).values(&event).execute(&conn);
+                match diesel::insert_into(Events).values(&event).execute(&conn) {
+                    Ok(_) => Ok(()),
+                    Err(e) => DB::error_handling(e),
+                }
             }
+        };
+        future::result(execute_result)
+    }
+
+    fn error_handling<T>(e: diesel::result::Error) -> Result<T, error::Error> {
+        match e {
+            diesel::result::Error::DatabaseError(_, _) => {
+                if e.to_string().contains("database is locked") {
+                    Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
+                        DatabaseError::DatabaseLocked,
+                    ))))
+                } else {
+                    Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
+                        DatabaseError::Other,
+                    ))))
+                }
+            }
+            _ => Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
+                DatabaseError::Other,
+            )))),
         }
-        Box::new(futures::future::ok(()))
     }
 
     fn merge_cluster_examples(
@@ -499,48 +536,52 @@ impl DB {
         &self,
         c_id: &str,
         new_c_id: &str,
-    ) -> Box<Future<Item = String, Error = Error> + Send + 'static> {
+    ) -> impl Future<Item = String, Error = Error> {
         let conn = self.pool.get().unwrap();
         let c_id_check = Events
             .filter(schema::Events::dsl::cluster_id.eq(c_id))
             .load::<EventsTable>(&conn);
         let datasource = match DB::check_db_query_result(c_id_check) {
             Some(event) => event[0].data_source.clone(),
-            None => return Box::new(futures::future::ok("No entry found".to_string())),
+            None => return future::result(Ok("No entry found".to_string())),
         };
 
         let target = Events.filter(schema::Events::dsl::cluster_id.eq(c_id));
         let now = chrono::Utc::now();
         let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-        let _ = diesel::update(target)
+        let update_result = match diesel::update(target)
             .set((
                 schema::Events::dsl::cluster_id.eq(new_c_id),
                 schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
             ))
-            .execute(&conn);
+            .execute(&conn)
+        {
+            Ok(_) => Ok(datasource),
+            Err(e) => DB::error_handling(e),
+        };
 
-        Box::new(futures::future::ok(datasource))
+        future::result(update_result)
     }
 
     pub fn update_qualifier_id(
         &self,
         c_id: &str,
         new_qualifier_id: i32,
-    ) -> Box<Future<Item = i8, Error = Error> + Send + 'static> {
+    ) -> impl Future<Item = i8, Error = Error> {
         let conn = self.pool.get().unwrap();
 
         let q_id_check = Qualifier
             .filter(schema::Qualifier::dsl::qualifier_id.eq(new_qualifier_id))
             .load::<QualifierTable>(&conn);
         if DB::check_db_query_result(q_id_check).is_none() {
-            return Box::new(futures::future::ok(-1));
+            return future::result(Ok(-1));
         }
         let reviewed = Status
             .filter(schema::Status::dsl::status.eq("reviewed"))
             .load::<StatusTable>(&conn);
         let reviewed = match DB::check_db_query_result(reviewed) {
             Some(reviewed) => reviewed[0].status_id.unwrap(),
-            None => return Box::new(futures::future::ok(-1)),
+            None => return future::result(Ok(-1)),
         };
 
         let record_check = Events
@@ -550,17 +591,21 @@ impl DB {
             let target = Events.filter(schema::Events::dsl::cluster_id.eq(c_id));
             let now = chrono::Utc::now();
             let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-            let _ = diesel::update(target)
+            let update_result = match diesel::update(target)
                 .set((
                     schema::Events::dsl::qualifier_id.eq(new_qualifier_id),
                     schema::Events::dsl::status_id.eq(reviewed),
                     schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
                 ))
-                .execute(&conn);
+                .execute(&conn)
+            {
+                Ok(_) => Ok(0),
+                Err(e) => DB::error_handling(e),
+            };
 
-            return Box::new(futures::future::ok(0));
+            return future::result(update_result);
         }
 
-        Box::new(futures::future::ok(-1))
+        future::result(Ok(-1))
     }
 }

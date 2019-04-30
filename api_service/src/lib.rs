@@ -437,8 +437,9 @@ impl ApiService {
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
                                 .map(move |data: Vec<Cluster>| {
+                                    let mut err: Vec<db::error::Error> = Vec::new();
                                     for d in &data {
-                                        db::DB::update_cluster(
+                                        let mut update_result = db::DB::update_cluster(
                                             &self.db,
                                             &d.cluster_id.as_str(),
                                             d.detector_id,
@@ -447,17 +448,52 @@ impl ApiService {
                                             d.size,
                                             &d.examples,
                                         );
+                                        if let Err(e) = update_result.poll() {
+                                            err.push(e);
+                                        }
+                                    }
+                                    if err.is_empty() {
+                                        Ok(())
+                                    } else {
+                                        Err(err)
                                     }
                                 })
                                 .map_err(Into::into)
                         })
-                        .and_then(|_| {
-                            future::ok(
+                        .and_then(|result| match result {
+                            Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::OK)
                                     .body(Body::from("Cluster information has been updated"))
                                     .unwrap(),
-                            )
+                            ),
+                            Err(err) => {
+                                let is_temporary_error = err.iter().find_map(|e| {
+                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                        e.kind()
+                                    {
+                                        if *reason != db::error::DatabaseError::DatabaseLocked {
+                                            return Some(());
+                                        }
+                                    }
+                                    None
+                                });
+                                if is_temporary_error.is_none() {
+                                    future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                                            .body(Body::from("Service temporarily unavailable"))
+                                            .unwrap(),
+                                    )
+                                } else {
+                                    future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                            .body(Body::from("Internal Server Error"))
+                                            .unwrap(),
+                                    )
+                                }
+                            }
                         });
 
                     Box::new(result)
@@ -476,24 +512,60 @@ impl ApiService {
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
                                 .map(move |data: Vec<Outliers>| {
+                                    let mut err: Vec<db::error::Error> = Vec::new();
                                     for d in &data {
-                                        db::DB::update_outlier(
+                                        let mut update_result = db::DB::update_outlier(
                                             &self.db,
                                             &d.outlier,
                                             &d.data_source,
                                             &d.event_ids,
                                         );
+                                        if let Err(e) = update_result.poll() {
+                                            err.push(e);
+                                        }
+                                    }
+                                    if err.is_empty() {
+                                        Ok(())
+                                    } else {
+                                        Err(err)
                                     }
                                 })
                                 .map_err(Into::into)
                         })
-                        .and_then(|_| {
-                            future::ok(
+                        .and_then(|result| match result {
+                            Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::OK)
                                     .body(Body::from("Outlier information has been updated"))
                                     .unwrap(),
-                            )
+                            ),
+                            Err(err) => {
+                                let is_temporary_error = err.iter().find_map(|e| {
+                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                        e.kind()
+                                    {
+                                        if *reason != db::error::DatabaseError::DatabaseLocked {
+                                            return Some(());
+                                        }
+                                    }
+                                    None
+                                });
+                                if is_temporary_error.is_none() {
+                                    future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                                            .body(Body::from("Service temporarily unavailable"))
+                                            .unwrap(),
+                                    )
+                                } else {
+                                    future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                            .body(Body::from("Internal Server Error"))
+                                            .unwrap(),
+                                    )
+                                }
+                            }
                         });
 
                     Box::new(result)
