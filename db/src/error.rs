@@ -7,6 +7,11 @@ use std::fmt::Display;
 
 #[derive(Fail, Debug)]
 pub enum ErrorKind {
+    #[fail(
+        display = "An error occurred while processing a database transaction : {}",
+        _0
+    )]
+    DatabaseTransactionError(DatabaseError),
     #[fail(display = "An error occurred while processing a database query")]
     Query,
     #[fail(display = "An error occurred while connecting database")]
@@ -81,5 +86,23 @@ impl From<ErrorKind> for Error {
 impl From<Context<ErrorKind>> for Error {
     fn from(inner: Context<ErrorKind>) -> Error {
         Error { inner }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DatabaseError {
+    DatabaseLocked,
+    Other,
+}
+
+impl Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DatabaseError::DatabaseLocked => write!(
+                f,
+                "Database is being locked to process another database transaction"
+            ),
+            DatabaseError::Other => write!(f, "An error occurred"),
+        }
     }
 }
