@@ -62,7 +62,6 @@ RUN set -eux; \
 ENV LD_LIBRARY_PATH=/usr/pkg/lib
 
 COPY --from=builder /work/target/release/review .
-COPY --from=builder /work/api_service/config/reviewd_config.json .
 COPY --from=builder /work/.env .
 COPY --from=builder /work/central_repo.db .
 EXPOSE 8080
