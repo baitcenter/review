@@ -37,6 +37,20 @@ impl DB {
         Box::new(future::result(db))
     }
 
+    pub fn add_new_category(&self, new_category: &str) -> impl Future<Item = (), Error = Error> {
+        let conn = self.pool.get().unwrap();
+        let c = CategoryTable {
+            category_id: None,
+            category: new_category.to_string(),
+        };
+        let insert_result = match diesel::insert_into(Category).values(&c).execute(&conn) {
+            Ok(_) => Ok(()),
+            Err(e) => return future::result(DB::error_handling(e)),
+        };
+
+        future::result(insert_result)
+    }
+
     pub fn get_action_table(&self) -> impl Future<Item = Vec<ActionTable>, Error = Error> {
         let action_table = self
             .pool

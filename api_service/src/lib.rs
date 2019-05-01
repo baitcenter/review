@@ -263,6 +263,60 @@ impl ApiService {
                         ))
                     }
                 }
+                (&Method::POST, "/api/category") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let Some(category) = hash_query.get("category") {
+                        let resp =
+                            db::DB::add_new_category(&self.db, &category).then(|insert_result| {
+                                match insert_result {
+                                    Ok(_) => future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::CREATED)
+                                            .body(Body::from("New category has been added"))
+                                            .unwrap(),
+                                    ),
+                                    Err(err) => {
+                                        let is_temporary_error =
+                                            if let db::error::ErrorKind::DatabaseTransactionError(
+                                                reason,
+                                            ) = err.kind()
+                                            {
+                                                *reason == db::error::DatabaseError::DatabaseLocked
+                                            } else {
+                                                false
+                                            };
+                                        if is_temporary_error {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                    .body(Body::from(
+                                                        "Service temporarily unavailable",
+                                                    ))
+                                                    .unwrap(),
+                                            )
+                                        } else {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                                    .body(Body::from("Internal Server Error"))
+                                                    .unwrap(),
+                                            )
+                                        }
+                                    }
+                                }
+                            });
+                        Box::new(resp)
+                    } else {
+                        Box::new(future::ok(
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from("Invalid request"))
+                                .unwrap(),
+                        ))
+                    }
+                }
                 (&Method::PUT, "/api/cluster") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
