@@ -59,12 +59,14 @@ impl DB {
 
     pub fn get_event_table(
         &self,
-    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable, CategoryTable)>, Error = Error>
+    {
         let event_table = self.pool.get().map_err(Into::into).and_then(|conn| {
             Events
                 .inner_join(Status)
                 .inner_join(Qualifier)
-                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
+                .inner_join(Category)
+                .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
                 .map_err(Into::into)
         });
 
@@ -104,13 +106,15 @@ impl DB {
     pub fn get_event_by_status(
         &self,
         s_id: i32,
-    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable, CategoryTable)>, Error = Error>
+    {
         let event = self.pool.get().map_err(Into::into).and_then(|conn| {
             Events
                 .filter(schema::Events::dsl::status_id.eq(s_id))
                 .inner_join(Status)
                 .inner_join(Qualifier)
-                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
+                .inner_join(Category)
+                .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
                 .map_err(Into::into)
         });
 
@@ -120,13 +124,15 @@ impl DB {
     pub fn get_event_by_data_source(
         &self,
         datasource: &str,
-    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable)>, Error = Error> {
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable, CategoryTable)>, Error = Error>
+    {
         let event = self.pool.get().map_err(Into::into).and_then(|conn| {
             Events
                 .filter(schema::Events::dsl::data_source.eq(datasource))
                 .inner_join(Status)
                 .inner_join(Qualifier)
-                .load::<(EventsTable, StatusTable, QualifierTable)>(&conn)
+                .inner_join(Category)
+                .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
                 .map_err(Into::into)
         });
 

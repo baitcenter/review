@@ -7,7 +7,9 @@ pub struct ActionTable {
     pub action: String,
 }
 
-#[derive(Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[table_name = "Category"]
+#[primary_key(category_id)]
 pub struct CategoryTable {
     pub category_id: Option<i32>,
     pub category: String,
@@ -23,6 +25,7 @@ pub struct ClusterExample {
 #[derive(Debug, AsChangeset, Associations, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "Events"]
 #[primary_key(event_id)]
+#[belongs_to(CategoryTable, foreign_key = "category_id")]
 #[belongs_to(StatusTable, foreign_key = "status_id")]
 #[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
 pub struct EventsTable {

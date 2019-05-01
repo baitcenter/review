@@ -760,6 +760,7 @@ impl ApiService {
             db::models::EventsTable,
             db::models::StatusTable,
             db::models::QualifierTable,
+            db::models::CategoryTable,
         )],
     ) -> Response<Body> {
         #[derive(Debug, Serialize)]
@@ -768,6 +769,7 @@ impl ApiService {
             detector_id: i32,
             qualifier: String,
             status: String,
+            category: String,
             signature: String,
             data_source: String,
             size: usize,
@@ -793,6 +795,7 @@ impl ApiService {
                 detector_id: d.0.detector_id,
                 qualifier: d.2.qualifier.clone(),
                 status: d.1.status.clone(),
+                category: d.3.category.clone(),
                 signature: d.0.signature.clone(),
                 data_source: d.0.data_source.clone(),
                 size,
