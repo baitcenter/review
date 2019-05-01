@@ -144,25 +144,26 @@ fn main() {
         let docker_host_ip = std::env::var("DOCKER_HOST_IP").expect("DOCKER_HOST_IP is not set");
         let docker_host_addr = format!("{}:8080", docker_host_ip);
 
+        let new_service = move || {
+            let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
+            let api_service = api_service::ApiService::new(
+                &database_url,
+                docker_host_addr.as_str(),
+                etcd_url.as_str(),
+                etcd_sig_key.as_str(),
+            )
+            .map_err(|e| panic!("Initialization fails: {}", e))
+            .and_then(|srv| {
+                service_fn(move |req| {
+                    api_service::ApiService::request_handler(srv.clone(), req)
+                        .then(api_service::ApiService::error_handler)
+                })
+            });
+            Box::new(api_service)
+        };
         if let Ok(reviewd_addr) = reviewd_addr.parse() {
             let server = Server::bind(&reviewd_addr)
-                .serve(move || {
-                    let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
-                    let api_service = api_service::ApiService::new(
-                        &database_url,
-                        docker_host_addr.as_str(),
-                        etcd_url.as_str(),
-                        etcd_sig_key.as_str(),
-                    )
-                    .map_err(|e| panic!("Initialization fails: {}", e))
-                    .and_then(|srv| {
-                        service_fn(move |req| {
-                            api_service::ApiService::request_handler(srv.clone(), req)
-                                .then(api_service::ApiService::error_handler)
-                        })
-                    });
-                    Box::new(api_service)
-                })
+                .serve(new_service)
                 .map_err(|e| panic!("Failed to build server: {}", e));
 
             hyper::rt::run(server);
