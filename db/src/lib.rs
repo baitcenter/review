@@ -552,6 +552,71 @@ impl DB {
         }
     }
 
+    pub fn update_category(
+        &self,
+        current_category: &str,
+        new_category: &str,
+    ) -> impl Future<Item = (), Error = Error> {
+        let conn = self.pool.get().unwrap();
+
+        let record_check = Category
+            .filter(schema::Category::dsl::category.eq(current_category))
+            .load::<CategoryTable>(&conn);
+        if DB::check_db_query_result(record_check).is_none() {
+            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::RecordNotExist,
+            ))));
+        }
+
+        let target = Category.filter(schema::Category::dsl::category.eq(current_category));
+        let update_result = match diesel::update(target)
+            .set((schema::Category::dsl::category.eq(new_category),))
+            .execute(&conn)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => DB::error_handling(e),
+        };
+
+        future::result(update_result)
+    }
+
+    pub fn update_category_id(
+        &self,
+        cls_id: &str,
+        datasource: &str,
+        cat_id: i32,
+    ) -> impl Future<Item = (), Error = Error> {
+        let conn = self.pool.get().unwrap();
+
+        let record_check = Events
+            .filter(schema::Events::dsl::cluster_id.eq(cls_id))
+            .filter(schema::Events::dsl::data_source.eq(datasource))
+            .load::<EventsTable>(&conn);
+        if DB::check_db_query_result(record_check).is_none() {
+            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::RecordNotExist,
+            ))));
+        }
+
+        let target = Events
+            .filter(schema::Events::dsl::cluster_id.eq(cls_id))
+            .filter(schema::Events::dsl::data_source.eq(datasource));
+        let now = chrono::Utc::now();
+        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+        let update_result = match diesel::update(target)
+            .set((
+                schema::Events::dsl::category_id.eq(cat_id),
+                schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+            ))
+            .execute(&conn)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => DB::error_handling(e),
+        };
+
+        future::result(update_result)
+    }
+
     pub fn update_cluster_id(
         &self,
         c_id: &str,

@@ -317,6 +317,63 @@ impl ApiService {
                         ))
                     }
                 }
+                (&Method::PUT, "/api/category") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let (Some(category), Some(new_category)) =
+                        (hash_query.get("category"), hash_query.get("new_category"))
+                    {
+                        let resp = db::DB::update_category(&self.db, &category, &new_category)
+                            .then(move |update_result| match update_result {
+                                Ok(_) => future::ok(
+                                    Response::builder()
+                                        .status(StatusCode::OK)
+                                        .body(Body::from("The category has been updated"))
+                                        .unwrap(),
+                                ),
+                                Err(err) => {
+                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                        err.kind()
+                                    {
+                                        if *reason == db::error::DatabaseError::DatabaseLocked {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                    .body(Body::from(
+                                                        "Service temporarily unavailable",
+                                                    ))
+                                                    .unwrap(),
+                                            )
+                                        } else if *reason
+                                            == db::error::DatabaseError::RecordNotExist
+                                        {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::BAD_REQUEST)
+                                                    .body(Body::from(
+                                                        "The specified category does not exist in database",
+                                                    ))
+                                                    .unwrap(),
+                                            )
+                                        } else {
+                                            future::ok(ApiService::build_http_500_response())
+                                        }
+                                    } else {
+                                        future::ok(ApiService::build_http_500_response())
+                                    }
+                                }
+                            });
+                        Box::new(resp)
+                    } else {
+                        Box::new(future::ok(
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from("Invalid request"))
+                                .unwrap(),
+                        ))
+                    }
+                }
                 (&Method::PUT, "/api/cluster") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()

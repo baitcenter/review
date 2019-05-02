@@ -92,6 +92,7 @@ impl From<Context<ErrorKind>> for Error {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DatabaseError {
     DatabaseLocked,
+    RecordNotExist,
     Other,
 }
 
@@ -102,6 +103,7 @@ impl Display for DatabaseError {
                 f,
                 "Database is being locked to process another database transaction"
             ),
+            DatabaseError::RecordNotExist => write!(f, "Record does not exist in database"),
             DatabaseError::Other => write!(f, "An error occurred"),
         }
     }
