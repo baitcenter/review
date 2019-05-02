@@ -580,14 +580,13 @@ impl DB {
         future::result(update_result)
     }
 
-    pub fn update_category_id(
+    pub fn update_category_in_events(
         &self,
         cls_id: &str,
         datasource: &str,
-        cat_id: i32,
+        cat: &str,
     ) -> impl Future<Item = (), Error = Error> {
         let conn = self.pool.get().unwrap();
-
         let record_check = Events
             .filter(schema::Events::dsl::cluster_id.eq(cls_id))
             .filter(schema::Events::dsl::data_source.eq(datasource))
@@ -597,7 +596,60 @@ impl DB {
                 DatabaseError::RecordNotExist,
             ))));
         }
+        let record_check = Category
+            .filter(schema::Category::dsl::category.eq(cat))
+            .load::<CategoryTable>(&conn);
+        let cat_id = match DB::check_db_query_result(record_check) {
+            Some(record_check) => record_check[0].category_id.unwrap(),
+            None => {
+                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::RecordNotExist,
+                ))))
+            }
+        };
+        let target = Events
+            .filter(schema::Events::dsl::cluster_id.eq(cls_id))
+            .filter(schema::Events::dsl::data_source.eq(datasource));
+        let now = chrono::Utc::now();
+        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+        let update_result = match diesel::update(target)
+            .set((
+                schema::Events::dsl::category_id.eq(cat_id),
+                schema::Events::dsl::last_modification_time.eq(Some(timestamp)),
+            ))
+            .execute(&conn)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => DB::error_handling(e),
+        };
 
+        future::result(update_result)
+    }
+
+    pub fn update_category_id_in_events(
+        &self,
+        cls_id: &str,
+        datasource: &str,
+        cat_id: i32,
+    ) -> impl Future<Item = (), Error = Error> {
+        let conn = self.pool.get().unwrap();
+        let record_check = Events
+            .filter(schema::Events::dsl::cluster_id.eq(cls_id))
+            .filter(schema::Events::dsl::data_source.eq(datasource))
+            .load::<EventsTable>(&conn);
+        if DB::check_db_query_result(record_check).is_none() {
+            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::RecordNotExist,
+            ))));
+        }
+        let record_check = Category
+            .filter(schema::Category::dsl::category_id.eq(cat_id))
+            .load::<CategoryTable>(&conn);
+        if DB::check_db_query_result(record_check).is_none() {
+            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::RecordNotExist,
+            ))));
+        }
         let target = Events
             .filter(schema::Events::dsl::cluster_id.eq(cls_id))
             .filter(schema::Events::dsl::data_source.eq(datasource));

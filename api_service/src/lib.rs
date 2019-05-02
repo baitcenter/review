@@ -364,15 +364,14 @@ impl ApiService {
                                     }
                                 }
                             });
-                        Box::new(resp)
-                    } else {
-                        Box::new(future::ok(
-                            Response::builder()
-                                .status(StatusCode::BAD_REQUEST)
-                                .body(Body::from("Invalid request"))
-                                .unwrap(),
-                        ))
+                        return Box::new(resp);
                     }
+                    Box::new(future::ok(
+                        Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from("Invalid request"))
+                            .unwrap(),
+                    ))
                 }
                 (&Method::PUT, "/api/cluster") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
@@ -467,6 +466,100 @@ impl ApiService {
                                 .map_err(Into::into);
 
                         return Box::new(result);
+                    } else if let (Some(cluster_id), Some(data_source), Some(new_category_id)) = (
+                        hash_query.get("cluster_id"),
+                        hash_query.get("data_source"),
+                        hash_query.get("new_category_id"),
+                    ) {
+                        if let Ok(new_category_id) = new_category_id.parse::<i32>() {
+                            let resp = db::DB::update_category_id_in_events(&self.db, &cluster_id, &data_source, new_category_id)
+                                .then(move |update_result| match update_result {
+                                    Ok(_) => future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::OK)
+                                            .body(Body::from("The category_id has been updated"))
+                                            .unwrap(),
+                                    ),
+                                    Err(err) => {
+                                        if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                            err.kind()
+                                        {
+                                            if *reason == db::error::DatabaseError::DatabaseLocked {
+                                                future::ok(
+                                                    Response::builder()
+                                                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                        .body(Body::from(
+                                                            "Service temporarily unavailable",
+                                                        ))
+                                                        .unwrap(),
+                                                )
+                                            } else if *reason
+                                                == db::error::DatabaseError::RecordNotExist
+                                            {
+                                                future::ok(
+                                                    Response::builder()
+                                                        .status(StatusCode::BAD_REQUEST)
+                                                        .body(Body::from(
+                                                            "The specified record does not exist in database",
+                                                        ))
+                                                        .unwrap(),
+                                                )
+                                            } else {
+                                                future::ok(ApiService::build_http_500_response())
+                                            }
+                                        } else {
+                                            future::ok(ApiService::build_http_500_response())
+                                        }
+                                    }
+                                });
+                            return Box::new(resp);
+                        }
+                    } else if let (Some(cluster_id), Some(data_source), Some(new_category)) = (
+                        hash_query.get("cluster_id"),
+                        hash_query.get("data_source"),
+                        hash_query.get("new_category"),
+                    ) {
+                        let resp = db::DB::update_category_in_events(&self.db, &cluster_id, &data_source, new_category)
+                            .then(move |update_result| match update_result {
+                                Ok(_) => future::ok(
+                                    Response::builder()
+                                        .status(StatusCode::OK)
+                                        .body(Body::from("The category has been updated"))
+                                        .unwrap(),
+                                ),
+                                Err(err) => {
+                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                        err.kind()
+                                    {
+                                        if *reason == db::error::DatabaseError::DatabaseLocked {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                    .body(Body::from(
+                                                        "Service temporarily unavailable",
+                                                    ))
+                                                    .unwrap(),
+                                            )
+                                        } else if *reason
+                                            == db::error::DatabaseError::RecordNotExist
+                                        {
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::BAD_REQUEST)
+                                                    .body(Body::from(
+                                                        "The specified record does not exist in database",
+                                                    ))
+                                                    .unwrap(),
+                                            )
+                                        } else {
+                                            future::ok(ApiService::build_http_500_response())
+                                        }
+                                    } else {
+                                        future::ok(ApiService::build_http_500_response())
+                                    }
+                                }
+                            });
+                        return Box::new(resp);
                     }
                     Box::new(future::ok(
                         Response::builder()
