@@ -46,6 +46,7 @@ impl ApiService {
         Box::new(fut)
     }
 
+    #[allow(clippy::cyclomatic_complexity)]
     pub fn request_handler(
         self,
         req: Request<Body>,
@@ -56,12 +57,16 @@ impl ApiService {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect();
-                    if let Some(status_id) = hash_query.get("status_id") {
+                    if let Some(category_id) = hash_query.get("category_id") {
+                        let result = db::DB::get_event_by_category(&self.db, category_id)
+                            .and_then(|data| future::ok(ApiService::process_events(&data)))
+                            .map_err(Into::into);
+                        Box::new(result)
+                    } else if let Some(status_id) = hash_query.get("status_id") {
                         if let Ok(status_id) = status_id.parse::<i32>() {
                             let result = db::DB::get_event_by_status(&self.db, status_id)
                                 .and_then(|data| future::ok(ApiService::process_events(&data)))
                                 .map_err(Into::into);
-
                             Box::new(result)
                         } else {
                             Box::new(future::ok(ApiService::build_http_404_response()))

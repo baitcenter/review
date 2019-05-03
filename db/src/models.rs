@@ -7,7 +7,7 @@ pub struct ActionTable {
     pub action: String,
 }
 
-#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Category"]
 #[primary_key(category_id)]
 pub struct CategoryTable {
@@ -22,7 +22,16 @@ pub struct ClusterExample {
     pub examples: Option<Vec<u8>>,
 }
 
-#[derive(Debug, AsChangeset, Associations, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    Debug,
+    AsChangeset,
+    Associations,
+    Identifiable,
+    Insertable,
+    Queryable,
+    QueryableByName,
+    Serialize,
+)]
 #[table_name = "Events"]
 #[primary_key(event_id)]
 #[belongs_to(CategoryTable, foreign_key = "category_id")]
@@ -61,7 +70,7 @@ pub struct PriorityTable {
     pub priority: String,
 }
 
-#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Qualifier"]
 #[primary_key(qualifier_id)]
 pub struct QualifierTable {
@@ -69,7 +78,7 @@ pub struct QualifierTable {
     pub qualifier: String,
 }
 
-#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Status"]
 #[primary_key(status_id)]
 pub struct StatusTable {

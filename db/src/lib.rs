@@ -117,6 +117,72 @@ impl DB {
         future::result(status_table)
     }
 
+    pub fn get_event_by_category(
+        &self,
+        cat_id: &str,
+    ) -> impl Future<Item = Vec<(EventsTable, StatusTable, QualifierTable, CategoryTable)>, Error = Error>
+    {
+        if cat_id.contains(',') {
+            let cat_id = cat_id.split(',');
+            let cat_id_vec = cat_id
+                .map(|c| (&c).parse::<i32>())
+                .filter_map(Result::ok)
+                .collect::<Vec<_>>();
+            if !cat_id_vec.is_empty() && cat_id_vec.len() != 1 {
+                let mut query = String::new();
+                for (index, cat_id) in cat_id_vec.iter().enumerate() {
+                    if index == 0 {
+                        let q = format!("Events.category_id = {}", cat_id);
+                        query.push_str(&q);
+                    } else {
+                        let q = format!(" or Events.category_id = {}", cat_id);
+                        query.push_str(&q);
+                    }
+                }
+                let query = format!(
+                    "SELECT * FROM Events INNER JOIN Category ON Events.category_id = Category.category_id INNER JOIN Qualifier ON Events.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Events.status_id = Status.status_id WHERE {};",
+                    query
+                );
+                let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+                    diesel::sql_query(query)
+                        .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                        .map_err(Into::into)
+                });
+                future::result(event)
+            } else if cat_id_vec.len() == 1 {
+                let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+                    Events
+                        .filter(schema::Events::dsl::category_id.eq(cat_id_vec[0]))
+                        .inner_join(Status)
+                        .inner_join(Qualifier)
+                        .inner_join(Category)
+                        .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                        .map_err(Into::into)
+                });
+                future::result(event)
+            } else {
+                future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                ))))
+            }
+        } else if let Ok(cat_id) = cat_id.parse::<i32>() {
+            let event = self.pool.get().map_err(Into::into).and_then(|conn| {
+                Events
+                    .filter(schema::Events::dsl::category_id.eq(cat_id))
+                    .inner_join(Status)
+                    .inner_join(Qualifier)
+                    .inner_join(Category)
+                    .load::<(EventsTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                    .map_err(Into::into)
+            });
+            future::result(event)
+        } else {
+            future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::Other,
+            ))))
+        }
+    }
+
     pub fn get_event_by_status(
         &self,
         s_id: i32,
