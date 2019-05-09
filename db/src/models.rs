@@ -1,5 +1,5 @@
 use super::schema::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Serialize)]
 pub struct ActionTable {
@@ -20,6 +20,16 @@ pub struct CategoryTable {
 pub struct ClusterExample {
     pub cluster_id: Option<String>,
     pub examples: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ClusterUpdate {
+    pub cluster_id: String,
+    pub detector_id: i32,
+    pub signature: Option<String>,
+    pub data_source: String,
+    pub size: Option<usize>,
+    pub examples: Option<Vec<(usize, String)>>,
 }
 
 #[derive(
@@ -62,6 +72,13 @@ pub struct OutliersTable {
     pub outlier_data_source: String,
     pub outlier_event_ids: Option<Vec<u8>>,
     pub outlier_size: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OutlierUpdate {
+    pub outlier: Vec<u8>,
+    pub data_source: String,
+    pub event_ids: Vec<u64>,
 }
 
 #[derive(Queryable, Serialize)]

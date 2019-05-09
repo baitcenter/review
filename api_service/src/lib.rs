@@ -3,7 +3,7 @@ use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -254,11 +254,84 @@ impl ApiService {
                                             .unwrap(),
                                     ))
                         }
+                    } else if let (Some(data_source), Some(cluster_only)) = (
+                        hash_query.get("data_source"),
+                        hash_query.get("cluster_only"),
+                    ) {
+                        if cluster_only == "true" {
+                            let result = db::DB::get_cluster_only(&self.db, data_source)
+                                .and_then(|data| {
+                                    let data =
+                                        data.iter().filter(|d| d.is_some()).collect::<Vec<_>>();
+                                    match serde_json::to_string(&data) {
+                                        Ok(json) => future::ok(
+                                            Response::builder()
+                                                .header(header::CONTENT_TYPE, "application/json")
+                                                .body(Body::from(json))
+                                                .unwrap(),
+                                        ),
+                                        Err(_) => future::ok(ApiService::build_http_500_response()),
+                                    }
+                                })
+                                .map_err(Into::into);
+
+                            Box::new(result)
+                        } else {
+                            let result = db::DB::get_event_by_data_source(&self.db, data_source)
+                                .and_then(|data| future::ok(ApiService::process_events(&data)))
+                                .map_err(Into::into);
+                            Box::new(result)
+                        }
                     } else if let Some(data_source) = hash_query.get("data_source") {
                         let result = db::DB::get_event_by_data_source(&self.db, data_source)
                             .and_then(|data| future::ok(ApiService::process_events(&data)))
                             .map_err(Into::into);
                         Box::new(result)
+                    } else {
+                        Box::new(future::ok(
+                            Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from("Invalid request"))
+                                .unwrap(),
+                        ))
+                    }
+                }
+                (&Method::GET, "/api/outlier") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let (Some(data_source), Some(outlier_only)) = (
+                        hash_query.get("data_source"),
+                        hash_query.get("outlier_only"),
+                    ) {
+                        if outlier_only == "true" {
+                            let result = db::DB::get_outlier_only(&self.db, data_source)
+                                .and_then(|data| {
+                                    let data = data
+                                        .iter()
+                                        .map(|d| ApiService::bytes_to_string(&d))
+                                        .collect::<Vec<_>>();
+                                    match serde_json::to_string(&data) {
+                                        Ok(json) => future::ok(
+                                            Response::builder()
+                                                .header(header::CONTENT_TYPE, "application/json")
+                                                .body(Body::from(json))
+                                                .unwrap(),
+                                        ),
+                                        Err(_) => future::ok(ApiService::build_http_500_response()),
+                                    }
+                                })
+                                .map_err(Into::into);
+
+                            Box::new(result)
+                        } else {
+                            Box::new(future::ok(
+                                Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .body(Body::from("Invalid request"))
+                                    .unwrap(),
+                            ))
+                        }
                     } else {
                         Box::new(future::ok(
                             Response::builder()
@@ -630,149 +703,131 @@ impl ApiService {
             },
             None => match (req.method(), req.uri().path()) {
                 (&Method::POST, "/api/cluster") => {
-                    #[derive(Debug, Deserialize)]
-                    struct Cluster {
-                        cluster_id: String,
-                        detector_id: i32,
-                        signature: Option<String>,
-                        data_source: String,
-                        size: Option<usize>,
-                        examples: Option<Vec<(usize, String)>>,
-                    }
                     let result = req
                         .into_body()
                         .concat2()
                         .map_err(Into::into)
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
-                                .map(move |data: Vec<Cluster>| {
-                                    let mut err: Vec<db::error::Error> = Vec::new();
-                                    for d in &data {
-                                        let mut update_result = db::DB::update_cluster(
-                                            &self.db,
-                                            &d.cluster_id.as_str(),
-                                            d.detector_id,
-                                            &d.signature,
-                                            &d.data_source,
-                                            d.size,
-                                            &d.examples,
-                                        );
-                                        if let Err(e) = update_result.poll() {
-                                            err.push(e);
-                                        }
-                                    }
-                                    if err.is_empty() {
-                                        Ok(())
-                                    } else {
-                                        Err(err)
-                                    }
+                                .map(move |data: Vec<db::models::ClusterUpdate>| {
+                                    db::DB::add_clusters(&self.db, &data)
                                 })
                                 .map_err(Into::into)
                         })
-                        .and_then(|result| match result {
+                        .and_then(|_| {
+                            future::ok(
+                                Response::builder()
+                                    .status(StatusCode::CREATED)
+                                    .body(Body::from(
+                                        "New clusters have been inserted into database",
+                                    ))
+                                    .unwrap(),
+                            )
+                        });
+
+                    Box::new(result)
+                }
+                (&Method::POST, "/api/outlier") => {
+                    let result = req
+                        .into_body()
+                        .concat2()
+                        .map_err(Into::into)
+                        .and_then(|buf| {
+                            serde_json::from_slice(&buf)
+                                .map(move |data: Vec<db::models::OutlierUpdate>| {
+                                    db::DB::add_outliers(&self.db, &data)
+                                })
+                                .map_err(Into::into)
+                        })
+                        .and_then(|_| {
+                            future::ok(
+                                Response::builder()
+                                    .status(StatusCode::CREATED)
+                                    .body(Body::from(
+                                        "New outliers have been inserted into database",
+                                    ))
+                                    .unwrap(),
+                            )
+                        });
+
+                    Box::new(result)
+                }
+                (&Method::PUT, "/api/cluster") => {
+                    let result = req
+                        .into_body()
+                        .concat2()
+                        .map_err(Into::into)
+                        .and_then(|buf| {
+                            serde_json::from_slice(&buf)
+                                .map(move |data: Vec<db::models::ClusterUpdate>| {
+                                    db::DB::update_clusters(&self.db, &data)
+                                })
+                                .map_err(Into::into)
+                        })
+                        .and_then(|mut result| match result.poll() {
                             Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::OK)
-                                    .body(Body::from("Cluster information has been updated"))
+                                    .body(Body::from("Clusters have been updated"))
                                     .unwrap(),
                             ),
-                            Err(err) => {
-                                let is_temporary_error = err.iter().find_map(|e| {
-                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                        e.kind()
-                                    {
-                                        if *reason != db::error::DatabaseError::DatabaseLocked {
-                                            return Some(());
-                                        }
+                            Err(e) => {
+                                if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                    e.kind()
+                                {
+                                    if *reason == db::error::DatabaseError::DatabaseLocked {
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                .body(Body::from("Service temporarily unavailable"))
+                                                .unwrap(),
+                                        )
+                                    } else {
+                                        future::ok(ApiService::build_http_500_response())
                                     }
-                                    None
-                                });
-                                if is_temporary_error.is_none() {
-                                    future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                                            .body(Body::from("Service temporarily unavailable"))
-                                            .unwrap(),
-                                    )
                                 } else {
-                                    future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                            .body(Body::from("Internal Server Error"))
-                                            .unwrap(),
-                                    )
+                                    future::ok(ApiService::build_http_500_response())
                                 }
                             }
                         });
 
                     Box::new(result)
                 }
-                (&Method::POST, "/api/outlier") => {
-                    #[derive(Debug, Deserialize)]
-                    struct Outliers {
-                        outlier: Vec<u8>,
-                        data_source: String,
-                        event_ids: Vec<u64>,
-                    }
+                (&Method::PUT, "/api/outlier") => {
                     let result = req
                         .into_body()
                         .concat2()
                         .map_err(Into::into)
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
-                                .map(move |data: Vec<Outliers>| {
-                                    let mut err: Vec<db::error::Error> = Vec::new();
-                                    for d in &data {
-                                        let mut update_result = db::DB::update_outlier(
-                                            &self.db,
-                                            &d.outlier,
-                                            &d.data_source,
-                                            &d.event_ids,
-                                        );
-                                        if let Err(e) = update_result.poll() {
-                                            err.push(e);
-                                        }
-                                    }
-                                    if err.is_empty() {
-                                        Ok(())
-                                    } else {
-                                        Err(err)
-                                    }
+                                .map(move |data: Vec<db::models::OutlierUpdate>| {
+                                    db::DB::update_outliers(&self.db, &data)
                                 })
                                 .map_err(Into::into)
                         })
-                        .and_then(|result| match result {
+                        .and_then(|mut result| match result.poll() {
                             Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::OK)
-                                    .body(Body::from("Outlier information has been updated"))
+                                    .body(Body::from("Cluster information has been updated"))
                                     .unwrap(),
                             ),
-                            Err(err) => {
-                                let is_temporary_error = err.iter().find_map(|e| {
-                                    if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                        e.kind()
-                                    {
-                                        if *reason != db::error::DatabaseError::DatabaseLocked {
-                                            return Some(());
-                                        }
+                            Err(e) => {
+                                if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                    e.kind()
+                                {
+                                    if *reason == db::error::DatabaseError::DatabaseLocked {
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                .body(Body::from("Service temporarily unavailable"))
+                                                .unwrap(),
+                                        )
+                                    } else {
+                                        future::ok(ApiService::build_http_500_response())
                                     }
-                                    None
-                                });
-                                if is_temporary_error.is_none() {
-                                    future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                                            .body(Body::from("Service temporarily unavailable"))
-                                            .unwrap(),
-                                    )
                                 } else {
-                                    future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                            .body(Body::from("Internal Server Error"))
-                                            .unwrap(),
-                                    )
+                                    future::ok(ApiService::build_http_500_response())
                                 }
                             }
                         });
