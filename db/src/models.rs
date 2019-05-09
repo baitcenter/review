@@ -22,7 +22,7 @@ pub struct ClusterExample {
     pub examples: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ClusterUpdate {
     pub cluster_id: String,
     pub detector_id: i32,
@@ -74,7 +74,7 @@ pub struct OutliersTable {
     pub outlier_size: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct OutlierUpdate {
     pub outlier: Vec<u8>,
     pub data_source: String,
