@@ -135,16 +135,12 @@ impl ApiService {
                                         let mut clusters: Vec<Clusters> = Vec::new();
                                         for d in data {
                                             let eg = match d.examples {
-                                                Some(eg) => {
-                                                    match rmp_serde::decode::from_slice(&eg)
-                                                        as Result<
-                                                            Vec<(usize, String)>,
-                                                            rmp_serde::decode::Error,
-                                                        > {
-                                                        Ok(eg) => Some(eg),
-                                                        Err(_) => None,
-                                                    }
-                                                }
+                                                Some(eg) => (rmp_serde::decode::from_slice(&eg)
+                                                    as Result<
+                                                        Vec<(usize, String)>,
+                                                        rmp_serde::decode::Error,
+                                                    >)
+                                                    .ok(),
                                                 None => None,
                                             };
                                             clusters.push(Clusters {
@@ -184,16 +180,12 @@ impl ApiService {
                                         let mut clusters: Vec<Clusters> = Vec::new();
                                         for d in data {
                                             let eg = match d.examples {
-                                                Some(eg) => {
-                                                    match rmp_serde::decode::from_slice(&eg)
-                                                        as Result<
-                                                            Vec<(usize, String)>,
-                                                            rmp_serde::decode::Error,
-                                                        > {
-                                                        Ok(eg) => Some(eg),
-                                                        Err(_) => None,
-                                                    }
-                                                }
+                                                Some(eg) => (rmp_serde::decode::from_slice(&eg)
+                                                    as Result<
+                                                        Vec<(usize, String)>,
+                                                        rmp_serde::decode::Error,
+                                                    >)
+                                                    .ok(),
                                                 None => None,
                                             };
                                             clusters.push(Clusters {
@@ -238,16 +230,12 @@ impl ApiService {
                                     let mut clusters: Vec<Clusters> = Vec::new();
                                     for d in data {
                                         let eg = match d.examples {
-                                            Some(eg) => {
-                                                match rmp_serde::decode::from_slice(&eg)
-                                                    as Result<
-                                                        Vec<(usize, String)>,
-                                                        rmp_serde::decode::Error,
-                                                    > {
-                                                    Ok(eg) => Some(eg),
-                                                    Err(_) => None,
-                                                }
-                                            }
+                                            Some(eg) => (rmp_serde::decode::from_slice(&eg)
+                                                as Result<
+                                                    Vec<(usize, String)>,
+                                                    rmp_serde::decode::Error,
+                                                >)
+                                                .ok(),
                                             None => None,
                                         };
                                         clusters.push(Clusters {
@@ -1049,14 +1037,9 @@ impl ApiService {
         let mut clusters: Vec<Clusters> = Vec::new();
         for d in data {
             let eg = match &d.0.examples {
-                Some(eg) => {
-                    match rmp_serde::decode::from_slice(&eg)
-                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
-                    {
-                        Ok(eg) => Some(eg),
-                        Err(_) => None,
-                    }
-                }
+                Some(eg) => (rmp_serde::decode::from_slice(&eg)
+                    as Result<Vec<(usize, String)>, rmp_serde::decode::Error>)
+                    .ok(),
                 None => None,
             };
             let size = d.0.size.parse::<usize>().unwrap_or(0);
