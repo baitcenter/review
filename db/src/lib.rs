@@ -421,18 +421,39 @@ impl DB {
                 let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
                 match event_ids {
                     Some(event_ids) => {
-                        let query = format!("UPDATE Outliers SET outlier_event_ids = x'{}', outlier_size = '{}' WHERE outlier_raw_event = x'{}' and outlier_data_source = '{}';", 
+                        let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_event_ids, outlier_size, outlier_data_source) VALUES (x'{}', x'{}', '{}', '{}');", 
+                            hex::encode(DB::bytes_to_string(&o.outlier)),
                             hex::encode(event_ids),
                             o_size,
-                            hex::encode(DB::bytes_to_string(&o.outlier)),
                             o.data_source,
                         );
                         update_queries.push_str(&query);
                     }
                     None => {
-                        let query = format!("UPDATE Outliers SET outlier_size = '{}' WHERE outlier_raw_event = x'{}' and outlier_data_source = '{}';", 
-                            o_size,
+                        let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_size, outlier_data_source) VALUES (x'{}', '{}', '{}');", 
                             hex::encode(DB::bytes_to_string(&o.outlier)),
+                            o_size,
+                            o.data_source,
+                        );
+                        update_queries.push_str(&query);
+                    }
+                }
+            } else {
+                let event_ids = rmp_serde::encode::to_vec(&o.event_ids).ok();
+                match event_ids {
+                    Some(event_ids) => {
+                        let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_event_ids, outlier_size, outlier_data_source) VALUES (x'{}', x'{}', '{}', '{}');", 
+                            hex::encode(DB::bytes_to_string(&o.outlier)),
+                            hex::encode(event_ids),
+                            o.event_ids.len(),
+                            o.data_source,
+                        );
+                        update_queries.push_str(&query);
+                    }
+                    None => {
+                        let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_size, outlier_data_source) VALUES (x'{}', '{}', '{}');", 
+                            hex::encode(DB::bytes_to_string(&o.outlier)),
+                            o.event_ids.len(),
                             o.data_source,
                         );
                         update_queries.push_str(&query);
@@ -475,10 +496,14 @@ impl DB {
         #[derive(Debug, Queryable, QueryableByName, Serialize)]
         #[table_name = "Events"]
         pub struct Clusters {
-            pub cluster_id: Option<String>,
-            pub signature: String,
-            pub examples: Option<Vec<u8>>,
-            pub size: String,
+            cluster_id: Option<String>,
+            signature: String,
+            examples: Option<Vec<u8>>,
+            size: String,
+            category_id: i32,
+            priority_id: i32,
+            qualifier_id: i32,
+            status_id: i32,
         }
         let conn = self.pool.get().unwrap();
         let mut update_queries = String::new();
@@ -489,8 +514,8 @@ impl DB {
                 query.push_str(&q);
             } else if index == cluster_update.len() - 1 {
                 let q = format!(
-                    " or cluster_id = '{}' and data_source = '{}';",
-                    cluster.cluster_id, cluster.data_source
+                    " or cluster_id = '{}' and data_source = '{}' and detector_id = '{}';",
+                    cluster.cluster_id, cluster.data_source, cluster.detector_id,
                 );
                 query.push_str(&q);
             } else {
@@ -499,7 +524,7 @@ impl DB {
             }
         }
         let query = format!(
-            "SELECT cluster_id, signature, examples, size FROM Events WHERE {}",
+            "SELECT cluster_id, signature, examples, size, category_id, priority_id, qualifier_id, status_id FROM Events WHERE {}",
             query
         );
         let cluster_list = match diesel::sql_query(query).load::<Clusters>(&conn) {
@@ -539,28 +564,84 @@ impl DB {
                     };
                     match example {
                         Some(example) => {
-                            let query = format!("UPDATE Events SET rules = '{}', signature = '{}', examples = x'{}', size = '{}', last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = {};", 
-                                sig,
-                                sig,
-                                hex::encode(example),
-                                cluster_size,
-                                timestamp,
+                            let query = format!("INSERT OR REPLACE INTO Events (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
                                 c.cluster_id,
+                                cluster.category_id,
                                 c.detector_id,
+                                hex::encode(example),
+                                cluster.priority_id,
+                                cluster.qualifier_id,
+                                cluster.status_id,
+                                sig,
+                                sig,
+                                cluster_size,
+                                c.data_source,
+                                timestamp,
                             );
                             update_queries.push_str(&query);
                         }
                         None => {
-                            let query = format!("UPDATE Events SET rules = '{}', signature = '{}', size = '{}', last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = {};", 
+                            let query = format!("INSERT OR REPLACE INTO Events (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
+                                c.cluster_id,
+                                cluster.category_id,
+                                c.detector_id,
+                                cluster.priority_id,
+                                cluster.qualifier_id,
+                                cluster.status_id,
                                 sig,
                                 sig,
                                 cluster_size,
+                                c.data_source,
                                 timestamp,
-                                c.cluster_id,
-                                c.detector_id,
                             );
                             update_queries.push_str(&query);
                         }
+                    }
+                }
+            } else {
+                let example = match &c.examples {
+                    Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
+                    None => None,
+                };
+                let sig = match &c.signature {
+                    Some(sig) => sig.clone(),
+                    None => "-".to_string(),
+                };
+                let cluster_size = match c.size {
+                    Some(cluster_size) => cluster_size.to_string(),
+                    None => "1".to_string(),
+                };
+                match example {
+                    Some(example) => {
+                        let query = format!("INSERT OR REPLACE INTO Events (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
+                            c.cluster_id,
+                            1,
+                            c.detector_id,
+                            hex::encode(example),
+                            1,
+                            2,
+                            2,
+                            sig,
+                            sig,
+                            cluster_size,
+                            c.data_source,
+                        );
+                        update_queries.push_str(&query);
+                    }
+                    None => {
+                        let query = format!("INSERT OR REPLACE INTO Events (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
+                            c.cluster_id,
+                            1,
+                            c.detector_id,
+                            1,
+                            2,
+                            2,
+                            sig,
+                            sig,
+                            cluster_size,
+                            c.data_source,
+                        );
+                        update_queries.push_str(&query);
                     }
                 }
             }
