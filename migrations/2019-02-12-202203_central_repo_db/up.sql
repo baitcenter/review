@@ -61,6 +61,7 @@ CREATE TABLE Events (
   size TEXT NOT NULL DEFAULT "1",
   data_source TEXT NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (cluster_id, detector_id, data_source) ON CONFLICT REPLACE,
   FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
   FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
   FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
@@ -72,5 +73,6 @@ CREATE TABLE Outliers (
   outlier_raw_event BLOB NOT NULL,
   outlier_data_source TEXT NOT NULL,
   outlier_event_ids BLOB,
-  outlier_size TEXT
+  outlier_size TEXT,
+  UNIQUE (outlier_raw_event, outlier_data_source) ON CONFLICT REPLACE
 );
