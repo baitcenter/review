@@ -59,19 +59,21 @@ impl ApiService {
                         .collect();
                     if hash_query.len() == 1 {
                         if let Some(category_id) = hash_query.get("category_id") {
-                            let result = db::DB::get_event_by_category(&self.db, category_id)
-                                .and_then(|data| future::ok(ApiService::process_events(&data)))
+                            let result = db::DB::get_cluster_by_category(&self.db, category_id)
+                                .and_then(|data| future::ok(ApiService::process_clusters(&data)))
                                 .map_err(Into::into);
                             Box::new(result)
                         } else if let Some(data_source) = hash_query.get("data_source") {
-                            let result = db::DB::get_event_by_data_source(&self.db, data_source)
-                                .and_then(|data| future::ok(ApiService::process_events(&data)))
+                            let result = db::DB::get_cluster_by_data_source(&self.db, data_source)
+                                .and_then(|data| future::ok(ApiService::process_clusters(&data)))
                                 .map_err(Into::into);
                             Box::new(result)
                         } else if let Some(status_id) = hash_query.get("status_id") {
                             if let Ok(status_id) = status_id.parse::<i32>() {
-                                let result = db::DB::get_event_by_status(&self.db, status_id)
-                                    .and_then(|data| future::ok(ApiService::process_events(&data)))
+                                let result = db::DB::get_cluster_by_status(&self.db, status_id)
+                                    .and_then(|data| {
+                                        future::ok(ApiService::process_clusters(&data))
+                                    })
                                     .map_err(Into::into);
                                 Box::new(result)
                             } else {
@@ -293,9 +295,9 @@ impl ApiService {
                                 Box::new(result)
                             } else {
                                 let result =
-                                    db::DB::get_event_by_data_source(&self.db, data_source)
+                                    db::DB::get_cluster_by_data_source(&self.db, data_source)
                                         .and_then(|data| {
-                                            future::ok(ApiService::process_events(&data))
+                                            future::ok(ApiService::process_clusters(&data))
                                         })
                                         .map_err(Into::into);
                                 Box::new(result)
@@ -548,7 +550,7 @@ impl ApiService {
                             hash_query.get("new_category_id"),
                         ) {
                             if let Ok(new_category_id) = new_category_id.parse::<i32>() {
-                                let resp = db::DB::update_category_id_in_events(&self.db, &cluster_id, &data_source, new_category_id)
+                                let resp = db::DB::update_category_id_in_clusters(&self.db, &cluster_id, &data_source, new_category_id)
                                     .then(move |update_result| match update_result {
                                         Ok(_) => future::ok(
                                             Response::builder()
@@ -595,7 +597,7 @@ impl ApiService {
                             hash_query.get("data_source"),
                             hash_query.get("new_category"),
                         ) {
-                            let resp = db::DB::update_category_in_events(&self.db, &cluster_id, &data_source, new_category)
+                            let resp = db::DB::update_category_in_clusters(&self.db, &cluster_id, &data_source, new_category)
                                 .then(move |update_result| match update_result {
                                     Ok(_) => future::ok(
                                         Response::builder()
@@ -855,8 +857,8 @@ impl ApiService {
                 }
 
                 (&Method::GET, "/api/cluster") => {
-                    let result = db::DB::get_event_table(&self.db)
-                        .and_then(|data| future::ok(ApiService::process_events(&data)))
+                    let result = db::DB::get_cluster_table(&self.db)
+                        .and_then(|data| future::ok(ApiService::process_clusters(&data)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
@@ -1013,9 +1015,9 @@ impl ApiService {
         bytes.iter().map(|b| char::from(*b)).collect()
     }
 
-    fn process_events(
+    fn process_clusters(
         data: &[(
-            db::models::EventsTable,
+            db::models::ClustersTable,
             db::models::StatusTable,
             db::models::QualifierTable,
             db::models::CategoryTable,

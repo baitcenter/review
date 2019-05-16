@@ -13,6 +13,37 @@ CREATE TABLE Category (
 );
 INSERT INTO Category VALUES(1,'Non-Specified Alert');
 
+CREATE TABLE Clusters (
+  id INTEGER PRIMARY KEY,
+  cluster_id TEXT,
+  description TEXT,
+  category_id INTEGER NOT NULL,
+  detector_id INTEGER NOT NULL,
+  examples BLOB,
+  priority_id INTEGER NOT NULL,
+  qualifier_id INTEGER NOT NULL,
+  status_id INTEGER NOT NULL,
+  rules TEXT,
+  signature TEXT NOT NULL,
+  size TEXT NOT NULL DEFAULT "1",
+  data_source TEXT NOT NULL,
+  last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (cluster_id, detector_id, data_source) ON CONFLICT REPLACE,
+  FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
+  FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
+  FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
+  FOREIGN KEY(status_id) REFERENCES Status(status_id) ON UPDATE CASCADE
+);
+
+CREATE TABLE Outliers (
+  outlier_id INTEGER PRIMARY KEY,
+  outlier_raw_event BLOB NOT NULL,
+  outlier_data_source TEXT NOT NULL,
+  outlier_event_ids BLOB,
+  outlier_size TEXT,
+  UNIQUE (outlier_raw_event, outlier_data_source) ON CONFLICT REPLACE
+);
+
 -- Qualifier is the qualification of a cluster (i.e. good or bad). --
 CREATE TABLE Qualifier (
   qualifier_id INTEGER PRIMARY KEY,
@@ -43,36 +74,3 @@ CREATE TABLE Status (
 INSERT INTO Status VALUES(1,'reviewed');
 INSERT INTO Status VALUES(2,'pending review');
 INSERT INTO Status VALUES(3,'disabled');
-
--- Events represent rules that have been crafted from particular --
--- clusters. --
-CREATE TABLE Events (
-  event_id INTEGER PRIMARY KEY,
-  cluster_id TEXT,
-  description TEXT,
-  category_id INTEGER NOT NULL,
-  detector_id INTEGER NOT NULL,
-  examples BLOB,
-  priority_id INTEGER NOT NULL,
-  qualifier_id INTEGER NOT NULL,
-  status_id INTEGER NOT NULL,
-  rules TEXT,
-  signature TEXT NOT NULL,
-  size TEXT NOT NULL DEFAULT "1",
-  data_source TEXT NOT NULL,
-  last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (cluster_id, detector_id, data_source) ON CONFLICT REPLACE,
-  FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
-  FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
-  FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
-  FOREIGN KEY(status_id) REFERENCES Status(status_id) ON UPDATE CASCADE
-);
-
-CREATE TABLE Outliers (
-  outlier_id INTEGER PRIMARY KEY,
-  outlier_raw_event BLOB NOT NULL,
-  outlier_data_source TEXT NOT NULL,
-  outlier_event_ids BLOB,
-  outlier_size TEXT,
-  UNIQUE (outlier_raw_event, outlier_data_source) ON CONFLICT REPLACE
-);

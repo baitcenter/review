@@ -16,20 +16,10 @@ pub struct CategoryTable {
 }
 
 #[derive(Debug, Queryable, QueryableByName, Serialize)]
-#[table_name = "Events"]
+#[table_name = "Clusters"]
 pub struct ClusterExample {
     pub cluster_id: Option<String>,
     pub examples: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ClusterUpdate {
-    pub cluster_id: String,
-    pub detector_id: i32,
-    pub signature: Option<String>,
-    pub data_source: String,
-    pub size: Option<usize>,
-    pub examples: Option<Vec<(usize, String)>>,
 }
 
 #[derive(
@@ -42,13 +32,12 @@ pub struct ClusterUpdate {
     QueryableByName,
     Serialize,
 )]
-#[table_name = "Events"]
-#[primary_key(event_id)]
+#[table_name = "Clusters"]
 #[belongs_to(CategoryTable, foreign_key = "category_id")]
 #[belongs_to(StatusTable, foreign_key = "status_id")]
 #[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
-pub struct EventsTable {
-    pub event_id: Option<i32>,
+pub struct ClustersTable {
+    pub id: Option<i32>,
     pub cluster_id: Option<String>,
     pub description: Option<String>,
     pub category_id: i32,
@@ -62,6 +51,16 @@ pub struct EventsTable {
     pub size: String,
     pub data_source: String,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ClusterUpdate {
+    pub cluster_id: String,
+    pub detector_id: i32,
+    pub signature: Option<String>,
+    pub data_source: String,
+    pub size: Option<usize>,
+    pub examples: Option<Vec<(usize, String)>>,
 }
 
 #[derive(Debug, Insertable, AsChangeset, Queryable, Serialize)]
