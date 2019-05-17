@@ -749,7 +749,7 @@ impl DB {
 
     fn merge_cluster_examples(
         current_examples: Option<Vec<u8>>,
-        new_examples: Option<Vec<(usize, String)>>,
+        new_examples: Option<Vec<Examples>>,
     ) -> Option<Vec<u8>> {
         let max_examples_num: usize = 25;
 
@@ -762,7 +762,7 @@ impl DB {
                     }
                 } else if let Some(current_eg) = current_examples.clone() {
                     match rmp_serde::decode::from_slice(&current_eg)
-                        as Result<Vec<(usize, String)>, rmp_serde::decode::Error>
+                        as Result<Vec<Examples>, rmp_serde::decode::Error>
                     {
                         Ok(mut current_eg) => {
                             current_eg.extend(new_eg);
