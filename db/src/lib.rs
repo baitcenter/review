@@ -518,16 +518,22 @@ impl DB {
         let mut query = String::new();
         for (index, cluster) in cluster_update.iter().enumerate() {
             if index == 0 {
-                let q = format!("cluster_id = '{}'", cluster.cluster_id);
+                let q = format!(
+                    "cluster_id = '{}' and data_source = '{}' and detector_id = {}",
+                    cluster.cluster_id, cluster.data_source, cluster.detector_id
+                );
                 query.push_str(&q);
             } else if index == cluster_update.len() - 1 {
                 let q = format!(
-                    " or cluster_id = '{}' and data_source = '{}' and detector_id = '{}';",
+                    " or cluster_id = '{}' and data_source = '{}' and detector_id = {};",
                     cluster.cluster_id, cluster.data_source, cluster.detector_id,
                 );
                 query.push_str(&q);
             } else {
-                let q = format!(" or cluster_id = '{}'", cluster.cluster_id);
+                let q = format!(
+                    " or cluster_id = '{}' and data_source = '{}' and detector_id = {}",
+                    cluster.cluster_id, cluster.data_source, cluster.detector_id
+                );
                 query.push_str(&q);
             }
         }
