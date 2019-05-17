@@ -1033,14 +1033,14 @@ impl ApiService {
             signature: String,
             data_source: String,
             size: usize,
-            examples: Option<Vec<db::models::Examples>>,
+            examples: Option<Vec<db::models::Example>>,
             last_modification_time: Option<chrono::NaiveDateTime>,
         }
         let mut clusters: Vec<Clusters> = Vec::new();
         for d in data {
             let eg = match &d.0.examples {
                 Some(eg) => (rmp_serde::decode::from_slice(&eg)
-                    as Result<Vec<db::models::Examples>, rmp_serde::decode::Error>)
+                    as Result<Vec<db::models::Example>, rmp_serde::decode::Error>)
                     .ok(),
                 None => None,
             };

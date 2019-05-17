@@ -60,29 +60,29 @@ pub struct ClusterUpdate {
     pub signature: Option<String>,
     pub data_source: String,
     pub size: Option<usize>,
-    pub examples: Option<Vec<Examples>>,
+    pub examples: Option<Vec<Example>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Serialize)]
-pub struct Examples {
+pub struct Example {
     pub id: u64,
     pub raw_event: String,
 }
 
-impl Ord for Examples {
-    fn cmp(&self, other: &Examples) -> std::cmp::Ordering {
+impl Ord for Example {
+    fn cmp(&self, other: &Example) -> std::cmp::Ordering {
         self.id.cmp(&other.id)
     }
 }
 
-impl PartialOrd for Examples {
-    fn partial_cmp(&self, other: &Examples) -> Option<std::cmp::Ordering> {
+impl PartialOrd for Example {
+    fn partial_cmp(&self, other: &Example) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for Examples {
-    fn eq(&self, other: &Examples) -> bool {
+impl PartialEq for Example {
+    fn eq(&self, other: &Example) -> bool {
         self.id == other.id
     }
 }
