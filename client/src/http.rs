@@ -175,7 +175,7 @@ impl<'a> ClusterView<'a> {
                     .child(TextView::new("").with_id("cluster_properties"))
                     .child(
                         Dialog::around(TextView::new(
-                            "Please Select an cluster from the left lists",
+                            "Please Select a cluster from the left lists",
                         ))
                         .with_id("cluster_properties2"),
                     ),
