@@ -1,6 +1,6 @@
 <hr>
 
-## [v0.4.1](https://gitlab.com/resolutions/review/tree/0.4.1) (2019-05-20) 
+## [0.4.1](https://gitlab.com/resolutions/review/tree/0.4.1) (2019-05-20) 
 
 ### Changed
 - Rename `Events` table to `Clusters` table (Note that database files created by REview 0.4.0 do not work with REview 0.4.1 and vice versa)
@@ -17,7 +17,7 @@ v0.4.0
         "status_id": 2,
 ```
 
-v.0.4.1
+v0.4.1
 ```
         "cluster_id": "get http www",
         "detector_id": 2,
@@ -39,7 +39,7 @@ v.0.4.1
 <hr>
 
 
-## [v0.4.0](https://gitlab.com/resolutions/review/tree/0.4.0) (2019-04-16)
+## [0.4.0](https://gitlab.com/resolutions/review/tree/0.4.0) (2019-04-16)
 
 ### Added
 - New fields are added in database schema. Thus REview 0.4.0 does not work with databases created by older version of REview.
