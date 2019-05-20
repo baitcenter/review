@@ -177,6 +177,7 @@ version = "0.3.6"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "cursive 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "db 0.3.7",
  "remake 0.18.1",
  "reqwest 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "rmp-serde 0.13.7 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -15,10 +15,11 @@ pub struct Event {
     detector_id: u32,
     qualifier: String,
     status: String,
+    category: String,
     signature: String,
     data_source: String,
     size: usize,
-    examples: Vec<(usize, String)>,
+    examples: Vec<db::models::Example>,
     last_modification_time: String,
 }
 
@@ -212,8 +213,11 @@ impl<'a> EventView<'a> {
                             examples
                                 .iter()
                                 .map(|e| {
-                                    if e.1.len() > 500 {
-                                        (e.0, e.1[..500].to_string())
+                                    if e.raw_event.len() > 500 {
+                                        db::models::Example {
+                                            id: e.id,
+                                            raw_event: e.raw_event[..500].to_string(),
+                                        }
                                     } else {
                                         e.clone()
                                     }
@@ -224,8 +228,11 @@ impl<'a> EventView<'a> {
                                 .examples
                                 .iter()
                                 .map(|e| {
-                                    if e.1.len() > 500 {
-                                        (e.0, e.1[..500].to_string())
+                                    if e.raw_event.len() > 500 {
+                                        db::models::Example {
+                                            id: e.id,
+                                            raw_event: e.raw_event[..500].to_string(),
+                                        }
                                     } else {
                                         e.clone()
                                     }
