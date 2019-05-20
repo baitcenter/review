@@ -101,11 +101,11 @@ fn main() {
     if let Some(review_matches) = matches.subcommand_matches("client") {
         if let Some(url) = review_matches.value_of("url") {
             validate_url(url);
-            let event_view = client::http::EventView::new(&url);
-            match event_view {
-                Ok(mut event_view) => event_view.run(),
+            let cluster_view = client::http::ClusterView::new(&url);
+            match cluster_view {
+                Ok(mut cluster_view) => cluster_view.run(),
                 Err(e) => {
-                    eprintln!("Failed to create a event_view: {}", e);
+                    eprintln!("Failed to create a cluster_view: {}", e);
                     std::process::exit(1);
                 }
             }

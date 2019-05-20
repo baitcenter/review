@@ -10,7 +10,7 @@ use std::error::Error;
 use std::sync::mpsc;
 
 #[derive(Deserialize, Debug)]
-pub struct Event {
+pub struct Cluster {
     cluster_id: String,
     detector_id: u32,
     qualifier: String,
@@ -35,25 +35,25 @@ pub struct StatusTable {
     pub status: String,
 }
 
-pub enum EventViewMessage {
-    PrintEventProps(usize),
-    SaveEventQualifier((usize, u32)),
+pub enum ClusterViewMessage {
+    PrintClusterProps(usize),
+    SaveClusterQualifier((usize, u32)),
     SendUpdateRequest(),
 }
 
-pub struct EventView<'a> {
+pub struct ClusterView<'a> {
     cursive: Cursive,
-    event_view_rx: mpsc::Receiver<EventViewMessage>,
-    event_view_tx: mpsc::Sender<EventViewMessage>,
-    events: Vec<Event>,
+    cluster_view_rx: mpsc::Receiver<ClusterViewMessage>,
+    cluster_view_tx: mpsc::Sender<ClusterViewMessage>,
+    clusters: Vec<Cluster>,
     qualifier: HashMap<u32, String>,
-    is_event_updated: HashMap<String, u32>,
+    is_cluster_updated: HashMap<String, u32>,
     url: &'a str,
 }
 
-impl<'a> EventView<'a> {
-    pub fn new(url: &str) -> Result<EventView, Box<Error>> {
-        let (event_view_tx, event_view_rx) = mpsc::channel::<EventViewMessage>();
+impl<'a> ClusterView<'a> {
+    pub fn new(url: &str) -> Result<ClusterView, Box<Error>> {
+        let (cluster_view_tx, cluster_view_rx) = mpsc::channel::<ClusterViewMessage>();
 
         let url = url.trim_end_matches('/');
         let qualifier_url = format!("{}/api/qualifier", url);
@@ -101,13 +101,13 @@ impl<'a> EventView<'a> {
             .find(|&x| x.1.to_lowercase() == "pending review")
             .unwrap()
             .0;
-        let event_url = format!("{}/api/cluster?status_id={}", url, review_id);
-        let events = match reqwest::get(event_url.as_str()) {
-            Ok(mut resp) => match resp.json() as Result<Vec<Event>, reqwest::Error> {
+        let cluster_url = format!("{}/api/cluster?status_id={}", url, review_id);
+        let clusters = match reqwest::get(cluster_url.as_str()) {
+            Ok(mut resp) => match resp.json() as Result<Vec<Cluster>, reqwest::Error> {
                 Ok(data) => data,
                 Err(e) => {
                     eprintln!(
-                        "Unexpected response from server. cannot deserialize Events table. {}",
+                        "Unexpected response from server. cannot deserialize Clusters table. {}",
                         e
                     );
                     std::process::exit(1);
@@ -118,98 +118,101 @@ impl<'a> EventView<'a> {
                 std::process::exit(1);
             }
         };
-        if events.is_empty() {
-            eprintln!("Event with review status was not found.");
+        if clusters.is_empty() {
+            eprintln!("Cluster with review status was not found.");
             std::process::exit(1);
         }
-        let is_event_updated: HashMap<String, u32> = HashMap::new();
-        let mut event_view = EventView {
+        let is_cluster_updated: HashMap<String, u32> = HashMap::new();
+        let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
-            event_view_tx,
-            event_view_rx,
-            events,
+            cluster_view_tx,
+            cluster_view_rx,
+            clusters,
             qualifier,
-            is_event_updated,
+            is_cluster_updated,
             url,
         };
 
-        let names: Vec<String> = event_view
-            .events
+        let names: Vec<String> = cluster_view
+            .clusters
             .iter()
             .map(|e| e.cluster_id.clone())
             .collect();
-        let mut event_select = SelectView::new();
+        let mut cluster_select = SelectView::new();
         let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
         for (i, label) in names.iter().enumerate() {
             let index_str = (i + 1).to_string();
-            event_select.add_item(
+            cluster_select.add_item(
                 " ".repeat(index_width - index_str.len()) + &index_str + " " + label,
                 i,
             );
         }
 
-        let event_view_tx_clone = event_view.event_view_tx.clone();
-        event_select.set_on_submit(move |_, i| {
-            event_view_tx_clone
-                .send(EventViewMessage::PrintEventProps(*i))
+        let cluster_view_tx_clone = cluster_view.cluster_view_tx.clone();
+        cluster_select.set_on_submit(move |_, i| {
+            cluster_view_tx_clone
+                .send(ClusterViewMessage::PrintClusterProps(*i))
                 .unwrap();
         });
 
         let quit_view = TextView::new("Press q to exit".to_string());
         let save_view = TextView::new("Press s to save changes.".to_string());
         let top_layout = LinearLayout::new(Orientation::Vertical)
-            .child(event_select.scrollable().full_width().fixed_height(20))
+            .child(cluster_select.scrollable().full_width().fixed_height(20))
             .child(DummyView)
             .child(DummyView)
             .child(save_view)
             .child(quit_view);
 
-        let event_prop_box1 = BoxView::new(SizeConstraint::Full, SizeConstraint::Full, top_layout)
-            .with_id("event_view");
-        let event_prop_box2 = BoxView::new(
+        let cluster_prop_box1 =
+            BoxView::new(SizeConstraint::Full, SizeConstraint::Full, top_layout)
+                .with_id("cluster_view");
+        let cluster_prop_box2 = BoxView::new(
             SizeConstraint::Fixed(60),
             SizeConstraint::Fixed(60),
             Panel::new(
                 LinearLayout::vertical()
-                    .child(TextView::new("").with_id("event_properties"))
+                    .child(TextView::new("").with_id("cluster_properties"))
                     .child(
-                        Dialog::around(TextView::new("Please Select an event from the left lists"))
-                            .with_id("event_properties2"),
+                        Dialog::around(TextView::new(
+                            "Please Select an cluster from the left lists",
+                        ))
+                        .with_id("cluster_properties2"),
                     ),
             ),
         );
 
-        event_view.cursive.add_layer(
+        cluster_view.cursive.add_layer(
             LinearLayout::horizontal()
-                .child(event_prop_box1)
-                .child(event_prop_box2)
+                .child(cluster_prop_box1)
+                .child(cluster_prop_box2)
                 .scrollable(),
         );
 
-        event_view.cursive.add_global_callback('q', Cursive::quit);
-        let event_view_tx_clone = event_view.event_view_tx.clone();
-        event_view.cursive.add_global_callback('s', move |_| {
-            event_view_tx_clone
-                .send(EventViewMessage::SendUpdateRequest())
+        cluster_view.cursive.add_global_callback('q', Cursive::quit);
+        let cluster_view_tx_clone = cluster_view.cluster_view_tx.clone();
+        cluster_view.cursive.add_global_callback('s', move |_| {
+            cluster_view_tx_clone
+                .send(ClusterViewMessage::SendUpdateRequest())
                 .unwrap();
         });
 
-        Ok(event_view)
+        Ok(cluster_view)
     }
     pub fn run(&mut self) {
         while self.cursive.is_running() {
-            while let Some(message) = self.event_view_rx.try_iter().next() {
+            while let Some(message) = self.cluster_view_rx.try_iter().next() {
                 match message {
-                    EventViewMessage::PrintEventProps(item) => {
-                        let mut event_prop_window1 = self
+                    ClusterViewMessage::PrintClusterProps(item) => {
+                        let mut cluster_prop_window1 = self
                             .cursive
-                            .find_id::<TextView>("event_properties")
+                            .find_id::<TextView>("cluster_properties")
                             .unwrap();
                         // REview displays at most 3 examples for each cluster
                         // if the length of an example is longer than 500,
                         // REview only uses first 500
-                        let examples = if self.events[item].examples.len() > 3 {
-                            let (examples, _) = &self.events[item].examples.split_at(3);
+                        let examples = if self.clusters[item].examples.len() > 3 {
+                            let (examples, _) = &self.clusters[item].examples.split_at(3);
                             examples
                                 .iter()
                                 .map(|e| {
@@ -224,7 +227,7 @@ impl<'a> EventView<'a> {
                                 })
                                 .collect::<Vec<_>>()
                         } else {
-                            self.events[item]
+                            self.clusters[item]
                                 .examples
                                 .iter()
                                 .map(|e| {
@@ -240,47 +243,51 @@ impl<'a> EventView<'a> {
                                 .collect::<Vec<_>>()
                         };
                         let msg = format!("cluster_id: {}\ndetector_id: {}\nqualifier: {}\nstatus: {}\nsignature: {}\ndata_source: {}\nsize: {}\nexample: {:#?}\nlast_modification_time: {}", 
-                            &self.events[item].cluster_id,
-                            &self.events[item].detector_id,
-                            &self.events[item].qualifier,
-                            &self.events[item].status,
-                            &self.events[item].signature,
-                            &self.events[item].data_source,
-                            &self.events[item].size,
+                            &self.clusters[item].cluster_id,
+                            &self.clusters[item].detector_id,
+                            &self.clusters[item].qualifier,
+                            &self.clusters[item].status,
+                            &self.clusters[item].signature,
+                            &self.clusters[item].data_source,
+                            &self.clusters[item].size,
                             &examples,
-                            &self.events[item].last_modification_time,
+                            &self.clusters[item].last_modification_time,
                         );
-                        event_prop_window1.set_content(msg);
+                        cluster_prop_window1.set_content(msg);
 
-                        let mut event_prop_window2 =
-                            self.cursive.find_id::<Dialog>("event_properties2").unwrap();
-                        let event_view_tx_clone = self.event_view_tx.clone();
+                        let mut cluster_prop_window2 = self
+                            .cursive
+                            .find_id::<Dialog>("cluster_properties2")
+                            .unwrap();
+                        let cluster_view_tx_clone = self.cluster_view_tx.clone();
 
                         let mut qualifier_select = SelectView::new();
                         for (i, qualifier) in &self.qualifier {
                             qualifier_select.add_item(qualifier.to_string(), *i);
                         }
-                        event_prop_window2.set_content(qualifier_select.on_submit(
+                        cluster_prop_window2.set_content(qualifier_select.on_submit(
                             move |_, qualifier: &u32| {
-                                event_view_tx_clone
-                                    .send(EventViewMessage::SaveEventQualifier((item, *qualifier)))
+                                cluster_view_tx_clone
+                                    .send(ClusterViewMessage::SaveClusterQualifier((
+                                        item, *qualifier,
+                                    )))
                                     .unwrap();
                             },
                         ))
                     }
 
-                    EventViewMessage::SaveEventQualifier(item) => {
-                        if self.events[item.0].qualifier != self.qualifier[&item.1] {
-                            self.events[item.0].qualifier = self.qualifier[&item.1].clone();
-                            self.is_event_updated
-                                .insert(self.events[item.0].cluster_id.clone(), item.1);
+                    ClusterViewMessage::SaveClusterQualifier(item) => {
+                        if self.clusters[item.0].qualifier != self.qualifier[&item.1] {
+                            self.clusters[item.0].qualifier = self.qualifier[&item.1].clone();
+                            self.is_cluster_updated
+                                .insert(self.clusters[item.0].cluster_id.clone(), item.1);
                         }
                     }
 
-                    EventViewMessage::SendUpdateRequest() => {
+                    ClusterViewMessage::SendUpdateRequest() => {
                         let mut resp_err: Vec<String> = Vec::new();
                         let mut send_err: Vec<String> = Vec::new();
-                        for (cluster_id, qualifier_id) in &self.is_event_updated {
+                        for (cluster_id, qualifier_id) in &self.is_cluster_updated {
                             let url = format!(
                                 "{}/api/cluster?cluster_id={}&qualifier_id={}",
                                 self.url, cluster_id, qualifier_id
@@ -297,20 +304,24 @@ impl<'a> EventView<'a> {
                         }
                         if resp_err.is_empty() && send_err.is_empty() {
                             let popup_message = "Your changes have been successfully saved.";
-                            EventView::create_popup_window(&mut self.cursive, popup_message, &"OK");
+                            ClusterView::create_popup_window(
+                                &mut self.cursive,
+                                popup_message,
+                                &"OK",
+                            );
                         } else if !resp_err.is_empty() {
                             let popup_message = format!(
                                 "Failed to update the following cluster_id:\n\n{:?}",
                                 resp_err
                             );
-                            EventView::create_popup_window(
+                            ClusterView::create_popup_window(
                                 &mut self.cursive,
                                 popup_message.as_str(),
                                 &"OK",
                             );
                         } else if !send_err.is_empty() {
-                            let popup_message = format!("Failed to send update requests of the following event_id to backend server:\n\n{:?}", send_err);
-                            EventView::create_popup_window(
+                            let popup_message = format!("Failed to send update requests of the following cluster_id to backend server:\n\n{:?}", send_err);
+                            ClusterView::create_popup_window(
                                 &mut self.cursive,
                                 popup_message.as_str(),
                                 &"OK",
