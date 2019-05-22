@@ -6,6 +6,7 @@ use hyper::{header, Body, Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use url::percent_encoding::percent_decode;
 
 mod error;
 use error::Error;
@@ -689,7 +690,114 @@ impl ApiService {
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
-                _ => Box::new(future::ok(ApiService::build_http_404_response())),
+                _ => {
+                    if req.method() == Method::PUT && req.uri().path().contains("/api/cluster/") {
+                        let path: Vec<&str> = req.uri().path().split('/').collect();
+                        let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                            .into_owned()
+                            .collect();
+                        if path.len() == 4
+                            && hash_query.len() == 2
+                            && path[1] == "api"
+                            && path[2] == "cluster"
+                        {
+                            let cluster_id = percent_decode(path[3].as_bytes()).decode_utf8();
+                            if let (Ok(cluster_id), Some(detector_id), Some(data_source)) = (
+                                cluster_id,
+                                hash_query.get("detector_id"),
+                                hash_query.get("data_source"),
+                            ) {
+                                #[derive(Debug, Deserialize)]
+                                struct NewValues {
+                                    cluster_id: Option<String>,
+                                    category: Option<String>,
+                                    qualifier: Option<String>,
+                                }
+                                let cluster_id_cloned = cluster_id.into_owned();
+                                let data_source_cloned = data_source.clone();
+                                let detector_id_cloned = detector_id.clone();
+                                let result = req
+                                    .into_body()
+                                    .concat2()
+                                    .map_err(Into::into)
+                                    .and_then(|buf| {
+                                        serde_json::from_slice(&buf)
+                                            .map(move |data: NewValues| {
+                                                if data.cluster_id.is_some() || data.category.is_some() || data.qualifier.is_some() {
+                                                    let mut set_query = String::new();
+                                                    if let Some(new_cluster_id) = data.cluster_id {
+                                                        set_query.push_str(&format!("SET cluster_id = '{}'", new_cluster_id));
+                                                    }
+                                                    if let Some(new_category) = data.category {
+                                                        if set_query.is_empty() {
+                                                            set_query.push_str(&format!("SET category_id = (SELECT category_id FROM category WHERE category = '{}')", new_category));
+                                                        }
+                                                        else {
+                                                            set_query.push_str(&format!(", category_id = (SELECT category_id FROM category WHERE category = '{}')", new_category));
+                                                        }
+                                                    }
+                                                    if let Some(new_qualifier) = data.qualifier {
+                                                        if set_query.is_empty() {
+                                                            set_query.push_str(&format!("SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", new_qualifier));
+                                                        }
+                                                        else {
+                                                            set_query.push_str(&format!(", qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", new_qualifier));
+                                                        }
+                                                    }
+                                                    let now = chrono::Utc::now();
+                                                    let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+                                                    let query = format!("UPDATE clusters {} , last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", set_query, timestamp, cluster_id_cloned, detector_id_cloned, data_source_cloned);
+                                                    db::DB::execute_query(&self.db, &query)
+                                                }
+                                                else {
+                                                    future::result(Err(db::error::Error::from(db::error::ErrorKind::DatabaseTransactionError(
+                                                                        db::error::DatabaseError::RecordNotExist,
+                                                                    ))))
+                                                }
+                                            })
+                                            .map_err(Into::into)
+                                    })
+                                    .and_then(|mut result| match result.poll() {
+                                        Ok(_) => future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::OK)
+                                                .body(Body::from("Cluster has been successfully updated"))
+                                                .unwrap(),
+                                        ),
+                                        Err(e) => {
+                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                                e.kind()
+                                            {
+                                                if *reason == db::error::DatabaseError::DatabaseLocked {
+                                                    future::ok(
+                                                        Response::builder()
+                                                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                            .body(Body::from("Service temporarily unavailable"))
+                                                            .unwrap(),
+                                                    )
+                                                } else if *reason == db::error::DatabaseError::RecordNotExist {
+                                                    future::ok(
+                                                        Response::builder()
+                                                            .status(StatusCode::BAD_REQUEST)
+                                                            .body(Body::from("The specified record does not exist in database"))
+                                                            .unwrap(),
+                                                    )
+                                                } else {
+                                                    future::ok(ApiService::build_http_500_response())
+                                                }
+                                            } else {
+                                                future::ok(ApiService::build_http_500_response())
+                                            }
+                                        }
+                                    });
+
+                                return Box::new(result);
+                            }
+                        }
+                    }
+
+                    Box::new(future::ok(ApiService::build_http_404_response()))
+                }
             },
             None => match (req.method(), req.uri().path()) {
                 (&Method::POST, "/api/cluster") => {
