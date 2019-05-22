@@ -3,7 +3,7 @@ use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -863,6 +863,64 @@ impl ApiService {
                     Box::new(result)
                 }
 
+                (&Method::GET, "/api/cluster/examples") => {
+                    let query = "SELECT cluster_id, examples FROM Clusters;";
+                    let result = db::DB::get_cluster_examples(&self.db, query)
+                        .and_then(|data| future::ok(ApiService::process_cluster_examples(data)))
+                        .map_err(Into::into);
+                    Box::new(result)
+                }
+
+                (&Method::PUT, "/api/cluster/qualifier") => {
+                    #[derive(Debug, Deserialize)]
+                    struct NewQualifier {
+                        cluster_id: String,
+                        data_source: String,
+                        detector_id: u32,
+                        qualifier: String,
+                    }
+                    let result = req
+                        .into_body()
+                        .concat2()
+                        .map_err(Into::into)
+                        .and_then(|buf| {
+                            serde_json::from_slice(&buf)
+                                .map(move |data: NewQualifier| {
+                                    let query = format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}') WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", data.qualifier, data.cluster_id, data.detector_id, data.data_source);
+                                    db::DB::execute_query(&self.db, &query)
+                                })
+                                .map_err(Into::into)
+                        })
+                        .and_then(|mut result| match result.poll() {
+                            Ok(_) => future::ok(
+                                Response::builder()
+                                    .status(StatusCode::OK)
+                                    .body(Body::from("Qualifier has been successfully updated"))
+                                    .unwrap(),
+                            ),
+                            Err(e) => {
+                                if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                    e.kind()
+                                {
+                                    if *reason == db::error::DatabaseError::DatabaseLocked {
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                .body(Body::from("Service temporarily unavailable"))
+                                                .unwrap(),
+                                        )
+                                    } else {
+                                        future::ok(ApiService::build_http_500_response())
+                                    }
+                                } else {
+                                    future::ok(ApiService::build_http_500_response())
+                                }
+                            }
+                        });
+
+                    Box::new(result)
+                }
+
                 (&Method::GET, "/api/outlier") => {
                     let result = db::DB::get_outliers_table(&self.db)
                         .and_then(|data| {
@@ -1056,6 +1114,33 @@ impl ApiService {
                 size,
                 examples: eg,
                 last_modification_time: d.0.last_modification_time,
+            });
+        }
+        match serde_json::to_string(&clusters) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => ApiService::build_http_500_response(),
+        }
+    }
+
+    fn process_cluster_examples(data: Vec<db::models::ClusterExample>) -> Response<Body> {
+        #[derive(Debug, Serialize)]
+        struct Clusters {
+            cluster_id: Option<String>,
+            examples: Option<Vec<db::models::Example>>,
+        }
+        let mut clusters: Vec<Clusters> = Vec::new();
+        for d in data {
+            let eg = d.examples.and_then(|eg| {
+                (rmp_serde::decode::from_slice(&eg)
+                    as Result<Vec<db::models::Example>, rmp_serde::decode::Error>)
+                    .ok()
+            });
+            clusters.push(Clusters {
+                cluster_id: d.cluster_id,
+                examples: eg,
             });
         }
         match serde_json::to_string(&clusters) {

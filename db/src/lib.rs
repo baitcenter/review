@@ -254,6 +254,20 @@ impl DB {
 
         future::result(cluster)
     }
+
+    pub fn get_cluster_examples(
+        &self,
+        query: &str,
+    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
+        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::sql_query(query)
+                .load::<ClusterExample>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(cluster)
+    }
+
     pub fn get_cluster_only(
         &self,
         datasource: &str,
@@ -268,6 +282,7 @@ impl DB {
 
         future::result(cluster)
     }
+
     pub fn get_cluster_with_limit_num(
         &self,
         c_id: &str,
@@ -341,6 +356,15 @@ impl DB {
         });
 
         future::result(cluster)
+    }
+
+    pub fn execute_query(&self, query: &str) -> future::FutureResult<(), Error> {
+        let conn = self.pool.get().unwrap();
+        let execution_result = match conn.execute(query) {
+            Ok(_) => Ok(()),
+            Err(e) => DB::error_handling(e),
+        };
+        future::result(execution_result)
     }
 
     pub fn add_outliers(
