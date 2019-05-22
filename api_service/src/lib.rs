@@ -1013,10 +1013,11 @@ impl ApiService {
                         .map_err(Into::into)
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
-                                .map(move |data: NewQualifier| {
+                                .map(move |data: Vec<NewQualifier>| {
                                     let now = chrono::Utc::now();
                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                                    let query = format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", data.qualifier, timestamp, data.cluster_id, data.detector_id, data.data_source);
+                                    let mut query = String::new();
+                                    data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.detector_id, d.data_source)));
                                     db::DB::execute_query(&self.db, &query)
                                 })
                                 .map_err(Into::into)
