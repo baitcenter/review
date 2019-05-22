@@ -310,6 +310,26 @@ impl ApiService {
                         Box::new(future::ok(ApiService::build_http_400_response()))
                     }
                 }
+                (&Method::GET, "/api/cluster/example") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let (Some(limit), 1) = (hash_query.get("limit"), hash_query.len()) {
+                        if let Ok(limit) = limit.parse::<u64>() {
+                            let query = format!(
+                                "SELECT cluster_id, examples FROM Clusters LIMIT {};",
+                                limit
+                            );
+                            let result = db::DB::get_cluster_examples(&self.db, &query)
+                                .and_then(|data| {
+                                    future::ok(ApiService::process_cluster_examples(data))
+                                })
+                                .map_err(Into::into);
+                            return Box::new(result);
+                        }
+                    }
+                    Box::new(future::ok(ApiService::build_http_400_response()))
+                }
                 (&Method::GET, "/api/outlier") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
@@ -971,7 +991,7 @@ impl ApiService {
                     Box::new(result)
                 }
 
-                (&Method::GET, "/api/cluster/examples") => {
+                (&Method::GET, "/api/cluster/example") => {
                     let query = "SELECT cluster_id, examples FROM Clusters;";
                     let result = db::DB::get_cluster_examples(&self.db, query)
                         .and_then(|data| future::ok(ApiService::process_cluster_examples(data)))
