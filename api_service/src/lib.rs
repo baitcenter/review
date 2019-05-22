@@ -994,7 +994,9 @@ impl ApiService {
                         .and_then(|buf| {
                             serde_json::from_slice(&buf)
                                 .map(move |data: NewQualifier| {
-                                    let query = format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}') WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", data.qualifier, data.cluster_id, data.detector_id, data.data_source);
+                                    let now = chrono::Utc::now();
+                                    let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+                                    let query = format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", data.qualifier, timestamp, data.cluster_id, data.detector_id, data.data_source);
                                     db::DB::execute_query(&self.db, &query)
                                 })
                                 .map_err(Into::into)
