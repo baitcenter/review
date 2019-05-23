@@ -335,7 +335,7 @@ impl ApiService {
                                     }
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
-                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
                                     .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
@@ -367,13 +367,13 @@ impl ApiService {
                                     }
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
-                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
                                     .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
                             } else {
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit);
-                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
                                     .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
@@ -776,7 +776,7 @@ impl ApiService {
                                                     let now = chrono::Utc::now();
                                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
                                                     let query = format!("UPDATE clusters {} , last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", set_query, timestamp, cluster_id_cloned, detector_id_cloned, data_source_cloned);
-                                                    db::DB::execute_query(&self.db, &query)
+                                                    db::DB::execute_update_query(&self.db, &query)
                                                 }
                                                 else {
                                                     future::result(Err(db::error::Error::from(db::error::ErrorKind::DatabaseTransactionError(
@@ -1018,8 +1018,8 @@ impl ApiService {
                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
                                     let mut query = String::new();
                                     data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.detector_id, d.data_source)));
-                                    let mut result = db::DB::execute_query(&self.db, &query);
 
+                                    let mut result = db::DB::execute_update_query(&self.db, &query);
                                     match result.poll() {
                                         Ok(_) => {
                                             data.iter().for_each(|d| {

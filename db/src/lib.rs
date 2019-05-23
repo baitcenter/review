@@ -227,22 +227,6 @@ impl DB {
         future::result(cluster)
     }
 
-    pub fn get_cluster_by_filter(
-        &self,
-        query: &str,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            diesel::sql_query(query)
-                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
     pub fn get_benign_id(&self) -> i32 {
         if let Ok(conn) = self.pool.get() {
             if let Ok(qualifier_table) = Qualifier.load::<QualifierTable>(&conn) {
@@ -374,7 +358,23 @@ impl DB {
         future::result(cluster)
     }
 
-    pub fn execute_query(&self, query: &str) -> future::FutureResult<(), Error> {
+    pub fn execute_select_cluster_query(
+        &self,
+        query: &str,
+    ) -> impl Future<
+        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
+        Error = Error,
+    > {
+        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::sql_query(query)
+                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                .map_err(Into::into)
+        });
+
+        future::result(cluster)
+    }
+
+    pub fn execute_update_query(&self, query: &str) -> future::FutureResult<(), Error> {
         let conn = self.pool.get().unwrap();
         let execution_result = match conn.execute(query) {
             Ok(_) => Ok(()),
