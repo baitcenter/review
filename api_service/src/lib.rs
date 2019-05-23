@@ -61,20 +61,18 @@ impl ApiService {
                     if hash_query.len() == 1 {
                         if let Some(category_id) = hash_query.get("category_id") {
                             let result = db::DB::get_cluster_by_category(&self.db, category_id)
-                                .and_then(|data| future::ok(ApiService::process_clusters(&data)))
+                                .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                 .map_err(Into::into);
                             Box::new(result)
                         } else if let Some(data_source) = hash_query.get("data_source") {
                             let result = db::DB::get_cluster_by_data_source(&self.db, data_source)
-                                .and_then(|data| future::ok(ApiService::process_clusters(&data)))
+                                .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                 .map_err(Into::into);
                             Box::new(result)
                         } else if let Some(status_id) = hash_query.get("status_id") {
                             if let Ok(status_id) = status_id.parse::<i32>() {
                                 let result = db::DB::get_cluster_by_status(&self.db, status_id)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::process_clusters(&data))
-                                    })
+                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 Box::new(result)
                             } else {
@@ -298,7 +296,7 @@ impl ApiService {
                                 let result =
                                     db::DB::get_cluster_by_data_source(&self.db, data_source)
                                         .and_then(|data| {
-                                            future::ok(ApiService::process_clusters(&data))
+                                            future::ok(ApiService::process_clusters(data))
                                         })
                                         .map_err(Into::into);
                                 Box::new(result)
@@ -350,9 +348,7 @@ impl ApiService {
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
                                 let result = db::DB::get_cluster_by_filter(&self.db, &query)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::process_clusters(&data))
-                                    })
+                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
                             }
@@ -379,9 +375,7 @@ impl ApiService {
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
                                 let result = db::DB::get_cluster_by_filter(&self.db, &query)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::process_clusters(&data))
-                                    })
+                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
                             }
@@ -1046,7 +1040,7 @@ impl ApiService {
 
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_cluster_table(&self.db)
-                        .and_then(|data| future::ok(ApiService::process_clusters(&data)))
+                        .and_then(|data| future::ok(ApiService::process_clusters(data)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
@@ -1265,12 +1259,12 @@ impl ApiService {
     }
 
     fn process_clusters(
-        data: &[(
+        data: Vec<(
             db::models::ClustersTable,
             db::models::StatusTable,
             db::models::QualifierTable,
             db::models::CategoryTable,
-        )],
+        )>,
     ) -> Response<Body> {
         #[derive(Debug, Serialize)]
         struct Clusters {
@@ -1287,21 +1281,20 @@ impl ApiService {
         }
         let mut clusters: Vec<Clusters> = Vec::new();
         for d in data {
-            let eg = match &d.0.examples {
-                Some(eg) => (rmp_serde::decode::from_slice(&eg)
+            let eg = d.0.examples.and_then(|eg| {
+                (rmp_serde::decode::from_slice(&eg)
                     as Result<Vec<db::models::Example>, rmp_serde::decode::Error>)
-                    .ok(),
-                None => None,
-            };
+                    .ok()
+            });
             let size = d.0.size.parse::<usize>().unwrap_or(0);
             clusters.push(Clusters {
-                cluster_id: d.0.cluster_id.clone(),
+                cluster_id: d.0.cluster_id,
                 detector_id: d.0.detector_id,
-                qualifier: d.2.qualifier.clone(),
-                status: d.1.status.clone(),
-                category: d.3.category.clone(),
-                signature: d.0.signature.clone(),
-                data_source: d.0.data_source.clone(),
+                qualifier: d.2.qualifier,
+                status: d.1.status,
+                category: d.3.category,
+                signature: d.0.signature,
+                data_source: d.0.data_source,
                 size,
                 examples: eg,
                 last_modification_time: d.0.last_modification_time,
@@ -1352,20 +1345,6 @@ struct Filter {
     qualifier: Option<Vec<String>>,
     cluster_id: Option<Vec<String>>,
     detector_id: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ReturnParameter {
-    cluster_id: Option<bool>,
-    category: Option<bool>,
-    detector_id: Option<bool>,
-    examples: Option<bool>,
-    qualifier: Option<bool>,
-    status: Option<bool>,
-    signature: Option<bool>,
-    size: Option<bool>,
-    data_source: Option<bool>,
-    last_modification_time: Option<bool>,
 }
 
 fn build_where_clause(query: &mut Vec<String>, new_filters: &[String]) {
