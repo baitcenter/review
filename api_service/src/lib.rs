@@ -351,6 +351,11 @@ impl ApiService {
                                     .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
                                 return Box::new(result);
+                            } else {
+                                let result = db::DB::get_cluster_table(&self.db)
+                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .map_err(Into::into);
+                                return Box::new(result);
                             }
                         }
                     } else if let (Some(filter), Some(limit), 2) = (
@@ -374,6 +379,12 @@ impl ApiService {
                                     }
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
+                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .map_err(Into::into);
+                                return Box::new(result);
+                            } else {
+                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit);
                                 let result = db::DB::get_cluster_by_filter(&self.db, &query)
                                     .and_then(|data| future::ok(ApiService::process_clusters(data)))
                                     .map_err(Into::into);
