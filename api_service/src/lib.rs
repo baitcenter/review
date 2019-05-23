@@ -765,6 +765,13 @@ impl ApiService {
                                                         else {
                                                             set_query.push_str(&format!(", qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", new_qualifier));
                                                         }
+                                                        if new_qualifier == "benign" {
+                                                            let value = format!(
+                                                                "http://{}/api/cluster/search?filter={{\"qualifier\": [\"benign\"], \"data_source\":[\"{}\"], \"detector_id\": [{}]}}",
+                                                                &self.docker_host_addr, &data_source_cloned, &detector_id_cloned
+                                                            );
+                                                            ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
+                                                        }
                                                     }
                                                     let now = chrono::Utc::now();
                                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
@@ -1004,38 +1011,54 @@ impl ApiService {
                         .into_body()
                         .concat2()
                         .map_err(Into::into)
-                        .and_then(|buf| {
-                            serde_json::from_slice(&buf)
-                                .map(move |data: Vec<NewQualifier>| {
+                        .and_then(move |buf| {
+                            match serde_json::from_slice(&buf) as Result<Vec<NewQualifier>, serde_json::error::Error> {
+                                Ok(data) => {
                                     let now = chrono::Utc::now();
                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
                                     let mut query = String::new();
                                     data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.detector_id, d.data_source)));
-                                    db::DB::execute_query(&self.db, &query)
-                                })
-                                .map_err(Into::into)
-                        })
-                        .and_then(|mut result| match result.poll() {
-                            Ok(_) => future::ok(
-                                Response::builder()
-                                    .status(StatusCode::OK)
-                                    .body(Body::from("Qualifier has been successfully updated"))
-                                    .unwrap(),
-                            ),
-                            Err(e) => {
-                                if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                    e.kind()
-                                {
-                                    if *reason == db::error::DatabaseError::DatabaseLocked {
-                                        future::ok(
-                                            ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                        )
-                                    } else {
-                                        future::ok(ApiService::build_http_500_response())
+                                    let mut result = db::DB::execute_query(&self.db, &query);
+
+                                    match result.poll() {
+                                        Ok(_) => {
+                                            data.iter().for_each(|d| {
+                                                if d.qualifier == "benign" {
+                                                    let value = format!(
+                                                        "http://{}/api/cluster/search?filter={{\"qualifier\": [\"benign\"], \"data_source\":[\"{}\"], \"detector_id\": [{}]}}",
+                                                        &self.docker_host_addr, &d.data_source, &d.detector_id
+                                                    );
+                                                    ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
+                                                }
+                                            });
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::OK)
+                                                    .body(Body::from("Qualifier has been successfully updated"))
+                                                    .unwrap(),
+                                            )
+                                        }
+                                        Err(e) => {
+                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                                e.kind()
+                                            {
+                                                if *reason == db::error::DatabaseError::DatabaseLocked {
+                                                    future::ok(
+                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
+                                                    )
+                                                } else {
+                                                    future::ok(ApiService::build_http_500_response())
+                                                }
+                                            } else {
+                                                future::ok(ApiService::build_http_500_response())
+                                            }
+                                        }
                                     }
-                                } else {
-                                    future::ok(ApiService::build_http_500_response())
+
                                 }
+                                Err(_) => future::ok(
+                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "Invalid JSON format")
+                                ),
                             }
                         });
 
@@ -1302,6 +1325,18 @@ impl ApiService {
             Err(_) => ApiService::build_http_500_response(),
         }
     }
+
+    fn update_etcd(url: &str, key: &str, value: &str) {
+        let data = format!(
+            "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+            base64::encode(key),
+            base64::encode(value)
+        );
+        let client = reqwest::Client::new();
+        if let Err(e) = client.post(url).body(data).send() {
+            eprintln!("An error occurs while updating etcd: {}", e);
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1311,7 +1346,7 @@ struct Filter {
     status: Option<Vec<String>>,
     qualifier: Option<Vec<String>>,
     cluster_id: Option<Vec<String>>,
-    detector_id: Option<Vec<String>>,
+    detector_id: Option<Vec<u64>>,
 }
 
 impl Filter {
