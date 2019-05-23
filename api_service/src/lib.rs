@@ -121,10 +121,7 @@ impl ApiService {
                                 if let Ok(max_cluster_count) = max_cluster_count.parse::<usize>() {
                                     if max_cluster_count == 0 {
                                         return Box::new(future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::BAD_REQUEST)
-                                                .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
-                                                .unwrap(),
+                                            ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
                                         ));
                                     }
 
@@ -169,10 +166,7 @@ impl ApiService {
                                     Box::new(result)
                                 } else {
                                     return Box::new(future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::BAD_REQUEST)
-                                            .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
-                                            .unwrap(),
+                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
                                     ));
                                 }
                             } else if max_cluster_count == "all" {
@@ -216,10 +210,7 @@ impl ApiService {
                             {
                                 if max_cluster_count == 0 {
                                     return Box::new(future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::BAD_REQUEST)
-                                            .body(Body::from("max_cluster_count must be a positive integer value or 'all'"))
-                                            .unwrap(),
+                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
                                     ));
                                 }
                                 let result = db::DB::get_cluster_with_limit_num(
@@ -259,10 +250,7 @@ impl ApiService {
                                 Box::new(result)
                             } else {
                                 Box::new(future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::BAD_REQUEST)
-                                                .body(Body::from("cluster_id and max_cluster_count must be a positive integer value or 'all'"))
-                                                .unwrap(),
+                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "cluster_id and max_cluster_count must be a positive integer value or 'all'")
                                         ))
                             }
                         } else if let (Some(data_source), Some(cluster_only)) = (
@@ -459,21 +447,12 @@ impl ApiService {
                                                 false
                                             };
                                         if is_temporary_error {
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                    .body(Body::from(
-                                                        "Service temporarily unavailable",
-                                                    ))
-                                                    .unwrap(),
-                                            )
+                                            future::ok(ApiService::build_http_response(
+                                                StatusCode::SERVICE_UNAVAILABLE,
+                                                "Service temporarily unavailable",
+                                            ))
                                         } else {
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                                    .body(Body::from("Internal Server Error"))
-                                                    .unwrap(),
-                                            )
+                                            future::ok(ApiService::build_http_500_response())
                                         }
                                     }
                                 },
@@ -505,23 +484,13 @@ impl ApiService {
                                         {
                                             if *reason == db::error::DatabaseError::DatabaseLocked {
                                                 return future::ok(
-                                                    Response::builder()
-                                                        .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                        .body(Body::from(
-                                                            "Service temporarily unavailable",
-                                                        ))
-                                                        .unwrap(),
+                                                    ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
                                                 );
                                             } else if *reason
                                                 == db::error::DatabaseError::RecordNotExist
                                             {
                                                 return future::ok(
-                                                    Response::builder()
-                                                        .status(StatusCode::BAD_REQUEST)
-                                                        .body(Body::from(
-                                                            "The specified category does not exist in database",
-                                                        ))
-                                                        .unwrap(),
+                                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified category does not exist in database")
                                                 );
                                             }
                                         }
@@ -615,14 +584,10 @@ impl ApiService {
                                                     .unwrap(),
                                             )
                                         } else {
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::BAD_REQUEST)
-                                                    .body(Body::from(
-                                                        "cluster_id does not exist in database",
-                                                    ))
-                                                    .unwrap(),
-                                            )
+                                            future::ok(ApiService::build_http_response(
+                                                StatusCode::BAD_REQUEST,
+                                                "cluster_id does not exist in database",
+                                            ))
                                         }
                                     })
                                     .map_err(Into::into);
@@ -649,32 +614,19 @@ impl ApiService {
                                                 err.kind()
                                             {
                                                 if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                    future::ok(
-                                                        Response::builder()
-                                                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                            .body(Body::from(
-                                                                "Service temporarily unavailable",
-                                                            ))
-                                                            .unwrap(),
-                                                    )
+                                                    return future::ok(
+                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
+                                                    );
                                                 } else if *reason
                                                     == db::error::DatabaseError::RecordNotExist
                                                 {
-                                                    future::ok(
-                                                        Response::builder()
-                                                            .status(StatusCode::BAD_REQUEST)
-                                                            .body(Body::from(
-                                                                "The specified record does not exist in database",
-                                                            ))
-                                                            .unwrap(),
-                                                    )
-                                                } else {
-                                                    future::ok(ApiService::build_http_500_response())
+                                                    return future::ok(
+                                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified record does not exist in database")
+                                                    );
                                                 }
-                                            } else {
+                                            }
                                                 future::ok(ApiService::build_http_500_response())
                                             }
-                                        }
                                     });
                                 return Box::new(resp);
                             }
@@ -696,32 +648,19 @@ impl ApiService {
                                             err.kind()
                                         {
                                             if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                future::ok(
-                                                    Response::builder()
-                                                        .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                        .body(Body::from(
-                                                            "Service temporarily unavailable",
-                                                        ))
-                                                        .unwrap(),
-                                                )
+                                                return future::ok(
+                                                    ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
+                                                );
                                             } else if *reason
                                                 == db::error::DatabaseError::RecordNotExist
                                             {
-                                                future::ok(
-                                                    Response::builder()
-                                                        .status(StatusCode::BAD_REQUEST)
-                                                        .body(Body::from(
-                                                            "The specified record does not exist in database",
-                                                        ))
-                                                        .unwrap(),
-                                                )
-                                            } else {
-                                                future::ok(ApiService::build_http_500_response())
+                                                return future::ok(
+                                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified record does not exist in database")
+                                                );
                                             }
-                                        } else {
+                                            }
                                             future::ok(ApiService::build_http_500_response())
                                         }
-                                    }
                                 });
                             return Box::new(resp);
                         }
@@ -760,12 +699,10 @@ impl ApiService {
                                                 e
                                             );
                                             eprintln!("{}", err_msg);
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                                    .body(Body::from(err_msg))
-                                                    .unwrap(),
-                                            )
+                                            future::ok(ApiService::build_http_response(
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                &err_msg,
+                                            ))
                                         }
                                     }
                                 },
@@ -855,18 +792,13 @@ impl ApiService {
                                             {
                                                 if *reason == db::error::DatabaseError::DatabaseLocked {
                                                     future::ok(
-                                                        Response::builder()
-                                                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                            .body(Body::from("Service temporarily unavailable"))
-                                                            .unwrap(),
+                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
                                                     )
                                                 } else if *reason == db::error::DatabaseError::RecordNotExist {
-                                                    future::ok(
-                                                        Response::builder()
-                                                            .status(StatusCode::BAD_REQUEST)
-                                                            .body(Body::from("The specified record does not exist in database"))
-                                                            .unwrap(),
-                                                    )
+                                                    future::ok(ApiService::build_http_response(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "The specified record does not exist in database",
+                                                    ))
                                                 } else {
                                                     future::ok(ApiService::build_http_500_response())
                                                 }
@@ -959,12 +891,10 @@ impl ApiService {
                                     e.kind()
                                 {
                                     if *reason == db::error::DatabaseError::DatabaseLocked {
-                                        future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                .body(Body::from("Service temporarily unavailable"))
-                                                .unwrap(),
-                                        )
+                                        future::ok(ApiService::build_http_response(
+                                            StatusCode::SERVICE_UNAVAILABLE,
+                                            "Service temporarily unavailable",
+                                        ))
                                     } else {
                                         future::ok(ApiService::build_http_500_response())
                                     }
@@ -1000,12 +930,10 @@ impl ApiService {
                                     e.kind()
                                 {
                                     if *reason == db::error::DatabaseError::DatabaseLocked {
-                                        future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                .body(Body::from("Service temporarily unavailable"))
-                                                .unwrap(),
-                                        )
+                                        future::ok(ApiService::build_http_response(
+                                            StatusCode::SERVICE_UNAVAILABLE,
+                                            "Service temporarily unavailable",
+                                        ))
                                     } else {
                                         future::ok(ApiService::build_http_500_response())
                                     }
@@ -1100,10 +1028,7 @@ impl ApiService {
                                 {
                                     if *reason == db::error::DatabaseError::DatabaseLocked {
                                         future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                .body(Body::from("Service temporarily unavailable"))
-                                                .unwrap(),
+                                            ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
                                         )
                                     } else {
                                         future::ok(ApiService::build_http_500_response())
@@ -1244,24 +1169,55 @@ impl ApiService {
         }
     }
 
+    fn build_http_response(status_code: http::status::StatusCode, message: &str) -> Response<Body> {
+        let body = json!({
+            "message": message,
+        })
+        .to_string();
+        Response::builder()
+            .status(status_code)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, body.len().to_string().as_str())
+            .body(body.into())
+            .unwrap()
+    }
+
     fn build_http_400_response() -> Response<Body> {
+        let body = json!({
+            "message": "Invalid request",
+        })
+        .to_string();
         Response::builder()
             .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("Invalid request"))
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, body.len().to_string().as_str())
+            .body(body.into())
             .unwrap()
     }
 
     fn build_http_404_response() -> Response<Body> {
+        let body = json!({
+            "message": "Not found",
+        })
+        .to_string();
         Response::builder()
             .status(StatusCode::NOT_FOUND)
-            .body(Body::from("Not found"))
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, body.len().to_string().as_str())
+            .body(body.into())
             .unwrap()
     }
 
     fn build_http_500_response() -> Response<Body> {
+        let body = json!({
+            "message": "Internal server error",
+        })
+        .to_string();
         Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::from("Internal server error"))
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, body.len().to_string().as_str())
+            .body(body.into())
             .unwrap()
     }
 
