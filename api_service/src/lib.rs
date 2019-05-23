@@ -324,7 +324,7 @@ impl ApiService {
                         if let Ok(filter) = serde_json::from_str(&filter)
                             as Result<Filter, serde_json::error::Error>
                         {
-                            let filter = query_builder(&filter);
+                            let filter = Filter::query_builder(&filter);
                             if !filter.is_empty() {
                                 let mut where_clause = String::new();
                                 for (index, filter) in filter.iter().enumerate() {
@@ -356,7 +356,7 @@ impl ApiService {
                                 as Result<Filter, serde_json::error::Error>,
                             limit.parse::<u64>(),
                         ) {
-                            let filter = query_builder(&filter);
+                            let filter = Filter::query_builder(&filter);
                             if !filter.is_empty() {
                                 let mut where_clause = String::new();
                                 for (index, filter) in filter.iter().enumerate() {
@@ -1314,70 +1314,72 @@ struct Filter {
     detector_id: Option<Vec<String>>,
 }
 
-fn build_where_clause(query: &mut Vec<String>, new_filters: &[String]) {
-    if query.is_empty() {
-        query.extend(new_filters.iter().map(std::string::ToString::to_string));
-    } else {
-        let mut new_query = Vec::<String>::new();
-        while let Some(q) = query.pop() {
-            new_query.extend(
-                new_filters
-                    .iter()
-                    .map(|f| format!("{} and {}", q, f))
-                    .collect::<Vec<String>>(),
-            );
-        }
-        query.extend(new_query);
-    }
-}
-
-fn query_builder(filter: &Filter) -> Vec<String> {
-    let mut query = Vec::<String>::new();
-    if let Some(category) = &filter.category {
-        query.extend(category.iter().map(|c| {
-            format!(
-                "Clusters.category_id = (SELECT category_id FROM category WHERE category = '{}')",
-                c
-            )
-        }));
-    }
-    if let Some(cluster_id) = &filter.cluster_id {
-        let cluster_id = cluster_id
-            .iter()
-            .map(|c| format!("cluster_id='{}'", c))
-            .collect::<Vec<String>>();
-        build_where_clause(&mut query, &cluster_id);
-    }
-    if let Some(data_source) = &filter.data_source {
-        let data_source = data_source
-            .iter()
-            .map(|d| format!("data_source='{}'", d))
-            .collect::<Vec<String>>();
-        build_where_clause(&mut query, &data_source);
-    }
-    if let Some(detector_id) = &filter.detector_id {
-        let detector_id = detector_id
-            .iter()
-            .map(|d| format!("detector_id='{}'", d))
-            .collect::<Vec<String>>();
-        build_where_clause(&mut query, &detector_id);
-    }
-    if let Some(status) = &filter.status {
-        let status = status
-            .iter()
-            .map(|s| {
+impl Filter {
+    fn query_builder(&self) -> Vec<String> {
+        let mut query = Vec::<String>::new();
+        if let Some(category) = &self.category {
+            query.extend(category.iter().map(|c| {
                 format!(
-                    "Clusters.status_id = (SELECT status_id FROM status WHERE status = '{}')",
-                    s
+                    "Clusters.category_id = (SELECT category_id FROM category WHERE category = '{}')",
+                    c
                 )
-            })
-            .collect::<Vec<String>>();
-        build_where_clause(&mut query, &status);
-    }
-    if let Some(qualifier) = &filter.qualifier {
-        let qualifier = qualifier.iter().map(|q| format!("Clusters.qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", q)).collect::<Vec<String>>();
-        build_where_clause(&mut query, &qualifier);
+            }));
+        }
+        if let Some(cluster_id) = &self.cluster_id {
+            let cluster_id = cluster_id
+                .iter()
+                .map(|c| format!("cluster_id='{}'", c))
+                .collect::<Vec<String>>();
+            Filter::build_where_clause(&mut query, &cluster_id);
+        }
+        if let Some(data_source) = &self.data_source {
+            let data_source = data_source
+                .iter()
+                .map(|d| format!("data_source='{}'", d))
+                .collect::<Vec<String>>();
+            Filter::build_where_clause(&mut query, &data_source);
+        }
+        if let Some(detector_id) = &self.detector_id {
+            let detector_id = detector_id
+                .iter()
+                .map(|d| format!("detector_id='{}'", d))
+                .collect::<Vec<String>>();
+            Filter::build_where_clause(&mut query, &detector_id);
+        }
+        if let Some(status) = &self.status {
+            let status = status
+                .iter()
+                .map(|s| {
+                    format!(
+                        "Clusters.status_id = (SELECT status_id FROM status WHERE status = '{}')",
+                        s
+                    )
+                })
+                .collect::<Vec<String>>();
+            Filter::build_where_clause(&mut query, &status);
+        }
+        if let Some(qualifier) = &self.qualifier {
+            let qualifier = qualifier.iter().map(|q| format!("Clusters.qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", q)).collect::<Vec<String>>();
+            Filter::build_where_clause(&mut query, &qualifier);
+        }
+
+        query
     }
 
-    query
+    fn build_where_clause(query: &mut Vec<String>, new_filters: &[String]) {
+        if query.is_empty() {
+            query.extend(new_filters.iter().map(std::string::ToString::to_string));
+        } else {
+            let mut new_query = Vec::<String>::new();
+            while let Some(q) = query.pop() {
+                new_query.extend(
+                    new_filters
+                        .iter()
+                        .map(|f| format!("{} and {}", q, f))
+                        .collect::<Vec<String>>(),
+                );
+            }
+            query.extend(new_query);
+        }
+    }
 }
