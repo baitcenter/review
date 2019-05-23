@@ -330,6 +330,66 @@ impl ApiService {
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
+                (&Method::GET, "/api/cluster/search") => {
+                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect();
+                    if let (Some(filter), 1) = (hash_query.get("filter"), hash_query.len()) {
+                        if let Ok(filter) = serde_json::from_str(&filter)
+                            as Result<Filter, serde_json::error::Error>
+                        {
+                            let filter = query_builder(&filter);
+                            if !filter.is_empty() {
+                                let mut where_clause = String::new();
+                                for (index, filter) in filter.iter().enumerate() {
+                                    if index == 0 {
+                                        where_clause.push_str(&filter);
+                                    } else {
+                                        where_clause.push_str(&format!(" or {}", filter));
+                                    }
+                                }
+                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
+                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                    .and_then(|data| {
+                                        future::ok(ApiService::process_clusters(&data))
+                                    })
+                                    .map_err(Into::into);
+                                return Box::new(result);
+                            }
+                        }
+                    } else if let (Some(filter), Some(limit), 2) = (
+                        hash_query.get("filter"),
+                        hash_query.get("limit"),
+                        hash_query.len(),
+                    ) {
+                        if let (Ok(filter), Ok(limit)) = (
+                            serde_json::from_str(&filter)
+                                as Result<Filter, serde_json::error::Error>,
+                            limit.parse::<u64>(),
+                        ) {
+                            let filter = query_builder(&filter);
+                            if !filter.is_empty() {
+                                let mut where_clause = String::new();
+                                for (index, filter) in filter.iter().enumerate() {
+                                    if index == 0 {
+                                        where_clause.push_str(&filter);
+                                    } else {
+                                        where_clause.push_str(&format!(" or {}", filter));
+                                    }
+                                }
+                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
+                                let result = db::DB::get_cluster_by_filter(&self.db, &query)
+                                    .and_then(|data| {
+                                        future::ok(ApiService::process_clusters(&data))
+                                    })
+                                    .map_err(Into::into);
+                                return Box::new(result);
+                            }
+                        }
+                    }
+
+                    Box::new(future::ok(ApiService::build_http_404_response()))
+                }
                 (&Method::GET, "/api/outlier") => {
                     let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
@@ -1282,4 +1342,96 @@ impl ApiService {
             Err(_) => ApiService::build_http_500_response(),
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct Filter {
+    category: Option<Vec<String>>,
+    data_source: Option<Vec<String>>,
+    status: Option<Vec<String>>,
+    qualifier: Option<Vec<String>>,
+    cluster_id: Option<Vec<String>>,
+    detector_id: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReturnParameter {
+    cluster_id: Option<bool>,
+    category: Option<bool>,
+    detector_id: Option<bool>,
+    examples: Option<bool>,
+    qualifier: Option<bool>,
+    status: Option<bool>,
+    signature: Option<bool>,
+    size: Option<bool>,
+    data_source: Option<bool>,
+    last_modification_time: Option<bool>,
+}
+
+fn build_where_clause(query: &mut Vec<String>, new_filters: &[String]) {
+    if query.is_empty() {
+        query.extend(new_filters.iter().map(std::string::ToString::to_string));
+    } else {
+        let mut new_query = Vec::<String>::new();
+        while let Some(q) = query.pop() {
+            new_query.extend(
+                new_filters
+                    .iter()
+                    .map(|f| format!("{} and {}", q, f))
+                    .collect::<Vec<String>>(),
+            );
+        }
+        query.extend(new_query);
+    }
+}
+
+fn query_builder(filter: &Filter) -> Vec<String> {
+    let mut query = Vec::<String>::new();
+    if let Some(category) = &filter.category {
+        query.extend(category.iter().map(|c| {
+            format!(
+                "Clusters.category_id = (SELECT category_id FROM category WHERE category = '{}')",
+                c
+            )
+        }));
+    }
+    if let Some(cluster_id) = &filter.cluster_id {
+        let cluster_id = cluster_id
+            .iter()
+            .map(|c| format!("cluster_id='{}'", c))
+            .collect::<Vec<String>>();
+        build_where_clause(&mut query, &cluster_id);
+    }
+    if let Some(data_source) = &filter.data_source {
+        let data_source = data_source
+            .iter()
+            .map(|d| format!("data_source='{}'", d))
+            .collect::<Vec<String>>();
+        build_where_clause(&mut query, &data_source);
+    }
+    if let Some(detector_id) = &filter.detector_id {
+        let detector_id = detector_id
+            .iter()
+            .map(|d| format!("detector_id='{}'", d))
+            .collect::<Vec<String>>();
+        build_where_clause(&mut query, &detector_id);
+    }
+    if let Some(status) = &filter.status {
+        let status = status
+            .iter()
+            .map(|s| {
+                format!(
+                    "Clusters.status_id = (SELECT status_id FROM status WHERE status = '{}')",
+                    s
+                )
+            })
+            .collect::<Vec<String>>();
+        build_where_clause(&mut query, &status);
+    }
+    if let Some(qualifier) = &filter.qualifier {
+        let qualifier = qualifier.iter().map(|q| format!("Clusters.qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", q)).collect::<Vec<String>>();
+        build_where_clause(&mut query, &qualifier);
+    }
+
+    query
 }
