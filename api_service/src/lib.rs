@@ -518,7 +518,7 @@ impl ApiService {
                                         &self.docker_host_addr, benign_id,
                                     );
                                     let data = format!(
-                                        "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                        r#"{{"key": "{}", "value": "{}"}}"#,
                                         base64::encode(&self.etcd_key),
                                         base64::encode(&value)
                                     );
@@ -564,7 +564,7 @@ impl ApiService {
                                             );
                                             let etcd_key = format!("clusters_{}", data_source);
                                             let data = format!(
-                                                "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                                r#"{{"key": "{}", "value": "{}"}}"#,
                                                 base64::encode(&etcd_key),
                                                 base64::encode(&value)
                                             );
@@ -677,7 +677,7 @@ impl ApiService {
                             let result = req.into_body().concat2().map_err(Into::into).and_then(
                                 move |buf| {
                                     let data = format!(
-                                        "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+                                        r#"{{"key": "{}", "value": "{}"}}"#,
                                         base64::encode(&etcd_key_cloned),
                                         base64::encode(&buf)
                                     );
@@ -767,7 +767,7 @@ impl ApiService {
                                                         }
                                                         if new_qualifier == "benign" {
                                                             let value = format!(
-                                                                "http://{}/api/cluster/search?filter={{\"qualifier\": [\"benign\"], \"data_source\":[\"{}\"], \"detector_id\": [{}]}}",
+                                                                r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"], "detector_id": [{}]}}"#,
                                                                 &self.docker_host_addr, &data_source_cloned, &detector_id_cloned
                                                             );
                                                             ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
@@ -1025,7 +1025,7 @@ impl ApiService {
                                             data.iter().for_each(|d| {
                                                 if d.qualifier == "benign" {
                                                     let value = format!(
-                                                        "http://{}/api/cluster/search?filter={{\"qualifier\": [\"benign\"], \"data_source\":[\"{}\"], \"detector_id\": [{}]}}",
+                                                        r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"], "detector_id": [{}]}}"#,
                                                         &self.docker_host_addr, &d.data_source, &d.detector_id
                                                     );
                                                     ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
