@@ -55,9 +55,8 @@ impl ApiService {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
                 (&Method::GET, "/api/cluster") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if hash_query.len() == 1 {
                         if let Some(category_id) = hash_query.get("category_id") {
                             let result = db::DB::get_cluster_by_category(&self.db, category_id)
@@ -297,9 +296,7 @@ impl ApiService {
                     }
                 }
                 (&Method::GET, "/api/cluster/example") => {
-                    let query = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect::<Vec<_>>();
+                    let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "limit" {
                         if let Ok(limit) = query[0].1.parse::<u64>() {
                             let query = format!(
@@ -317,9 +314,8 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 (&Method::GET, "/api/cluster/search") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if let (Some(filter), 1) = (hash_query.get("filter"), hash_query.len()) {
                         if let Ok(filter) = serde_json::from_str(&filter)
                             as Result<Filter, serde_json::error::Error>
@@ -384,9 +380,8 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
                 (&Method::GET, "/api/outlier") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if hash_query.len() == 2 {
                         if let (Some(data_source), Some(outlier_only)) = (
                             hash_query.get("data_source"),
@@ -423,9 +418,8 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 (&Method::POST, "/api/category") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if hash_query.len() == 1 {
                         if let Some(category) = hash_query.get("category") {
                             let resp = db::DB::add_new_category(&self.db, &category).then(
@@ -463,9 +457,8 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 (&Method::PUT, "/api/category") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if hash_query.len() == 2 {
                         if let (Some(category), Some(new_category)) =
                             (hash_query.get("category"), hash_query.get("new_category"))
@@ -503,9 +496,8 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 (&Method::PUT, "/api/cluster") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
-                        .into_owned()
-                        .collect();
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
                     if hash_query.len() == 2 {
                         if let (Some(cluster_id), Some(qualifier_id)) =
                             (hash_query.get("cluster_id"), hash_query.get("qualifier_id"))
