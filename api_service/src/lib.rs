@@ -47,7 +47,7 @@ impl ApiService {
         Box::new(fut)
     }
 
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     pub fn request_handler(
         self,
         req: Request<Body>,
