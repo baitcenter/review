@@ -374,6 +374,22 @@ impl DB {
         future::result(cluster)
     }
 
+    pub fn execute_select_outlier_query(
+        &self,
+        datasource: &str,
+    ) -> impl Future<Item = Vec<OutliersTable>, Error = Error> {
+        let result = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| 
+                Outliers
+                    .filter(outlier_data_source.eq(datasource))
+                    .load::<OutliersTable>(&conn).map_err(Into::into));
+
+        future::result(result)
+    }
+
     pub fn execute_update_query(&self, query: &str) -> future::FutureResult<(), Error> {
         let conn = self.pool.get().unwrap();
         let execution_result = match conn.execute(query) {

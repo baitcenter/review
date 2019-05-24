@@ -1154,7 +1154,65 @@ impl ApiService {
 
                     Box::new(result)
                 }
-                _ => Box::new(future::ok(ApiService::build_http_404_response())),
+                _ => {
+                    if req.method() == Method::GET && req.uri().path().contains("/api/outlier/") {
+                        let path: Vec<&str> = req.uri().path().split('/').collect();
+                        if path.len() == 4 && path[1] == "api" && path[2] == "outlier" {
+                            let data_source = percent_decode(path[3].as_bytes()).decode_utf8();
+                            if let Ok(data_source) = data_source {
+                                let result = db::DB::execute_select_outlier_query(
+                                    &self.db,
+                                    &data_source,
+                                )
+                                .and_then(|data| {
+                                    #[derive(Debug, Serialize)]
+                                    struct Outliers {
+                                        outlier: String,
+                                        data_source: String,
+                                        size: usize,
+                                        event_ids: Vec<u64>,
+                                    }
+                                    let mut outliers: Vec<Outliers> = Vec::new();
+                                    for d in data {
+                                        let event_ids = d.outlier_event_ids.map_or(
+                                            Vec::<u64>::new(),
+                                            |event_ids| {
+                                                (rmp_serde::decode::from_slice(&event_ids)
+                                                    as Result<Vec<u64>, rmp_serde::decode::Error>)
+                                                    .unwrap_or_default()
+                                            },
+                                        );
+                                        let size = d
+                                            .outlier_size
+                                            .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
+                                        outliers.push(Outliers {
+                                            outlier: ApiService::bytes_to_string(
+                                                &d.outlier_raw_event,
+                                            ),
+                                            data_source: d.outlier_data_source,
+                                            size,
+                                            event_ids,
+                                        });
+                                    }
+
+                                    match serde_json::to_string(&outliers) {
+                                        Ok(json) => future::ok(
+                                            Response::builder()
+                                                .header(header::CONTENT_TYPE, "application/json")
+                                                .body(Body::from(json))
+                                                .unwrap(),
+                                        ),
+                                        Err(_) => future::ok(ApiService::build_http_500_response()),
+                                    }
+                                })
+                                .map_err(Into::into);
+
+                                return Box::new(result);
+                            }
+                        }
+                    } 
+                    Box::new(future::ok(ApiService::build_http_404_response()))
+                }
             },
         }
     }
