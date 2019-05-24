@@ -222,16 +222,13 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 _ => {
-                    if req.method() == Method::PUT && req.uri().path().contains("/api/cluster/") {
+                    if req.method() == Method::PUT && req.uri().path().starts_with("/api/cluster/")
+                    {
                         let path: Vec<&str> = req.uri().path().split('/').collect();
                         let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
                             .into_owned()
                             .collect();
-                        if path.len() == 4
-                            && hash_query.len() == 2
-                            && path[1] == "api"
-                            && path[2] == "cluster"
-                        {
+                        if path.len() == 4 && hash_query.len() == 2 {
                             let cluster_id = percent_decode(path[3].as_bytes()).decode_utf8();
                             if let (Ok(cluster_id), Some(detector_id), Some(data_source)) = (
                                 cluster_id,
@@ -592,24 +589,27 @@ impl ApiService {
                     Box::new(result)
                 }
                 _ => {
-                    if req.method() == Method::GET && req.uri().path().contains("/api/outlier/") {
+                    if req.method() == Method::GET && req.uri().path().starts_with("/api/outlier/")
+                    {
                         let path: Vec<&str> = req.uri().path().split('/').collect();
-                        if path.len() == 4 && path[1] == "api" && path[2] == "outlier" {
+                        if path.len() == 4 {
                             let data_source = percent_decode(path[3].as_bytes()).decode_utf8();
                             if let Ok(data_source) = data_source {
                                 let result =
                                     db::DB::execute_select_outlier_query(&self.db, &data_source)
-                                        .and_then(|data| future::ok(ApiService::process_outliers(data)))
+                                        .and_then(|data| {
+                                            future::ok(ApiService::process_outliers(data))
+                                        })
                                         .map_err(Into::into);
 
                                 return Box::new(result);
                             }
                         }
                     } else if req.method() == Method::PUT
-                        && req.uri().path().contains("/api/category/")
+                        && req.uri().path().starts_with("/api/category/")
                     {
                         let path: Vec<&str> = req.uri().path().split('/').collect();
-                        if path.len() == 4 && path[1] == "api" && path[2] == "category" {
+                        if path.len() == 4 {
                             let category = percent_decode(path[3].as_bytes()).decode_utf8();
                             if let Ok(category) = category {
                                 #[derive(Debug, Deserialize)]
