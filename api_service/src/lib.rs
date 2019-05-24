@@ -297,11 +297,11 @@ impl ApiService {
                     }
                 }
                 (&Method::GET, "/api/cluster/example") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                    let query = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
-                        .collect();
-                    if let (Some(limit), 1) = (hash_query.get("limit"), hash_query.len()) {
-                        if let Ok(limit) = limit.parse::<u64>() {
+                        .collect::<Vec<_>>();
+                    if query.len() == 1 && query[0].0 == "limit" {
+                        if let Ok(limit) = query[0].1.parse::<u64>() {
                             let query = format!(
                                 "SELECT cluster_id, examples FROM Clusters LIMIT {};",
                                 limit
