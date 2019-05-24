@@ -378,14 +378,12 @@ impl DB {
         &self,
         datasource: &str,
     ) -> impl Future<Item = Vec<OutliersTable>, Error = Error> {
-        let result = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| 
-                Outliers
-                    .filter(outlier_data_source.eq(datasource))
-                    .load::<OutliersTable>(&conn).map_err(Into::into));
+        let result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            Outliers
+                .filter(outlier_data_source.eq(datasource))
+                .load::<OutliersTable>(&conn)
+                .map_err(Into::into)
+        });
 
         future::result(result)
     }

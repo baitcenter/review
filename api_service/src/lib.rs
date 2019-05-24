@@ -1210,7 +1210,62 @@ impl ApiService {
                                 return Box::new(result);
                             }
                         }
-                    } 
+                    } else if req.method() == Method::PUT
+                        && req.uri().path().contains("/api/category/")
+                    {
+                        let path: Vec<&str> = req.uri().path().split('/').collect();
+                        if path.len() == 4 && path[1] == "api" && path[2] == "category" {
+                            let category = percent_decode(path[3].as_bytes()).decode_utf8();
+                            if let Ok(category) = category {
+                                #[derive(Debug, Deserialize)]
+                                struct NewCategory {
+                                    category: String,
+                                }
+                                let category_cloned = category.into_owned();
+                                let result = req
+                                    .into_body()
+                                    .concat2()
+                                    .map_err(Into::into)
+                                    .and_then(|buf| {
+                                        serde_json::from_slice(&buf)
+                                            .map(move |new_category: NewCategory| {
+                                                db::DB::update_category(&self.db, &category_cloned, &new_category.category)
+                                            })
+                                            .map_err(Into::into)
+                                    })
+                                    .and_then(|mut result| match result.poll() {
+                                        Ok(_) => future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::OK)
+                                                .body(Body::from("Category has been successfully updated"))
+                                                .unwrap(),
+                                        ),
+                                        Err(e) => {
+                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
+                                                e.kind()
+                                            {
+                                                if *reason == db::error::DatabaseError::DatabaseLocked {
+                                                    future::ok(
+                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
+                                                    )
+                                                } else if *reason == db::error::DatabaseError::RecordNotExist {
+                                                    future::ok(ApiService::build_http_response(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "The specified record does not exist in database",
+                                                    ))
+                                                } else {
+                                                    future::ok(ApiService::build_http_500_response())
+                                                }
+                                            } else {
+                                                future::ok(ApiService::build_http_500_response())
+                                            }
+                                        }
+                                    });
+
+                                return Box::new(result);
+                            }
+                        }
+                    }
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
             },
