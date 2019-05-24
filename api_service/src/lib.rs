@@ -1059,49 +1059,7 @@ impl ApiService {
 
                 (&Method::GET, "/api/outlier") => {
                     let result = db::DB::get_outliers_table(&self.db)
-                        .and_then(|data| {
-                            #[derive(Debug, Serialize)]
-                            struct Outliers {
-                                outlier: String,
-                                data_source: String,
-                                size: usize,
-                                event_ids: Vec<u64>,
-                            }
-                            let mut outliers: Vec<Outliers> = Vec::new();
-                            for d in data {
-                                let event_ids = match d.outlier_event_ids {
-                                    Some(event_ids) => {
-                                        match rmp_serde::decode::from_slice(&event_ids)
-                                            as Result<Vec<u64>, rmp_serde::decode::Error>
-                                        {
-                                            Ok(event_ids) => event_ids,
-                                            Err(_) => Vec::<u64>::new(),
-                                        }
-                                    }
-                                    None => Vec::<u64>::new(),
-                                };
-                                let size = match d.outlier_size {
-                                    Some(size) => size.parse::<usize>().unwrap_or(0),
-                                    None => 0,
-                                };
-                                outliers.push(Outliers {
-                                    outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
-                                    data_source: d.outlier_data_source,
-                                    size,
-                                    event_ids,
-                                });
-                            }
-
-                            match serde_json::to_string(&outliers) {
-                                Ok(json) => future::ok(
-                                    Response::builder()
-                                        .header(header::CONTENT_TYPE, "application/json")
-                                        .body(Body::from(json))
-                                        .unwrap(),
-                                ),
-                                Err(_) => future::ok(ApiService::build_http_500_response()),
-                            }
-                        })
+                        .and_then(|data| future::ok(ApiService::process_outliers(data)))
                         .map_err(Into::into);
 
                     Box::new(result)
@@ -1160,52 +1118,10 @@ impl ApiService {
                         if path.len() == 4 && path[1] == "api" && path[2] == "outlier" {
                             let data_source = percent_decode(path[3].as_bytes()).decode_utf8();
                             if let Ok(data_source) = data_source {
-                                let result = db::DB::execute_select_outlier_query(
-                                    &self.db,
-                                    &data_source,
-                                )
-                                .and_then(|data| {
-                                    #[derive(Debug, Serialize)]
-                                    struct Outliers {
-                                        outlier: String,
-                                        data_source: String,
-                                        size: usize,
-                                        event_ids: Vec<u64>,
-                                    }
-                                    let mut outliers: Vec<Outliers> = Vec::new();
-                                    for d in data {
-                                        let event_ids = d.outlier_event_ids.map_or(
-                                            Vec::<u64>::new(),
-                                            |event_ids| {
-                                                (rmp_serde::decode::from_slice(&event_ids)
-                                                    as Result<Vec<u64>, rmp_serde::decode::Error>)
-                                                    .unwrap_or_default()
-                                            },
-                                        );
-                                        let size = d
-                                            .outlier_size
-                                            .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
-                                        outliers.push(Outliers {
-                                            outlier: ApiService::bytes_to_string(
-                                                &d.outlier_raw_event,
-                                            ),
-                                            data_source: d.outlier_data_source,
-                                            size,
-                                            event_ids,
-                                        });
-                                    }
-
-                                    match serde_json::to_string(&outliers) {
-                                        Ok(json) => future::ok(
-                                            Response::builder()
-                                                .header(header::CONTENT_TYPE, "application/json")
-                                                .body(Body::from(json))
-                                                .unwrap(),
-                                        ),
-                                        Err(_) => future::ok(ApiService::build_http_500_response()),
-                                    }
-                                })
-                                .map_err(Into::into);
+                                let result =
+                                    db::DB::execute_select_outlier_query(&self.db, &data_source)
+                                        .and_then(|data| future::ok(ApiService::process_outliers(data)))
+                                        .map_err(Into::into);
 
                                 return Box::new(result);
                             }
@@ -1423,6 +1339,41 @@ impl ApiService {
             });
         }
         match serde_json::to_string(&clusters) {
+            Ok(json) => Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap(),
+            Err(_) => ApiService::build_http_500_response(),
+        }
+    }
+
+    fn process_outliers(data: Vec<db::models::OutliersTable>) -> Response<Body> {
+        #[derive(Debug, Serialize)]
+        struct Outliers {
+            outlier: String,
+            data_source: String,
+            size: usize,
+            event_ids: Vec<u64>,
+        }
+        let mut outliers: Vec<Outliers> = Vec::new();
+        for d in data {
+            let event_ids = d.outlier_event_ids.map_or(Vec::<u64>::new(), |event_ids| {
+                (rmp_serde::decode::from_slice(&event_ids)
+                    as Result<Vec<u64>, rmp_serde::decode::Error>)
+                    .unwrap_or_default()
+            });
+            let size = d
+                .outlier_size
+                .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
+            outliers.push(Outliers {
+                outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
+                data_source: d.outlier_data_source,
+                size,
+                event_ids,
+            });
+        }
+
+        match serde_json::to_string(&outliers) {
             Ok(json) => Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json))
