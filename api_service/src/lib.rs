@@ -1320,7 +1320,7 @@ impl ApiService {
 
     fn update_etcd(url: &str, key: &str, value: &str) {
         let data = format!(
-            "{{\"key\": \"{}\", \"value\": \"{}\"}}",
+            r#"{{"key": "{}", "value": "{}"}}"#,
             base64::encode(key),
             base64::encode(value)
         );
