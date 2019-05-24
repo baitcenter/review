@@ -138,12 +138,11 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
                 (&Method::POST, "/api/category") => {
-                    let hash_query: HashMap<_, _> =
-                        url::form_urlencoded::parse(query.as_ref()).collect();
-                    if hash_query.len() == 1 {
-                        if let Some(category) = hash_query.get("category") {
-                            let resp = db::DB::add_new_category(&self.db, &category).then(
-                                |insert_result| match insert_result {
+                    let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
+                    if query.len() == 1 && query[0].0 == "category" {
+                        let resp =
+                            db::DB::add_new_category(&self.db, &query[0].1).then(|insert_result| {
+                                match insert_result {
                                     Ok(_) => future::ok(
                                         Response::builder()
                                             .status(StatusCode::CREATED)
@@ -169,32 +168,31 @@ impl ApiService {
                                             future::ok(ApiService::build_http_500_response())
                                         }
                                     }
-                                },
-                            );
-                            return Box::new(resp);
-                        }
+                                }
+                            });
+                        return Box::new(resp);
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
                 (&Method::PUT, "/api/suspicious_tokens") => {
-                    let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                    let query = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
-                        .collect();
-                    if hash_query.len() == 1 {
-                        if let Some(etcd_key) = hash_query.get("etcd_key") {
-                            let etcd_key_cloned = etcd_key.clone();
-                            let result = req.into_body().concat2().map_err(Into::into).and_then(
-                                move |buf| {
+                        .collect::<Vec<_>>();
+                    if query.len() == 1 && query[0].0 == "etcd_key" {
+                        let result =
+                            req.into_body()
+                                .concat2()
+                                .map_err(Into::into)
+                                .and_then(move |buf| {
                                     let data = format!(
                                         r#"{{"key": "{}", "value": "{}"}}"#,
-                                        base64::encode(&etcd_key_cloned),
+                                        base64::encode(&query[0].1),
                                         base64::encode(&buf)
                                     );
                                     let client = reqwest::Client::new();
                                     match client.post(&self.etcd_url).body(data).send() {
                                         Ok(_) => {
-                                            let msg =
-                                                format!("{} has been updated.", etcd_key_cloned);
+                                            let msg = format!("{} has been updated.", &query[0].1);
                                             future::ok(
                                                 Response::builder()
                                                     .status(StatusCode::OK)
@@ -214,10 +212,8 @@ impl ApiService {
                                             ))
                                         }
                                     }
-                                },
-                            );
-                            return Box::new(result);
-                        }
+                                });
+                        return Box::new(result);
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
