@@ -7,11 +7,9 @@ use failure::Fail;
 use futures::future;
 use futures::prelude::*;
 use models::*;
-use schema::Action::dsl::*;
 use schema::Category::dsl::*;
 use schema::Clusters::dsl::*;
 use schema::Outliers::dsl::*;
-use schema::Priority::dsl::*;
 use schema::Qualifier::dsl::*;
 use schema::Status::dsl::*;
 
@@ -51,16 +49,6 @@ impl DB {
         future::result(insert_result)
     }
 
-    pub fn get_action_table(&self) -> impl Future<Item = Vec<ActionTable>, Error = Error> {
-        let action_table = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| Action.load::<ActionTable>(&conn).map_err(Into::into));
-
-        future::result(action_table)
-    }
-
     pub fn get_category_table(&self) -> impl Future<Item = Vec<CategoryTable>, Error = Error> {
         let category_table = self
             .pool
@@ -89,16 +77,6 @@ impl DB {
         future::result(cluster_table)
     }
 
-    pub fn get_priority_table(&self) -> impl Future<Item = Vec<PriorityTable>, Error = Error> {
-        let priority_table = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| Priority.load::<PriorityTable>(&conn).map_err(Into::into));
-
-        future::result(priority_table)
-    }
-
     pub fn get_qualifier_table(&self) -> impl Future<Item = Vec<QualifierTable>, Error = Error> {
         let qualifier_table = self
             .pool
@@ -119,142 +97,6 @@ impl DB {
         future::result(status_table)
     }
 
-    pub fn get_cluster_by_category(
-        &self,
-        cat_id: &str,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        if cat_id.contains(',') {
-            let cat_id = cat_id.split(',');
-            let cat_id_vec = cat_id
-                .map(|c| (&c).parse::<i32>())
-                .filter_map(Result::ok)
-                .collect::<Vec<_>>();
-            if !cat_id_vec.is_empty() && cat_id_vec.len() != 1 {
-                let mut query = String::new();
-                for (index, cat_id) in cat_id_vec.iter().enumerate() {
-                    if index == 0 {
-                        let q = format!("Clusters.category_id = {}", cat_id);
-                        query.push_str(&q);
-                    } else {
-                        let q = format!(" or Clusters.category_id = {}", cat_id);
-                        query.push_str(&q);
-                    }
-                }
-                let query = format!(
-                    "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};",
-                    query
-                );
-                let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-                    diesel::sql_query(query)
-                        .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                        .map_err(Into::into)
-                });
-                future::result(cluster)
-            } else if cat_id_vec.len() == 1 {
-                let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-                    Clusters
-                        .filter(schema::Clusters::dsl::category_id.eq(cat_id_vec[0]))
-                        .inner_join(Status)
-                        .inner_join(Qualifier)
-                        .inner_join(Category)
-                        .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                        .map_err(Into::into)
-                });
-                future::result(cluster)
-            } else {
-                future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                ))))
-            }
-        } else if let Ok(cat_id) = cat_id.parse::<i32>() {
-            let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-                Clusters
-                    .filter(schema::Clusters::dsl::category_id.eq(cat_id))
-                    .inner_join(Status)
-                    .inner_join(Qualifier)
-                    .inner_join(Category)
-                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                    .map_err(Into::into)
-            });
-            future::result(cluster)
-        } else {
-            future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::Other,
-            ))))
-        }
-    }
-
-    pub fn get_cluster_by_status(
-        &self,
-        s_id: i32,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Clusters
-                .filter(schema::Clusters::dsl::status_id.eq(s_id))
-                .inner_join(Status)
-                .inner_join(Qualifier)
-                .inner_join(Category)
-                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_cluster_by_data_source(
-        &self,
-        datasource: &str,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Clusters
-                .filter(schema::Clusters::dsl::data_source.eq(datasource))
-                .inner_join(Status)
-                .inner_join(Qualifier)
-                .inner_join(Category)
-                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_benign_id(&self) -> i32 {
-        if let Ok(conn) = self.pool.get() {
-            if let Ok(qualifier_table) = Qualifier.load::<QualifierTable>(&conn) {
-                if let Some(benign) = qualifier_table.iter().find(|x| x.qualifier == "benign") {
-                    return benign.qualifier_id.unwrap();
-                }
-            }
-        }
-        -1
-    }
-
-    pub fn get_cluster(
-        &self,
-        c_id: &str,
-    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            let query = format!(
-                "SELECT cluster_id, examples FROM Clusters WHERE cluster_id = '{}'",
-                c_id
-            );
-            diesel::sql_query(query)
-                .load::<ClusterExample>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
     pub fn get_cluster_examples(
         &self,
         query: &str,
@@ -262,71 +104,6 @@ impl DB {
         let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
             diesel::sql_query(query)
                 .load::<ClusterExample>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_cluster_only(
-        &self,
-        datasource: &str,
-    ) -> impl Future<Item = Vec<Option<String>>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Clusters
-                .select(schema::Clusters::dsl::cluster_id)
-                .filter(schema::Clusters::dsl::data_source.eq(datasource))
-                .load::<Option<String>>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_cluster_with_limit_num(
-        &self,
-        c_id: &str,
-        limit_num: usize,
-    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            let query = format!(
-                "SELECT cluster_id, examples FROM Clusters WHERE cluster_id = '{}' LIMIT {}",
-                c_id, limit_num
-            );
-            diesel::sql_query(query)
-                .load::<ClusterExample>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_all_clusters_with_limit_num(
-        &self,
-        limit_num: usize,
-    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            let query = format!(
-                "SELECT cluster_id, examples FROM Clusters LIMIT {}",
-                limit_num
-            );
-            diesel::sql_query(query)
-                .load::<ClusterExample>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
-    }
-
-    pub fn get_signature_by_qualifier(
-        &self,
-        q_id: i32,
-    ) -> impl Future<Item = Vec<String>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Clusters
-                .select(schema::Clusters::dsl::signature)
-                .filter(schema::Clusters::dsl::qualifier_id.eq(q_id))
-                .load::<String>(&conn)
                 .map_err(Into::into)
         });
 
@@ -341,21 +118,6 @@ impl DB {
             .and_then(|conn| Outliers.load::<OutliersTable>(&conn).map_err(Into::into));
 
         future::result(outliers_table)
-    }
-
-    pub fn get_outlier_only(
-        &self,
-        datasource: &str,
-    ) -> impl Future<Item = Vec<Vec<u8>>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Outliers
-                .select(schema::Outliers::dsl::outlier_raw_event)
-                .filter(schema::Outliers::dsl::outlier_data_source.eq(datasource))
-                .load::<Vec<u8>>(&conn)
-                .map_err(Into::into)
-        });
-
-        future::result(cluster)
     }
 
     pub fn execute_select_cluster_query(
@@ -877,172 +639,6 @@ impl DB {
         };
 
         future::result(update_result)
-    }
-
-    pub fn update_category_in_clusters(
-        &self,
-        cls_id: &str,
-        datasource: &str,
-        cat: &str,
-    ) -> impl Future<Item = (), Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let record_check = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(cls_id))
-            .filter(schema::Clusters::dsl::data_source.eq(datasource))
-            .load::<ClustersTable>(&conn);
-        if DB::check_db_query_result(record_check).is_none() {
-            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::RecordNotExist,
-            ))));
-        }
-        let record_check = Category
-            .filter(schema::Category::dsl::category.eq(cat))
-            .load::<CategoryTable>(&conn);
-        let cat_id = match DB::check_db_query_result(record_check) {
-            Some(record_check) => record_check[0].category_id.unwrap(),
-            None => {
-                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::RecordNotExist,
-                ))))
-            }
-        };
-        let target = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(cls_id))
-            .filter(schema::Clusters::dsl::data_source.eq(datasource));
-        let now = chrono::Utc::now();
-        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-        let update_result = match diesel::update(target)
-            .set((
-                schema::Clusters::dsl::category_id.eq(cat_id),
-                schema::Clusters::dsl::last_modification_time.eq(Some(timestamp)),
-            ))
-            .execute(&conn)
-        {
-            Ok(_) => Ok(()),
-            Err(e) => DB::error_handling(e),
-        };
-
-        future::result(update_result)
-    }
-
-    pub fn update_category_id_in_clusters(
-        &self,
-        cls_id: &str,
-        datasource: &str,
-        cat_id: i32,
-    ) -> impl Future<Item = (), Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let record_check = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(cls_id))
-            .filter(schema::Clusters::dsl::data_source.eq(datasource))
-            .load::<ClustersTable>(&conn);
-        if DB::check_db_query_result(record_check).is_none() {
-            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::RecordNotExist,
-            ))));
-        }
-        let record_check = Category
-            .filter(schema::Category::dsl::category_id.eq(cat_id))
-            .load::<CategoryTable>(&conn);
-        if DB::check_db_query_result(record_check).is_none() {
-            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::RecordNotExist,
-            ))));
-        }
-        let target = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(cls_id))
-            .filter(schema::Clusters::dsl::data_source.eq(datasource));
-        let now = chrono::Utc::now();
-        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-        let update_result = match diesel::update(target)
-            .set((
-                schema::Clusters::dsl::category_id.eq(cat_id),
-                schema::Clusters::dsl::last_modification_time.eq(Some(timestamp)),
-            ))
-            .execute(&conn)
-        {
-            Ok(_) => Ok(()),
-            Err(e) => DB::error_handling(e),
-        };
-
-        future::result(update_result)
-    }
-
-    pub fn update_cluster_id(
-        &self,
-        c_id: &str,
-        new_c_id: &str,
-    ) -> impl Future<Item = String, Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let c_id_check = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(c_id))
-            .load::<ClustersTable>(&conn);
-        let datasource = match DB::check_db_query_result(c_id_check) {
-            Some(event) => event[0].data_source.clone(),
-            None => return future::result(Ok("No entry found".to_string())),
-        };
-
-        let target = Clusters.filter(schema::Clusters::dsl::cluster_id.eq(c_id));
-        let now = chrono::Utc::now();
-        let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-        let update_result = match diesel::update(target)
-            .set((
-                schema::Clusters::dsl::cluster_id.eq(new_c_id),
-                schema::Clusters::dsl::last_modification_time.eq(Some(timestamp)),
-            ))
-            .execute(&conn)
-        {
-            Ok(_) => Ok(datasource),
-            Err(e) => DB::error_handling(e),
-        };
-
-        future::result(update_result)
-    }
-
-    pub fn update_qualifier_id(
-        &self,
-        c_id: &str,
-        new_qualifier_id: i32,
-    ) -> impl Future<Item = i8, Error = Error> {
-        let conn = self.pool.get().unwrap();
-
-        let q_id_check = Qualifier
-            .filter(schema::Qualifier::dsl::qualifier_id.eq(new_qualifier_id))
-            .load::<QualifierTable>(&conn);
-        if DB::check_db_query_result(q_id_check).is_none() {
-            return future::result(Ok(-1));
-        }
-        let reviewed = Status
-            .filter(schema::Status::dsl::status.eq("reviewed"))
-            .load::<StatusTable>(&conn);
-        let reviewed = match DB::check_db_query_result(reviewed) {
-            Some(reviewed) => reviewed[0].status_id.unwrap(),
-            None => return future::result(Ok(-1)),
-        };
-
-        let record_check = Clusters
-            .filter(schema::Clusters::dsl::cluster_id.eq(c_id))
-            .load::<ClustersTable>(&conn);
-        if record_check.is_ok() && !record_check.unwrap().is_empty() {
-            let target = Clusters.filter(schema::Clusters::dsl::cluster_id.eq(c_id));
-            let now = chrono::Utc::now();
-            let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-            let update_result = match diesel::update(target)
-                .set((
-                    schema::Clusters::dsl::qualifier_id.eq(new_qualifier_id),
-                    schema::Clusters::dsl::status_id.eq(reviewed),
-                    schema::Clusters::dsl::last_modification_time.eq(Some(timestamp)),
-                ))
-                .execute(&conn)
-            {
-                Ok(_) => Ok(0),
-                Err(e) => DB::error_handling(e),
-            };
-
-            return future::result(update_result);
-        }
-
-        future::result(Ok(-1))
     }
 
     fn bytes_to_string(bytes: &[u8]) -> String {
