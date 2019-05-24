@@ -47,254 +47,12 @@ impl ApiService {
         Box::new(fut)
     }
 
-    #[allow(clippy::cognitive_complexity)]
     pub fn request_handler(
         self,
         req: Request<Body>,
     ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
-                (&Method::GET, "/api/cluster") => {
-                    let hash_query: HashMap<_, _> =
-                        url::form_urlencoded::parse(query.as_ref()).collect();
-                    if hash_query.len() == 1 {
-                        if let Some(category_id) = hash_query.get("category_id") {
-                            let result = db::DB::get_cluster_by_category(&self.db, category_id)
-                                .and_then(|data| future::ok(ApiService::process_clusters(data)))
-                                .map_err(Into::into);
-                            Box::new(result)
-                        } else if let Some(data_source) = hash_query.get("data_source") {
-                            let result = db::DB::get_cluster_by_data_source(&self.db, data_source)
-                                .and_then(|data| future::ok(ApiService::process_clusters(data)))
-                                .map_err(Into::into);
-                            Box::new(result)
-                        } else if let Some(status_id) = hash_query.get("status_id") {
-                            if let Ok(status_id) = status_id.parse::<i32>() {
-                                let result = db::DB::get_cluster_by_status(&self.db, status_id)
-                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
-                                    .map_err(Into::into);
-                                Box::new(result)
-                            } else {
-                                Box::new(future::ok(ApiService::build_http_404_response()))
-                            }
-                        } else if let Some(qualifier_id) = hash_query.get("qualifier_id") {
-                            if let Ok(qualifier_id) = qualifier_id.parse::<i32>() {
-                                let result =
-                                    db::DB::get_signature_by_qualifier(&self.db, qualifier_id)
-                                        .and_then(|data| match serde_json::to_string(&data) {
-                                            Ok(json) => future::ok(
-                                                Response::builder()
-                                                    .header(
-                                                        header::CONTENT_TYPE,
-                                                        "application/json",
-                                                    )
-                                                    .body(Body::from(json))
-                                                    .unwrap(),
-                                            ),
-                                            Err(_) => {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        })
-                                        .map_err(Into::into);
-
-                                Box::new(result)
-                            } else {
-                                Box::new(future::ok(ApiService::build_http_400_response()))
-                            }
-                        } else {
-                            Box::new(future::ok(ApiService::build_http_400_response()))
-                        }
-                    } else if hash_query.len() == 2 {
-                        if let (Some(cluster_id), Some(max_cluster_count)) = (
-                            hash_query.get("cluster_id"),
-                            hash_query.get("max_cluster_count"),
-                        ) {
-                            #[derive(Debug, Serialize)]
-                            struct Clusters {
-                                cluster_id: Option<String>,
-                                examples: Option<Vec<(usize, String)>>,
-                            }
-                            if cluster_id == "all" && max_cluster_count == "all" {
-                                Box::new(future::ok(ApiService::build_http_400_response()))
-                            } else if cluster_id == "all" {
-                                if let Ok(max_cluster_count) = max_cluster_count.parse::<usize>() {
-                                    if max_cluster_count == 0 {
-                                        return Box::new(future::ok(
-                                            ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
-                                        ));
-                                    }
-
-                                    let result = db::DB::get_all_clusters_with_limit_num(
-                                        &self.db,
-                                        max_cluster_count,
-                                    )
-                                    .and_then(|data| {
-                                        let mut clusters: Vec<Clusters> = Vec::new();
-                                        for d in data {
-                                            let eg = match d.examples {
-                                                Some(eg) => (rmp_serde::decode::from_slice(&eg)
-                                                    as Result<
-                                                        Vec<(usize, String)>,
-                                                        rmp_serde::decode::Error,
-                                                    >)
-                                                    .ok(),
-                                                None => None,
-                                            };
-                                            clusters.push(Clusters {
-                                                cluster_id: d.cluster_id,
-                                                examples: eg,
-                                            });
-                                        }
-                                        match serde_json::to_string(&clusters) {
-                                            Ok(json) => future::ok(
-                                                Response::builder()
-                                                    .header(
-                                                        header::CONTENT_TYPE,
-                                                        "application/json",
-                                                    )
-                                                    .body(Body::from(json))
-                                                    .unwrap(),
-                                            ),
-                                            Err(_) => {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
-                                    })
-                                    .map_err(Into::into);
-
-                                    Box::new(result)
-                                } else {
-                                    return Box::new(future::ok(
-                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
-                                    ));
-                                }
-                            } else if max_cluster_count == "all" {
-                                let result = db::DB::get_cluster(&self.db, cluster_id)
-                                    .and_then(|data| {
-                                        let mut clusters: Vec<Clusters> = Vec::new();
-                                        for d in data {
-                                            let eg = match d.examples {
-                                                Some(eg) => (rmp_serde::decode::from_slice(&eg)
-                                                    as Result<
-                                                        Vec<(usize, String)>,
-                                                        rmp_serde::decode::Error,
-                                                    >)
-                                                    .ok(),
-                                                None => None,
-                                            };
-                                            clusters.push(Clusters {
-                                                cluster_id: d.cluster_id,
-                                                examples: eg,
-                                            });
-                                        }
-                                        match serde_json::to_string(&clusters) {
-                                            Ok(json) => future::ok(
-                                                Response::builder()
-                                                    .header(
-                                                        header::CONTENT_TYPE,
-                                                        "application/json",
-                                                    )
-                                                    .body(Body::from(json))
-                                                    .unwrap(),
-                                            ),
-                                            Err(_) => {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
-                                    })
-                                    .map_err(Into::into);
-
-                                Box::new(result)
-                            } else if let Ok(max_cluster_count) = max_cluster_count.parse::<usize>()
-                            {
-                                if max_cluster_count == 0 {
-                                    return Box::new(future::ok(
-                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "max_cluster_count must be a positive integer value or 'all'")
-                                    ));
-                                }
-                                let result = db::DB::get_cluster_with_limit_num(
-                                    &self.db,
-                                    cluster_id,
-                                    max_cluster_count,
-                                )
-                                .and_then(|data| {
-                                    let mut clusters: Vec<Clusters> = Vec::new();
-                                    for d in data {
-                                        let eg = match d.examples {
-                                            Some(eg) => (rmp_serde::decode::from_slice(&eg)
-                                                as Result<
-                                                    Vec<(usize, String)>,
-                                                    rmp_serde::decode::Error,
-                                                >)
-                                                .ok(),
-                                            None => None,
-                                        };
-                                        clusters.push(Clusters {
-                                            cluster_id: d.cluster_id,
-                                            examples: eg,
-                                        });
-                                    }
-                                    match serde_json::to_string(&clusters) {
-                                        Ok(json) => future::ok(
-                                            Response::builder()
-                                                .header(header::CONTENT_TYPE, "application/json")
-                                                .body(Body::from(json))
-                                                .unwrap(),
-                                        ),
-                                        Err(_) => future::ok(ApiService::build_http_500_response()),
-                                    }
-                                })
-                                .map_err(Into::into);
-
-                                Box::new(result)
-                            } else {
-                                Box::new(future::ok(
-                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "cluster_id and max_cluster_count must be a positive integer value or 'all'")
-                                        ))
-                            }
-                        } else if let (Some(data_source), Some(cluster_only)) = (
-                            hash_query.get("data_source"),
-                            hash_query.get("cluster_only"),
-                        ) {
-                            if cluster_only == "true" {
-                                let result = db::DB::get_cluster_only(&self.db, data_source)
-                                    .and_then(|data| {
-                                        let data =
-                                            data.iter().filter(|d| d.is_some()).collect::<Vec<_>>();
-                                        match serde_json::to_string(&data) {
-                                            Ok(json) => future::ok(
-                                                Response::builder()
-                                                    .header(
-                                                        header::CONTENT_TYPE,
-                                                        "application/json",
-                                                    )
-                                                    .body(Body::from(json))
-                                                    .unwrap(),
-                                            ),
-                                            Err(_) => {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
-                                    })
-                                    .map_err(Into::into);
-
-                                Box::new(result)
-                            } else {
-                                let result =
-                                    db::DB::get_cluster_by_data_source(&self.db, data_source)
-                                        .and_then(|data| {
-                                            future::ok(ApiService::process_clusters(data))
-                                        })
-                                        .map_err(Into::into);
-                                Box::new(result)
-                            }
-                        } else {
-                            Box::new(future::ok(ApiService::build_http_400_response()))
-                        }
-                    } else {
-                        Box::new(future::ok(ApiService::build_http_400_response()))
-                    }
-                }
                 (&Method::GET, "/api/cluster/example") => {
                     let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "limit" {
@@ -379,44 +137,6 @@ impl ApiService {
 
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
-                (&Method::GET, "/api/outlier") => {
-                    let hash_query: HashMap<_, _> =
-                        url::form_urlencoded::parse(query.as_ref()).collect();
-                    if hash_query.len() == 2 {
-                        if let (Some(data_source), Some(outlier_only)) = (
-                            hash_query.get("data_source"),
-                            hash_query.get("outlier_only"),
-                        ) {
-                            if outlier_only == "true" {
-                                let result = db::DB::get_outlier_only(&self.db, data_source)
-                                    .and_then(|data| {
-                                        let data = data
-                                            .iter()
-                                            .map(|d| ApiService::bytes_to_string(&d))
-                                            .collect::<Vec<_>>();
-                                        match serde_json::to_string(&data) {
-                                            Ok(json) => future::ok(
-                                                Response::builder()
-                                                    .header(
-                                                        header::CONTENT_TYPE,
-                                                        "application/json",
-                                                    )
-                                                    .body(Body::from(json))
-                                                    .unwrap(),
-                                            ),
-                                            Err(_) => {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
-                                    })
-                                    .map_err(Into::into);
-
-                                return Box::new(result);
-                            }
-                        }
-                    }
-                    Box::new(future::ok(ApiService::build_http_400_response()))
-                }
                 (&Method::POST, "/api/category") => {
                     let hash_query: HashMap<_, _> =
                         url::form_urlencoded::parse(query.as_ref()).collect();
@@ -451,209 +171,6 @@ impl ApiService {
                                     }
                                 },
                             );
-                            return Box::new(resp);
-                        }
-                    }
-                    Box::new(future::ok(ApiService::build_http_400_response()))
-                }
-                (&Method::PUT, "/api/category") => {
-                    let hash_query: HashMap<_, _> =
-                        url::form_urlencoded::parse(query.as_ref()).collect();
-                    if hash_query.len() == 2 {
-                        if let (Some(category), Some(new_category)) =
-                            (hash_query.get("category"), hash_query.get("new_category"))
-                        {
-                            let resp = db::DB::update_category(&self.db, &category, &new_category)
-                                .then(move |update_result| match update_result {
-                                    Ok(_) => future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::OK)
-                                            .body(Body::from("The category has been updated"))
-                                            .unwrap(),
-                                    ),
-                                    Err(err) => {
-                                        if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                            err.kind()
-                                        {
-                                            if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                return future::ok(
-                                                    ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                );
-                                            } else if *reason
-                                                == db::error::DatabaseError::RecordNotExist
-                                            {
-                                                return future::ok(
-                                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified category does not exist in database")
-                                                );
-                                            }
-                                        }
-                                        future::ok(ApiService::build_http_500_response())
-                                    }
-                                });
-                            return Box::new(resp);
-                        }
-                    }
-                    Box::new(future::ok(ApiService::build_http_400_response()))
-                }
-                (&Method::PUT, "/api/cluster") => {
-                    let hash_query: HashMap<_, _> =
-                        url::form_urlencoded::parse(query.as_ref()).collect();
-                    if hash_query.len() == 2 {
-                        if let (Some(cluster_id), Some(qualifier_id)) =
-                            (hash_query.get("cluster_id"), hash_query.get("qualifier_id"))
-                        {
-                            if let Ok(qualifier_id) = qualifier_id.parse::<i32>() {
-                                let benign_id = db::DB::get_benign_id(&self.db);
-                                if qualifier_id == benign_id {
-                                    let value = format!(
-                                        "http://{}/api/cluster?qualifier_id={}",
-                                        &self.docker_host_addr, benign_id,
-                                    );
-                                    let data = format!(
-                                        r#"{{"key": "{}", "value": "{}"}}"#,
-                                        base64::encode(&self.etcd_key),
-                                        base64::encode(&value)
-                                    );
-                                    let client = reqwest::Client::new();
-                                    if let Err(e) = client.post(&self.etcd_url).body(data).send() {
-                                        eprintln!("An error occurs while updating etcd: {}", e);
-                                    }
-                                } else if benign_id == -1 {
-                                    eprintln!("An error occurs while accessing database.");
-                                }
-                                let result = db::DB::update_qualifier_id(
-                                    &self.db,
-                                    &cluster_id,
-                                    qualifier_id,
-                                )
-                                .and_then(|return_value| {
-                                    if return_value != -1 {
-                                        future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::OK)
-                                                .body(Body::from("Database has been updated"))
-                                                .unwrap(),
-                                        )
-                                    } else {
-                                        future::ok(ApiService::build_http_400_response())
-                                    }
-                                })
-                                .map_err(Into::into);
-
-                                return Box::new(result);
-                            }
-                        } else if let (Some(cluster_id), Some(new_cluster_id)) = (
-                            hash_query.get("cluster_id"),
-                            hash_query.get("new_cluster_id"),
-                        ) {
-                            let result =
-                                db::DB::update_cluster_id(&self.db, &cluster_id, &new_cluster_id)
-                                    .and_then(move |data_source| {
-                                        if data_source != "No entry found" {
-                                            let value = format!(
-                                                "http://{}/api/cluster?data_source={}",
-                                                &self.docker_host_addr, data_source,
-                                            );
-                                            let etcd_key = format!("clusters_{}", data_source);
-                                            let data = format!(
-                                                r#"{{"key": "{}", "value": "{}"}}"#,
-                                                base64::encode(&etcd_key),
-                                                base64::encode(&value)
-                                            );
-                                            let client = reqwest::Client::new();
-                                            if let Err(e) =
-                                                client.post(&self.etcd_url).body(data).send()
-                                            {
-                                                eprintln!(
-                                                    "An error occurs while updating etcd: {}",
-                                                    e
-                                                );
-                                            }
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::OK)
-                                                    .body(Body::from("Database has been updated"))
-                                                    .unwrap(),
-                                            )
-                                        } else {
-                                            future::ok(ApiService::build_http_response(
-                                                StatusCode::BAD_REQUEST,
-                                                "cluster_id does not exist in database",
-                                            ))
-                                        }
-                                    })
-                                    .map_err(Into::into);
-
-                            return Box::new(result);
-                        }
-                    } else if hash_query.len() == 3 {
-                        if let (Some(cluster_id), Some(data_source), Some(new_category_id)) = (
-                            hash_query.get("cluster_id"),
-                            hash_query.get("data_source"),
-                            hash_query.get("new_category_id"),
-                        ) {
-                            if let Ok(new_category_id) = new_category_id.parse::<i32>() {
-                                let resp = db::DB::update_category_id_in_clusters(&self.db, &cluster_id, &data_source, new_category_id)
-                                    .then(move |update_result| match update_result {
-                                        Ok(_) => future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::OK)
-                                                .body(Body::from("The category_id has been updated"))
-                                                .unwrap(),
-                                        ),
-                                        Err(err) => {
-                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                                err.kind()
-                                            {
-                                                if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                    return future::ok(
-                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                    );
-                                                } else if *reason
-                                                    == db::error::DatabaseError::RecordNotExist
-                                                {
-                                                    return future::ok(
-                                                        ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified record does not exist in database")
-                                                    );
-                                                }
-                                            }
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                    });
-                                return Box::new(resp);
-                            }
-                        } else if let (Some(cluster_id), Some(data_source), Some(new_category)) = (
-                            hash_query.get("cluster_id"),
-                            hash_query.get("data_source"),
-                            hash_query.get("new_category"),
-                        ) {
-                            let resp = db::DB::update_category_in_clusters(&self.db, &cluster_id, &data_source, new_category)
-                                .then(move |update_result| match update_result {
-                                    Ok(_) => future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::OK)
-                                            .body(Body::from("The category has been updated"))
-                                            .unwrap(),
-                                    ),
-                                    Err(err) => {
-                                        if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                            err.kind()
-                                        {
-                                            if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                return future::ok(
-                                                    ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                );
-                                            } else if *reason
-                                                == db::error::DatabaseError::RecordNotExist
-                                            {
-                                                return future::ok(
-                                                    ApiService::build_http_response(StatusCode::BAD_REQUEST, "The specified record does not exist in database")
-                                                );
-                                            }
-                                            }
-                                            future::ok(ApiService::build_http_500_response())
-                                        }
-                                });
                             return Box::new(resp);
                         }
                     }
@@ -944,22 +461,6 @@ impl ApiService {
 
                     Box::new(result)
                 }
-                (&Method::GET, "/api/action") => {
-                    let result = db::DB::get_action_table(&self.db)
-                        .and_then(|data| match serde_json::to_string(&data) {
-                            Ok(json) => future::ok(
-                                Response::builder()
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Body::from(json))
-                                    .unwrap(),
-                            ),
-                            Err(_) => future::ok(ApiService::build_http_500_response()),
-                        })
-                        .map_err(Into::into);
-
-                    Box::new(result)
-                }
-
                 (&Method::GET, "/api/category") => {
                     let result = db::DB::get_category_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
@@ -975,14 +476,12 @@ impl ApiService {
 
                     Box::new(result)
                 }
-
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_cluster_table(&self.db)
                         .and_then(|data| future::ok(ApiService::process_clusters(data)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
-
                 (&Method::GET, "/api/cluster/example") => {
                     let query = "SELECT cluster_id, examples FROM Clusters;";
                     let result = db::DB::get_cluster_examples(&self.db, query)
@@ -990,7 +489,6 @@ impl ApiService {
                         .map_err(Into::into);
                     Box::new(result)
                 }
-
                 (&Method::PUT, "/api/cluster/qualifier") => {
                     #[derive(Debug, Deserialize)]
                     struct NewQualifier {
@@ -1056,7 +554,6 @@ impl ApiService {
 
                     Box::new(result)
                 }
-
                 (&Method::GET, "/api/outlier") => {
                     let result = db::DB::get_outliers_table(&self.db)
                         .and_then(|data| future::ok(ApiService::process_outliers(data)))
@@ -1064,23 +561,6 @@ impl ApiService {
 
                     Box::new(result)
                 }
-
-                (&Method::GET, "/api/priority") => {
-                    let result = db::DB::get_priority_table(&self.db)
-                        .and_then(|data| match serde_json::to_string(&data) {
-                            Ok(json) => future::ok(
-                                Response::builder()
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Body::from(json))
-                                    .unwrap(),
-                            ),
-                            Err(_) => future::ok(ApiService::build_http_500_response()),
-                        })
-                        .map_err(Into::into);
-
-                    Box::new(result)
-                }
-
                 (&Method::GET, "/api/qualifier") => {
                     let result = db::DB::get_qualifier_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
@@ -1096,7 +576,6 @@ impl ApiService {
 
                     Box::new(result)
                 }
-
                 (&Method::GET, "/api/status") => {
                     let result = db::DB::get_status_table(&self.db)
                         .and_then(|data| match serde_json::to_string(&data) {
