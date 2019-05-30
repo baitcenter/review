@@ -290,7 +290,7 @@ impl<'a> ClusterView<'a> {
             while let Some(message) = self.cl_view_rx.try_iter().next() {
                 match message {
                     ClusterViewMessage::DeleteOldEvents() => {
-                        let mut cls = match ClusterView::read_clusters_file(self.cluster_path) {
+                        let cls = match ClusterView::read_clusters_file(self.cluster_path) {
                             Ok(cls) => cls,
                             Err(e) => {
                                 let err_msg = format!(
@@ -310,12 +310,16 @@ impl<'a> ClusterView<'a> {
                         if let Ok(mut raw_event_db) =
                             RawEventDatabase::new(&Path::new(self.raw_db_path))
                         {
-                            let (cls, event_ids_to_keep) =
-                                remake::cluster::delete_old_events(&mut cls, 25);
-                            match RawEventDatabase::shrink_to_fit(
-                                &mut raw_event_db,
-                                &event_ids_to_keep,
-                            ) {
+                            let shrunken_clusters = remake::cluster::delete_old_events(&cls, 25);
+                            let mut event_ids_to_keep =
+                                shrunken_clusters
+                                    .iter()
+                                    .fold(Vec::new(), |mut ids, (_, set)| {
+                                        ids.extend(set.iter());
+                                        ids
+                                    });
+                            event_ids_to_keep.sort_unstable();
+                            match raw_event_db.shrink_to_fit(&event_ids_to_keep) {
                                 Ok(_) => {
                                     match ClusterView::write_clusters_file(&self.cluster_path, &cls)
                                     {
@@ -345,7 +349,7 @@ impl<'a> ClusterView<'a> {
                                         err_msg.as_str(),
                                     );
                                 }
-                            }
+                            };
                         } else {
                             let err_msg =
                                 format!("Raw database {} could not be opened", self.raw_db_path);
