@@ -1,0 +1,689 @@
+swagger: "2.0"
+info:
+  version: "0.4.2"
+  title: "REviewd API"
+tags:
+- name: "cluster"
+- name: "outlier"
+- name: "category"
+- name: "qualifier"
+- name: "status"
+- name: "etcd"
+schemes:
+- "http"
+paths:
+  /api/cluster:
+    get:
+      tags: [cluster]
+      summary: "Get all clusters"
+      description: "This endpoint returns all clusters in database."
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Clusters"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      tags: [cluster]
+      summary: "Create one or more new clusters"
+      description: "This endpoint is for clients to create one or more new clusters."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "Cluster"
+        description: "New clusters to be created in database"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/ClusterCreateBody"
+      responses:
+        201:
+          description: "New clusters have been successfully inserted into database"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    put:
+      tags: [cluster]
+      summary: "Update properties for a selected clusters"
+      description: "This endpoint is to update one or more clusters. If the same cluster does not exist in database, create it as a new cluster."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "Cluster"
+        description: "Clusters to be updated or created"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/ClusterCreateBody"
+      responses:
+        '200':
+          description: "Clusters have been successfully updated"
+        '500':
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        '503':
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/cluster/{cluster_id}:
+    put:
+      tags: [cluster]
+      summary: "Update cluster_id, qualifier, and/or category for the specified cluster"
+      description: "This endpoint is aimed to update cluster_id, qualifier, and/or category of a cluster."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+        - name: "cluster_id"
+          in: "path"
+          description: "cluster_id of the cluster whose properties are to be updated"
+          type: "string"
+          required: true
+        - name: "data_source"
+          in: "query"
+          description: "data_source of the cluster whose properties are to be updated"
+          type: "string"
+          required: true
+        - name: "detector_id"
+          in: "query"
+          description: "detector_id of the cluster whose properties are to be updated"
+          type: "string"
+          required: true
+        - name: "Properties"
+          in: "body"
+          required: true
+          schema:
+            $ref: "#/definitions/ClusterUpdateBody"
+          description: "New values of cluster_id, category, and/or qualifier. At least one of the parameters must be specified to update the cluster."
+      responses:
+        '200':
+          description: "Updated cluster successfully"
+        '500':
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        '503':
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/cluster/qualifier:
+    put:
+      tags: [cluster]
+      summary: "Update qualifier for a selected clusters"
+      description: "This endpoint is to update cluster_id, category, and/or qualifier for a selected clusters."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+        - name: "qualifier"
+          in: "body"
+          required: true
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/QualifierUpdateBody"
+          description: "New values of qualifier. cluster_id, detector_id, and data_source are used to identify the cluster to be updated."
+      responses:
+        '200':
+          description: "Updated cluster successfully"
+        '500':
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        '503':
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/cluster/example:
+    get:
+      tags: [cluster]
+      summary: "Get pairs of cluster_id and examples"
+      description: "This endpoint returns pairs of cluster_id and examples."
+      parameters:
+        - name: "limit"
+          in: "query"
+          description: "Limit the number of clusters to be returned."
+          type: "string"
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Examples"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  
+  /api/cluster/search:
+    get:
+      tags: [cluster]
+      summary: "Search for clusters"
+      description: "This endpoint returns a list of clusters in the database."
+      parameters:
+        - name: "filter"
+          in: "query"
+          description: |
+            A JSON encoded value of the filters. Available filters:
+              - `category:[string]` array of category names
+              - `data_source:[string]` array of data_source names
+              - `status:[string]` array of status names
+              - `qualifier:[string]` array of qualifier names
+              - `cluster_id:[string]` array of cluster_id
+              - `detector_id:[integer]` array of detector_id
+          required: true
+          type: "string"
+        - name: "limit"
+          in: "query"
+          description: "Limit the number of clusters to be returned by a query."
+          type: "string"
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Clusters"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/outlier:
+    get:
+      tags: [outlier]
+      summary: "Get all outliers"
+      description: "This endpoint returns all outliers in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Outlier"
+        500:
+          description: "Internal server error"
+        503:
+          description: "Service temporarily unavailable"
+    post:
+      tags: [outlier]
+      summary: "Create one or more new outliers"
+      description: "This endpoint is for clients to create one or more new outliers."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "Outlier"
+        description: "New outliers to be created in database"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/OutlierCreateBody"
+      responses:
+        201:
+          description: "New outliers have been successfully inserted into database"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    put:
+      tags: [outlier]
+      summary: "Update properties for a selected outliers"
+      description: "This endpoint is to update one or more outliers. If the same outlier does not exist in database, create it as a new outlier."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "Outlier"
+        description: "Outliers to be updated or inserted to database"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/OutlierCreateBody"
+      responses:
+        200:
+          description: "Outliers have been successfully updated"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/outlier/{data_source}:
+    get:
+      tags: [outlier]
+      summary: "Get a list of outliers"
+      description: "This endpoint returns specific outliers by data_source."
+      parameters:
+        - name: "data_source"
+          in: "path"
+          description: "data_source"
+          type: "string"
+          required: true
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Outlier"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/category:
+    get:
+      tags: [category]
+      summary: "Get all categories"
+      description: "This endpoint returns all categories in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            $ref: "#/definitions/Category"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      tags: [category]
+      summary: "Create a new category"
+      description: "This endpoint is for clients to create a new category in database."
+      parameters:
+        - name: "category"
+          in: "query"
+          description: "name of the new category"
+          required: true
+          type: "string"
+      produces:
+        - "text/plain"
+      responses:
+        201:
+          description: "The new category has been successfully inserted into database"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/category/{category}:
+    put:
+      tags: [category]
+      summary: "Update the value of specified category"
+      description: "This endpoint is aimed to update the value of specified category."
+      parameters:
+        - name: "category"
+          in: "path"
+          description: "category name"
+          type: "string"
+          required: true
+        - in: "body"
+          name: "body"
+          description: "New value of category"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              category:
+                type: "string"
+                description: "New value of category"
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "The category has been successfully updated"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/qualifier:
+    get:
+      tags: [qualifier]
+      summary: "Get all qualifiers"
+      description: "This endpoint returns all qualifiers in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Qualifier"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/status:
+    get:
+      tags: [status]
+      summary: "Get all status"
+      description: "This endpoint returns all status in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Status"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/etcd/suspicious_token:
+    put:
+      tags: [etcd]
+      summary: "Update the value of specific etcd key"
+      description: "This endpoint is aimed to update the value, suspicious tokens, of specific etcd key."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - name: "etcd_key"
+        in: "query"
+        description: "The name of the etcd key. The value of the etcd key will be updated."
+        required: true
+        type: "string"
+      - name: "suspicious tokens"
+        in: "body"
+        description: "Sequences of strings in JSON format. REview uses the content of body as a new value of etcd key without checking it."
+        required: true
+        schema:
+          type: "array"
+          items:
+            type: "array"
+            items:
+              type: "string"
+      responses:
+        200:
+          description: "OK"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+definitions:
+  Category:
+    type: "object"
+    properties:
+      category_id:
+        type: "integer"
+        description: "a unique id for this category"
+      category:
+        type: "string"
+        description: "category name"
+  Clusters:
+    type: "object"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "a unique id for this cluster"
+      detector_id:
+        type: "integer"
+        format: "uint32"
+        description: "detector_id in REconverge config file configured for this cluster"
+      qualifier:
+        type: "string"
+        description: "qualifier for this cluster"
+      status:
+        type: "string"
+        description: "status for this cluster"
+      category:
+        type: "string"
+        description: "category for this cluster"
+      signature:
+        type: "string"
+        description: "A signature for this cluster generated by REmake"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      size:
+        type: "integer"
+        format: "uint64"
+        description: "The number of events for this cluster"
+      examples:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            id:
+              type: "integer"
+              format: "uint64"
+            raw_event:
+              type: "string"
+        description: "pairs of id and raw event"
+      last_modification_time:
+        type: "string"
+        format: "dateTime"
+  ClusterCreateBody:
+    type: "object"
+    required:
+    - "cluster_id"
+    - "detector_id"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "a unique id for this cluster"
+      detector_id:
+        type: "integer"
+        format: "uint32"
+        description: "Detector_id in REconverge config file used for this cluster"
+      signature:
+        type: "string"
+        description: "A signature generated by REmake"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      size:
+        type: "integer"
+        format: "uint64"
+        description: "The number of events for this cluster"
+  ClusterUpdateBody:
+    type: "object"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "New value of cluster_id"
+      category: 
+        type: "string"
+        description: "New value of category"
+      qualifier:
+        type: "string"
+        description: "New value of qualifier"
+  Examples:
+    type: "object"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "a unique id for this cluster"
+      examples:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            id:
+              type: "integer"
+              format: "uint64"
+            raw_event:
+              type: "string"
+        description: "pairs of id and raw event"
+  Outlier:
+    type: "object"
+    properties:
+      outlier:
+        type: "string"
+        description: "raw event for this outlier"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      size:
+        type: "integer"
+        format: "uint64"
+        description: "The number of events for this cluster"
+      event_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "uint64"
+        description: "list of event ids for this outlier"
+  OutlierCreateBody:
+    type: "object"
+    required:
+    - "outlier"
+    - "data_source"
+    - "event_ids"
+    properties:
+      outlier:
+        type: "array"
+        items:
+          type: "integer"
+          format: "uint8"
+        description: "raw event for this outlier"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      event_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "uint64"
+        description: "list of event ids for this outlier"
+  Qualifier:
+    type: "object"
+    properties:
+      qualifier_id:
+        type: "integer"
+        description: "a unique id for this qualifier"
+      qualifier:
+        type: "string"
+        description: "qualifier name"
+  QualifierUpdateBody:
+    type: "object"
+    required:
+    - "cluster_id"
+    - "data_source"
+    - "detector_id"
+    - "qualifier"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "cluster_id of the cluster whose qualifier is to be updated"
+      data_source:
+        type: "string"
+        description: "data_source of the cluster whose qualifier is to be updated"
+      detector_id:
+        type: "integer"
+        format: "uint32"
+        description: "detector_id of the cluster whose qualifier is to be updated"
+      qualifier: 
+        type: "string"
+        description: "new value of qualifier"
+  Status:
+    type: "object"
+    properties:
+      status_id:
+        type: "integer"
+        description: "a unique id for this status"
+      status:
+        type: "string"
+        description: "status name"
+  ErrorResponse:
+    description: "Represents an error."
+    type: "object"
+    required: 
+    - "message"
+    properties:
+      message:
+        description: "The error message."
+        type: "string"
+    example:
+      message: "Something went wrong."
