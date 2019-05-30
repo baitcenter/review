@@ -174,7 +174,7 @@ impl ApiService {
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
-                (&Method::PUT, "/api/suspicious_tokens") => {
+                (&Method::PUT, "/api/etcd/suspicious_tokens") => {
                     let query = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
                         .collect::<Vec<_>>();
