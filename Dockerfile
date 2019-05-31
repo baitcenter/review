@@ -3,7 +3,7 @@ FROM ubuntu:18.04 as builder
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.33.0
+    RUST_VERSION=1.35.0
 
 RUN set -eux; \
     apt-get update; \
@@ -20,7 +20,7 @@ RUN set -eux; \
     zlib1g-dev \
     ; \
     rustArch='x86_64-unknown-linux-gnu'; \
-    url="https://static.rust-lang.org/rustup/archive/1.16.0/${rustArch}/rustup-init"; \
+    url="https://static.rust-lang.org/rustup/archive/1.18.3/${rustArch}/rustup-init"; \
     wget "$url"; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --default-toolchain $RUST_VERSION; \
