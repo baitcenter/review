@@ -332,8 +332,8 @@ impl DB {
         for cluster in cluster_update.iter() {
             query = query.or_filter(
                 cluster_id
-                    .eq(cluster.cluster_id.clone())
-                    .and(data_source.eq(cluster.data_source.clone())),
+                    .eq(&cluster.cluster_id)
+                    .and(data_source.eq(&cluster.data_source)),
             );
         }
         let conn = self.pool.get().unwrap();
