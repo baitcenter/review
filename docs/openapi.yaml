@@ -110,11 +110,6 @@ paths:
           description: "data_source of the cluster whose properties are to be updated"
           type: "string"
           required: true
-        - name: "detector_id"
-          in: "query"
-          description: "detector_id of the cluster whose properties are to be updated"
-          type: "string"
-          required: true
         - name: "Properties"
           in: "body"
           required: true
@@ -136,7 +131,7 @@ paths:
     put:
       tags: [cluster]
       summary: "Update qualifier for a selected clusters"
-      description: "This endpoint is to update cluster_id, category, and/or qualifier for a selected clusters."
+      description: "This endpoint updates qualifier values for a selected clusters."
       consumes:
       - "application/json"
       produces:
@@ -149,7 +144,7 @@ paths:
             type: "array"
             items:
               $ref: "#/definitions/QualifierUpdateBody"
-          description: "New values of qualifier. cluster_id, detector_id, and data_source are used to identify the cluster to be updated."
+          description: "New values of qualifier. cluster_id and data_source are used to identify the cluster to be updated."
       responses:
         '200':
           description: "Updated cluster successfully"
@@ -651,7 +646,6 @@ definitions:
     required:
     - "cluster_id"
     - "data_source"
-    - "detector_id"
     - "qualifier"
     properties:
       cluster_id:
@@ -660,10 +654,6 @@ definitions:
       data_source:
         type: "string"
         description: "data_source of the cluster whose qualifier is to be updated"
-      detector_id:
-        type: "integer"
-        format: "uint32"
-        description: "detector_id of the cluster whose qualifier is to be updated"
       qualifier: 
         type: "string"
         description: "new value of qualifier"
