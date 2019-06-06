@@ -90,12 +90,16 @@ impl ApiService {
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
                                 let result = db::DB::execute_select_cluster_query(&self.db, &query)
-                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
                                     .map_err(Into::into);
                                 return Box::new(result);
                             } else {
                                 let result = db::DB::get_cluster_table(&self.db)
-                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
                                     .map_err(Into::into);
                                 return Box::new(result);
                             }
@@ -122,13 +126,17 @@ impl ApiService {
                                 }
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
                                 let result = db::DB::execute_select_cluster_query(&self.db, &query)
-                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
                                     .map_err(Into::into);
                                 return Box::new(result);
                             } else {
                                 let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit);
                                 let result = db::DB::execute_select_cluster_query(&self.db, &query)
-                                    .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
                                     .map_err(Into::into);
                                 return Box::new(result);
                             }
@@ -466,7 +474,7 @@ impl ApiService {
                 }
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_cluster_table(&self.db)
-                        .and_then(|data| future::ok(ApiService::process_clusters(data)))
+                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
@@ -840,57 +848,6 @@ impl ApiService {
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(json))
             .unwrap()
-    }
-
-    fn process_clusters(
-        data: Vec<(
-            db::models::ClustersTable,
-            db::models::StatusTable,
-            db::models::QualifierTable,
-            db::models::CategoryTable,
-        )>,
-    ) -> Response<Body> {
-        #[derive(Debug, Serialize)]
-        struct Clusters {
-            cluster_id: Option<String>,
-            detector_id: i32,
-            qualifier: String,
-            status: String,
-            category: String,
-            signature: String,
-            data_source: String,
-            size: usize,
-            examples: Option<Vec<db::models::Example>>,
-            last_modification_time: Option<chrono::NaiveDateTime>,
-        }
-        let mut clusters: Vec<Clusters> = Vec::new();
-        for d in data {
-            let eg = d.0.examples.and_then(|eg| {
-                (rmp_serde::decode::from_slice(&eg)
-                    as Result<Vec<db::models::Example>, rmp_serde::decode::Error>)
-                    .ok()
-            });
-            let size = d.0.size.parse::<usize>().unwrap_or(0);
-            clusters.push(Clusters {
-                cluster_id: d.0.cluster_id,
-                detector_id: d.0.detector_id,
-                qualifier: d.2.qualifier,
-                status: d.1.status,
-                category: d.3.category,
-                signature: d.0.signature,
-                data_source: d.0.data_source,
-                size,
-                examples: eg,
-                last_modification_time: d.0.last_modification_time,
-            });
-        }
-        match serde_json::to_string(&clusters) {
-            Ok(json) => Response::builder()
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json))
-                .unwrap(),
-            Err(_) => ApiService::build_http_500_response(),
-        }
     }
 
     fn process_cluster_examples(data: Vec<db::models::ClusterExample>) -> Response<Body> {

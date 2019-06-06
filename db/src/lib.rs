@@ -83,20 +83,43 @@ impl DB {
         future::result(category_table)
     }
 
-    pub fn get_cluster_table(
-        &self,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        let cluster_table = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Clusters
-                .inner_join(Status)
-                .inner_join(Qualifier)
-                .inner_join(Category)
-                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                .map_err(Into::into)
-        });
+    pub fn get_cluster_table(&self) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
+        let cluster_table = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| {
+                Clusters
+                    .inner_join(Status)
+                    .inner_join(Qualifier)
+                    .inner_join(Category)
+                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                    .map_err(Into::into)
+            })
+            .and_then(|data| {
+                let mut clusters: Vec<ClusterResponse> = Vec::new();
+                for d in data {
+                    let eg = d.0.examples.and_then(|eg| {
+                        (rmp_serde::decode::from_slice(&eg)
+                            as Result<Vec<Example>, rmp_serde::decode::Error>)
+                            .ok()
+                    });
+                    let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                    clusters.push((
+                        d.0.cluster_id,
+                        Some(d.0.detector_id),
+                        Some(d.2.qualifier),
+                        Some(d.1.status),
+                        Some(d.3.category),
+                        Some(d.0.signature),
+                        Some(d.0.data_source),
+                        Some(cluster_size),
+                        eg,
+                        d.0.last_modification_time,
+                    ));
+                }
+                Ok(clusters)
+            });
 
         future::result(cluster_table)
     }
@@ -147,15 +170,40 @@ impl DB {
     pub fn execute_select_cluster_query(
         &self,
         query: &str,
-    ) -> impl Future<
-        Item = Vec<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>,
-        Error = Error,
-    > {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            diesel::sql_query(query)
-                .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
-                .map_err(Into::into)
-        });
+    ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
+        let cluster = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| {
+                diesel::sql_query(query)
+                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                    .map_err(Into::into)
+            })
+            .and_then(|data| {
+                let mut clusters: Vec<ClusterResponse> = Vec::new();
+                for d in data {
+                    let eg = d.0.examples.and_then(|eg| {
+                        (rmp_serde::decode::from_slice(&eg)
+                            as Result<Vec<Example>, rmp_serde::decode::Error>)
+                            .ok()
+                    });
+                    let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                    clusters.push((
+                        d.0.cluster_id,
+                        Some(d.0.detector_id),
+                        Some(d.2.qualifier),
+                        Some(d.1.status),
+                        Some(d.3.category),
+                        Some(d.0.signature),
+                        Some(d.0.data_source),
+                        Some(cluster_size),
+                        eg,
+                        d.0.last_modification_time,
+                    ));
+                }
+                Ok(clusters)
+            });
 
         future::result(cluster)
     }
