@@ -31,6 +31,18 @@ pub type ClusterResponse = (
     Option<Vec<Example>>,          // examples
     Option<chrono::NaiveDateTime>, // last_modification_time
 );
+pub type SelectCluster = (
+    bool, // cluster_id,
+    bool, // detector_id
+    bool, // qualifier
+    bool, // status
+    bool, // category
+    bool, // signature
+    bool, // data_source
+    bool, // size
+    bool, // examples
+    bool, // last_modification_time
+);
 
 #[derive(Clone)]
 pub struct DB {
@@ -183,6 +195,7 @@ impl DB {
     pub fn execute_select_cluster_query(
         &self,
         query: &str,
+        select: SelectCluster,
     ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
         let cluster = self
             .pool
@@ -194,26 +207,54 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let clusters = data
+                let clusters: Vec<ClusterResponse> = data
                     .into_iter()
                     .map(|d| {
-                        let eg = d.0.examples.and_then(|eg| {
-                            (rmp_serde::decode::from_slice(&eg)
-                                as Result<Vec<Example>, rmp_serde::decode::Error>)
-                                .ok()
-                        });
-                        let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                        let cls = if select.0 { d.0.cluster_id } else { None };
+                        let d_id = if select.1 {
+                            Some(d.0.detector_id)
+                        } else {
+                            None
+                        };
+                        let q = if select.2 { Some(d.2.qualifier) } else { None };
+                        let s = if select.3 { Some(d.1.status) } else { None };
+                        let cat = if select.4 { Some(d.3.category) } else { None };
+                        let sig = if select.5 { Some(d.0.signature) } else { None };
+                        let datasource = if select.6 {
+                            Some(d.0.data_source)
+                        } else {
+                            None
+                        };
+                        let cluster_size = if select.7 {
+                            Some(d.0.size.parse::<usize>().unwrap_or(0))
+                        } else {
+                            None
+                        };
+                        let eg = if select.8 {
+                            d.0.examples.and_then(|eg| {
+                                (rmp_serde::decode::from_slice(&eg)
+                                    as Result<Vec<Example>, rmp_serde::decode::Error>)
+                                    .ok()
+                            })
+                        } else {
+                            None
+                        };
+                        let time = if select.9 {
+                            d.0.last_modification_time
+                        } else {
+                            None
+                        };
                         (
-                            d.0.cluster_id,
-                            Some(d.0.detector_id),
-                            Some(d.2.qualifier),
-                            Some(d.1.status),
-                            Some(d.3.category),
-                            Some(d.0.signature),
-                            Some(d.0.data_source),
-                            Some(cluster_size),
+                            cls,
+                            d_id,
+                            q,
+                            s,
+                            cat,
+                            sig,
+                            datasource,
+                            cluster_size,
                             eg,
-                            d.0.last_modification_time,
+                            time,
                         )
                     })
                     .collect();

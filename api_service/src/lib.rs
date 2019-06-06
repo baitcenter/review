@@ -11,6 +11,8 @@ use url::percent_encoding::percent_decode;
 mod error;
 use error::Error;
 
+const SELECT_ALL: db::SelectCluster = (true, true, true, true, true, true, true, true, true, true);
+
 #[derive(Clone)]
 pub struct ApiService {
     db: db::DB,
@@ -70,75 +72,93 @@ impl ApiService {
                 (&Method::GET, "/api/cluster/search") => {
                     let hash_query: HashMap<_, _> =
                         url::form_urlencoded::parse(query.as_ref()).collect();
-                    if let (Some(filter), 1) = (hash_query.get("filter"), hash_query.len()) {
-                        if let Ok(filter) = serde_json::from_str(&filter)
-                            as Result<Filter, serde_json::error::Error>
-                        {
-                            let filter = Filter::query_builder(&filter);
-                            if !filter.is_empty() {
-                                let mut where_clause = String::new();
-                                for (index, filter) in filter.iter().enumerate() {
-                                    if index == 0 {
-                                        where_clause.push_str(&filter);
-                                    } else {
-                                        where_clause.push_str(&format!(" or {}", filter));
-                                    }
+                    let where_clause = if let Some(filter) = hash_query.get("filter") {
+                        match Filter::get_where_clause(&filter) {
+                            Ok(where_clause) => {
+                                if where_clause.is_empty() {
+                                    let query = match hash_query.get("limit").and_then(|limit| limit.parse::<u64>().ok()) {
+                                        Some(limit) => format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit),
+                                        None => "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id;".to_string(),
+                                    };
+                                    let result = db::DB::execute_select_cluster_query(
+                                        &self.db, &query, SELECT_ALL,
+                                    )
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
+                                    .map_err(Into::into);
+                                    return Box::new(result);
+                                } else {
+                                    where_clause
                                 }
-                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
-                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
-                                return Box::new(result);
-                            } else {
-                                let result = db::DB::get_cluster_table(&self.db)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
-                                return Box::new(result);
+                            }
+                            Err(_) => {
+                                return Box::new(future::ok(ApiService::build_http_400_response()));
                             }
                         }
-                    } else if let (Some(filter), Some(limit), 2) = (
-                        hash_query.get("filter"),
+                    } else {
+                        return Box::new(future::ok(ApiService::build_http_400_response()));
+                    };
+
+                    if hash_query.len() == 1 {
+                        let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
+                        let result =
+                            db::DB::execute_select_cluster_query(&self.db, &query, SELECT_ALL)
+                                .and_then(|data| {
+                                    future::ok(ApiService::build_cluster_response(data))
+                                })
+                                .map_err(Into::into);
+                        return Box::new(result);
+                    } else if let (Some(limit), 2) = (hash_query.get("limit"), hash_query.len()) {
+                        if let Ok(limit) = limit.parse::<i64>() {
+                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
+                            let result =
+                                db::DB::execute_select_cluster_query(&self.db, &query, SELECT_ALL)
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
+                                    .map_err(Into::into);
+                            return Box::new(result);
+                        }
+                    } else if let (Some(select), 2) = (hash_query.get("select"), hash_query.len()) {
+                        if let Ok(select) = serde_json::from_str(&select)
+                            as Result<Select, serde_json::error::Error>
+                        {
+                            let select = Select::response_type_builder(&select);
+                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
+                            let result =
+                                db::DB::execute_select_cluster_query(&self.db, &query, select)
+                                    .and_then(|data| {
+                                        future::ok(ApiService::build_cluster_response(data))
+                                    })
+                                    .map_err(Into::into);
+                            return Box::new(result);
+                        } else {
+                            return Box::new(future::ok(ApiService::build_http_400_response()));
+                        }
+                    } else if let (Some(select), Some(limit), 3) = (
+                        hash_query.get("select"),
                         hash_query.get("limit"),
                         hash_query.len(),
                     ) {
-                        if let (Ok(filter), Ok(limit)) = (
-                            serde_json::from_str(&filter)
-                                as Result<Filter, serde_json::error::Error>,
-                            limit.parse::<u64>(),
+                        if let (Ok(select), Ok(limit)) = (
+                            serde_json::from_str(&select)
+                                as Result<Select, serde_json::error::Error>,
+                            limit.parse::<i64>(),
                         ) {
-                            let filter = Filter::query_builder(&filter);
-                            if !filter.is_empty() {
-                                let mut where_clause = String::new();
-                                for (index, filter) in filter.iter().enumerate() {
-                                    if index == 0 {
-                                        where_clause.push_str(&filter);
-                                    } else {
-                                        where_clause.push_str(&format!(" or {}", filter));
-                                    }
-                                }
-                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
-                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
+                            let select = Select::response_type_builder(&select);
+                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
+                            let result =
+                                db::DB::execute_select_cluster_query(&self.db, &query, select)
                                     .and_then(|data| {
                                         future::ok(ApiService::build_cluster_response(data))
                                     })
                                     .map_err(Into::into);
-                                return Box::new(result);
-                            } else {
-                                let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit);
-                                let result = db::DB::execute_select_cluster_query(&self.db, &query)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
-                                return Box::new(result);
-                            }
+                            return Box::new(result);
+                        } else {
+                            return Box::new(future::ok(ApiService::build_http_400_response()));
                         }
                     }
-
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
                 (&Method::POST, "/api/category") => {
@@ -981,5 +1001,57 @@ impl Filter {
             }
             new_query
         }
+    }
+
+    fn get_where_clause(filter: &str) -> Result<String, Error> {
+        serde_json::from_str(filter)
+            .map_err(Into::into)
+            .and_then(|filter: Filter| {
+                let filter = Filter::query_builder(&filter);
+                if !filter.is_empty() {
+                    let mut where_clause = String::new();
+                    for (index, filter) in filter.iter().enumerate() {
+                        if index == 0 {
+                            where_clause.push_str(&filter);
+                        } else {
+                            where_clause.push_str(&format!(" or {}", filter))
+                        }
+                    }
+                    Ok(where_clause)
+                } else {
+                    Ok(String::new())
+                }
+            })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct Select {
+    cluster_id: Option<bool>,
+    detector_id: Option<bool>,
+    qualifier: Option<bool>,
+    status: Option<bool>,
+    category: Option<bool>,
+    signature: Option<bool>,
+    data_source: Option<bool>,
+    size: Option<bool>,
+    examples: Option<bool>,
+    last_modification_time: Option<bool>,
+}
+
+impl Select {
+    fn response_type_builder(&self) -> db::SelectCluster {
+        (
+            self.cluster_id.unwrap_or_else(|| false),
+            self.detector_id.unwrap_or_else(|| false),
+            self.qualifier.unwrap_or_else(|| false),
+            self.status.unwrap_or_else(|| false),
+            self.category.unwrap_or_else(|| false),
+            self.signature.unwrap_or_else(|| false),
+            self.data_source.unwrap_or_else(|| false),
+            self.size.unwrap_or_else(|| false),
+            self.examples.unwrap_or_else(|| false),
+            self.last_modification_time.unwrap_or_else(|| false),
+        )
     }
 }
