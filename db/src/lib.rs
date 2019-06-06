@@ -146,14 +146,35 @@ impl DB {
 
     pub fn get_cluster_examples(
         &self,
-        query: &str,
-    ) -> impl Future<Item = Vec<ClusterExample>, Error = Error> {
-        let cluster = self.pool.get().map_err(Into::into).and_then(|conn| {
-            diesel::sql_query(query)
-                .load::<ClusterExample>(&conn)
-                .map_err(Into::into)
-        });
-
+        limit: Option<i64>,
+    ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
+        let cluster = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| match limit {
+                Some(limit) => Clusters
+                    .select((cluster_id, examples))
+                    .limit(limit)
+                    .load::<(Option<String>, Option<Vec<u8>>)>(&conn)
+                    .map_err(Into::into),
+                None => Clusters
+                    .select((cluster_id, examples))
+                    .load::<(Option<String>, Option<Vec<u8>>)>(&conn)
+                    .map_err(Into::into),
+            })
+            .and_then(|data| {
+                let mut clusters: Vec<ClusterResponse> = Vec::new();
+                for d in data {
+                    let eg = d.1.and_then(|eg| {
+                        (rmp_serde::decode::from_slice(&eg)
+                            as Result<Vec<Example>, rmp_serde::decode::Error>)
+                            .ok()
+                    });
+                    clusters.push((d.0, None, None, None, None, None, None, None, eg, None));
+                }
+                Ok(clusters)
+            });
         future::result(cluster)
     }
 

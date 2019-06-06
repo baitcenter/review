@@ -56,14 +56,10 @@ impl ApiService {
                 (&Method::GET, "/api/cluster/example") => {
                     let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "limit" {
-                        if let Ok(limit) = query[0].1.parse::<u64>() {
-                            let query = format!(
-                                "SELECT cluster_id, examples FROM Clusters LIMIT {};",
-                                limit
-                            );
-                            let result = db::DB::get_cluster_examples(&self.db, &query)
+                        if let Ok(limit) = query[0].1.parse::<i64>() {
+                            let result = db::DB::get_cluster_examples(&self.db, Some(limit))
                                 .and_then(|data| {
-                                    future::ok(ApiService::process_cluster_examples(data))
+                                    future::ok(ApiService::build_cluster_response(data))
                                 })
                                 .map_err(Into::into);
                             return Box::new(result);
@@ -479,9 +475,8 @@ impl ApiService {
                     Box::new(result)
                 }
                 (&Method::GET, "/api/cluster/example") => {
-                    let query = "SELECT cluster_id, examples FROM Clusters;";
-                    let result = db::DB::get_cluster_examples(&self.db, query)
-                        .and_then(|data| future::ok(ApiService::process_cluster_examples(data)))
+                    let result = db::DB::get_cluster_examples(&self.db, None)
+                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
@@ -742,10 +737,6 @@ impl ApiService {
             .unwrap()
     }
 
-    fn bytes_to_string(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| char::from(*b)).collect()
-    }
-
     fn build_cluster_response(data: Vec<db::ClusterResponse>) -> Response<Body> {
         let mut json = String::new();
         json.push_str("[");
@@ -850,31 +841,8 @@ impl ApiService {
             .unwrap()
     }
 
-    fn process_cluster_examples(data: Vec<db::models::ClusterExample>) -> Response<Body> {
-        #[derive(Debug, Serialize)]
-        struct Clusters {
-            cluster_id: Option<String>,
-            examples: Option<Vec<db::models::Example>>,
-        }
-        let mut clusters: Vec<Clusters> = Vec::new();
-        for d in data {
-            let eg = d.examples.and_then(|eg| {
-                (rmp_serde::decode::from_slice(&eg)
-                    as Result<Vec<db::models::Example>, rmp_serde::decode::Error>)
-                    .ok()
-            });
-            clusters.push(Clusters {
-                cluster_id: d.cluster_id,
-                examples: eg,
-            });
-        }
-        match serde_json::to_string(&clusters) {
-            Ok(json) => Response::builder()
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json))
-                .unwrap(),
-            Err(_) => ApiService::build_http_500_response(),
-        }
+    fn bytes_to_string(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| char::from(*b)).collect()
     }
 
     fn process_outliers(data: Vec<db::models::OutliersTable>) -> Response<Body> {
