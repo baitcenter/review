@@ -146,42 +146,6 @@ impl DB {
         future::result(status_table)
     }
 
-    pub fn get_cluster_examples(
-        &self,
-        limit: Option<i64>,
-    ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
-        let cluster = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| match limit {
-                Some(limit) => Clusters
-                    .select((cluster_id, examples))
-                    .limit(limit)
-                    .load::<(Option<String>, Option<Vec<u8>>)>(&conn)
-                    .map_err(Into::into),
-                None => Clusters
-                    .select((cluster_id, examples))
-                    .load::<(Option<String>, Option<Vec<u8>>)>(&conn)
-                    .map_err(Into::into),
-            })
-            .and_then(|data| {
-                let clusters = data
-                    .into_iter()
-                    .map(|d| {
-                        let eg = d.1.and_then(|eg| {
-                            (rmp_serde::decode::from_slice(&eg)
-                                as Result<Vec<Example>, rmp_serde::decode::Error>)
-                                .ok()
-                        });
-                        (d.0, None, None, None, None, None, None, None, eg, None)
-                    })
-                    .collect();
-                Ok(clusters)
-            });
-        future::result(cluster)
-    }
-
     pub fn get_outliers_table(&self) -> impl Future<Item = Vec<OutliersTable>, Error = Error> {
         let outliers_table = self
             .pool

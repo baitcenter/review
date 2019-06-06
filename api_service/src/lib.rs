@@ -55,20 +55,6 @@ impl ApiService {
     ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
-                (&Method::GET, "/api/cluster/example") => {
-                    let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
-                    if query.len() == 1 && query[0].0 == "limit" {
-                        if let Ok(limit) = query[0].1.parse::<i64>() {
-                            let result = db::DB::get_cluster_examples(&self.db, Some(limit))
-                                .and_then(|data| {
-                                    future::ok(ApiService::build_cluster_response(data))
-                                })
-                                .map_err(Into::into);
-                            return Box::new(result);
-                        }
-                    }
-                    Box::new(future::ok(ApiService::build_http_400_response()))
-                }
                 (&Method::GET, "/api/cluster/search") => {
                     let hash_query: HashMap<_, _> =
                         url::form_urlencoded::parse(query.as_ref()).collect();
@@ -490,12 +476,6 @@ impl ApiService {
                 }
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_cluster_table(&self.db)
-                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
-                        .map_err(Into::into);
-                    Box::new(result)
-                }
-                (&Method::GET, "/api/cluster/example") => {
-                    let result = db::DB::get_cluster_examples(&self.db, None)
                         .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
                         .map_err(Into::into);
                     Box::new(result)
