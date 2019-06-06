@@ -738,6 +738,110 @@ impl ApiService {
         bytes.iter().map(|b| char::from(*b)).collect()
     }
 
+    fn build_cluster_response(data: Vec<db::ClusterResponse>) -> Response<Body> {
+        let mut json = String::new();
+        json.push_str("[");
+        for (index, d) in data.iter().enumerate() {
+            json.push_str("{");
+            let mut j = String::new();
+            if let Some(cluster_id) = &d.0 {
+                j.push_str(&format!(r#""cluster_id":{:?}"#, cluster_id));
+            }
+            if let Some(detector_id) = d.1 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","detector_id":{}"#, detector_id));
+                } else {
+                    j.push_str(&format!(r#""detector_id":{}"#, detector_id));
+                }
+            }
+            if let Some(qualifier) = &d.2 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","qualifier":{:?}"#, qualifier));
+                } else {
+                    j.push_str(&format!(r#""qualifier":"{:?}"#, qualifier));
+                }
+            }
+            if let Some(status) = &d.3 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","status":{:?}"#, status));
+                } else {
+                    j.push_str(&format!(r#""status":{:?}"#, status));
+                }
+            }
+            if let Some(category) = &d.4 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","category":{:?}"#, category));
+                } else {
+                    j.push_str(&format!(r#""category":{:?}"#, category));
+                }
+            }
+            if let Some(signature) = &d.5 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","signature":{:?}"#, signature));
+                } else {
+                    j.push_str(&format!(r#""signature":{:?}"#, signature));
+                }
+            }
+            if let Some(data_source) = &d.6 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","data_source":{:?}"#, data_source));
+                } else {
+                    j.push_str(&format!(r#""data_source":{:?}"#, data_source));
+                }
+            }
+            if let Some(size) = &d.7 {
+                if !j.is_empty() {
+                    j.push_str(&format!(r#","size":{}"#, size));
+                } else {
+                    j.push_str(&format!(r#""size":{}"#, size));
+                }
+            }
+            if let Some(examples) = &d.8 {
+                match serde_json::to_string(&examples) {
+                    Ok(e) => {
+                        if !j.is_empty() {
+                            j.push_str(&format!(r#","examples":{}"#, e));
+                        } else {
+                            j.push_str(&format!(r#""examples":{}"#, e));
+                        }
+                    }
+                    Err(_) => {
+                        if !j.is_empty() {
+                            j.push_str(r#","examples":-"#);
+                        } else {
+                            j.push_str(r#""examples":-"#);
+                        }
+                    }
+                }
+            }
+            if let Some(last_modification_time) = &d.9 {
+                if !j.is_empty() {
+                    j.push_str(&format!(
+                        r#","last_modification_time":"{}""#,
+                        last_modification_time
+                    ));
+                } else {
+                    j.push_str(&format!(
+                        r#""last_modification_time":"{}""#,
+                        last_modification_time
+                    ));
+                }
+            }
+            if index == data.len() - 1 {
+                j.push_str("}")
+            } else {
+                j.push_str("},")
+            }
+
+            json.push_str(&j);
+        }
+        json.push_str("]");
+        Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(json))
+            .unwrap()
+    }
+
     fn process_clusters(
         data: Vec<(
             db::models::ClustersTable,
