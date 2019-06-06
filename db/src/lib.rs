@@ -317,8 +317,7 @@ impl DB {
     ) -> future::FutureResult<(), Error> {
         use schema::*;
         use serde::Serialize;
-        #[derive(Debug, Queryable, QueryableByName, Serialize)]
-        #[table_name = "Clusters"]
+        #[derive(Debug, Queryable, Serialize)]
         pub struct Cluster {
             cluster_id: Option<String>,
             signature: String,
@@ -329,39 +328,32 @@ impl DB {
             qualifier_id: i32,
             status_id: i32,
         }
-        let conn = self.pool.get().unwrap();
-        let mut update_queries = String::new();
-        let mut query = String::new();
-        for (index, cluster) in cluster_update.iter().enumerate() {
-            if index == 0 {
-                let q = format!(
-                    "cluster_id = '{}' and data_source = '{}' and detector_id = {}",
-                    cluster.cluster_id, cluster.data_source, cluster.detector_id
-                );
-                query.push_str(&q);
-            } else if index == cluster_update.len() - 1 {
-                let q = format!(
-                    " or cluster_id = '{}' and data_source = '{}' and detector_id = {};",
-                    cluster.cluster_id, cluster.data_source, cluster.detector_id,
-                );
-                query.push_str(&q);
-            } else {
-                let q = format!(
-                    " or cluster_id = '{}' and data_source = '{}' and detector_id = {}",
-                    cluster.cluster_id, cluster.data_source, cluster.detector_id
-                );
-                query.push_str(&q);
-            }
+        let mut query = Clusters.into_boxed();
+        for cluster in cluster_update.iter() {
+            query = query.or_filter(
+                cluster_id
+                    .eq(cluster.cluster_id.clone())
+                    .and(data_source.eq(cluster.data_source.clone())),
+            );
         }
-        let query = format!(
-            "SELECT cluster_id, signature, examples, size, category_id, priority_id, qualifier_id, status_id FROM Clusters WHERE {}",
-            query
-        );
-        let cluster_list = match diesel::sql_query(query).load::<Cluster>(&conn) {
+        let conn = self.pool.get().unwrap();
+        let cluster_list = match query
+            .select((
+                cluster_id,
+                signature,
+                examples,
+                size,
+                Clusters::dsl::category_id,
+                priority_id,
+                Clusters::dsl::qualifier_id,
+                Clusters::dsl::status_id,
+            ))
+            .load::<Cluster>(&conn)
+        {
             Ok(result) => result,
             Err(e) => return future::result(DB::error_handling(e)),
         };
-
+        let mut update_queries = String::new();
         for c in cluster_update {
             if let Some(cluster) = cluster_list
                 .iter()

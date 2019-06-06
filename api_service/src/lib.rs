@@ -221,16 +221,12 @@ impl ApiService {
                     if req.method() == Method::PUT && req.uri().path().starts_with("/api/cluster/")
                     {
                         let path: Vec<&str> = req.uri().path().split('/').collect();
-                        let hash_query: HashMap<_, _> = url::form_urlencoded::parse(query.as_ref())
+                        let query = url::form_urlencoded::parse(query.as_ref())
                             .into_owned()
-                            .collect();
-                        if path.len() == 4 && hash_query.len() == 2 {
+                            .collect::<Vec<_>>();
+                        if path.len() == 4 && query.len() == 1 && query[0].0 == "data_source" {
                             let cluster_id = percent_decode(path[3].as_bytes()).decode_utf8();
-                            if let (Ok(cluster_id), Some(detector_id), Some(data_source)) = (
-                                cluster_id,
-                                hash_query.get("detector_id"),
-                                hash_query.get("data_source"),
-                            ) {
+                            if let Ok(cluster_id) = cluster_id {
                                 #[derive(Debug, Deserialize)]
                                 struct NewValues {
                                     cluster_id: Option<String>,
@@ -238,8 +234,7 @@ impl ApiService {
                                     qualifier: Option<String>,
                                 }
                                 let cluster_id_cloned = cluster_id.into_owned();
-                                let data_source_cloned = data_source.clone();
-                                let detector_id_cloned = detector_id.clone();
+                                let data_source_cloned = query[0].1.clone();
                                 let result = req
                                     .into_body()
                                     .concat2()
@@ -269,15 +264,15 @@ impl ApiService {
                                                         }
                                                         if new_qualifier == "benign" {
                                                             let value = format!(
-                                                                r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"], "detector_id": [{}]}}"#,
-                                                                &self.docker_host_addr, &data_source_cloned, &detector_id_cloned
+                                                                r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
+                                                                &self.docker_host_addr, &data_source_cloned
                                                             );
                                                             ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
                                                         }
                                                     }
                                                     let now = chrono::Utc::now();
                                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                                                    let query = format!("UPDATE clusters {} , last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", set_query, timestamp, cluster_id_cloned, detector_id_cloned, data_source_cloned);
+                                                    let query = format!("UPDATE clusters {} , last_modification_time = '{}' WHERE cluster_id = '{}' and data_source = '{}';", set_query, timestamp, cluster_id_cloned, data_source_cloned);
                                                     db::DB::execute_update_query(&self.db, &query)
                                                 }
                                                 else {
@@ -487,7 +482,6 @@ impl ApiService {
                     struct NewQualifier {
                         cluster_id: String,
                         data_source: String,
-                        detector_id: u32,
                         qualifier: String,
                     }
                     let result = req
@@ -500,7 +494,7 @@ impl ApiService {
                                     let now = chrono::Utc::now();
                                     let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
                                     let mut query = String::new();
-                                    data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and detector_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.detector_id, d.data_source)));
+                                    data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.data_source)));
 
                                     let mut result = db::DB::execute_update_query(&self.db, &query);
                                     match result.poll() {
@@ -508,8 +502,8 @@ impl ApiService {
                                             data.iter().for_each(|d| {
                                                 if d.qualifier == "benign" {
                                                     let value = format!(
-                                                        r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"], "detector_id": [{}]}}"#,
-                                                        &self.docker_host_addr, &d.data_source, &d.detector_id
+                                                        r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
+                                                        &self.docker_host_addr, &d.data_source
                                                     );
                                                     ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
                                                 }
