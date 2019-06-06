@@ -85,27 +85,29 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let mut clusters: Vec<ClusterResponse> = Vec::new();
-                for d in data {
-                    let eg = d.0.examples.and_then(|eg| {
-                        (rmp_serde::decode::from_slice(&eg)
-                            as Result<Vec<Example>, rmp_serde::decode::Error>)
-                            .ok()
-                    });
-                    let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
-                    clusters.push((
-                        d.0.cluster_id,
-                        Some(d.0.detector_id),
-                        Some(d.2.qualifier),
-                        Some(d.1.status),
-                        Some(d.3.category),
-                        Some(d.0.signature),
-                        Some(d.0.data_source),
-                        Some(cluster_size),
-                        eg,
-                        d.0.last_modification_time,
-                    ));
-                }
+                let clusters = data
+                    .into_iter()
+                    .map(|d| {
+                        let eg = d.0.examples.and_then(|eg| {
+                            (rmp_serde::decode::from_slice(&eg)
+                                as Result<Vec<Example>, rmp_serde::decode::Error>)
+                                .ok()
+                        });
+                        let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                        (
+                            d.0.cluster_id,
+                            Some(d.0.detector_id),
+                            Some(d.2.qualifier),
+                            Some(d.1.status),
+                            Some(d.3.category),
+                            Some(d.0.signature),
+                            Some(d.0.data_source),
+                            Some(cluster_size),
+                            eg,
+                            d.0.last_modification_time,
+                        )
+                    })
+                    .collect();
                 Ok(clusters)
             });
 
@@ -152,15 +154,17 @@ impl DB {
                     .map_err(Into::into),
             })
             .and_then(|data| {
-                let mut clusters: Vec<ClusterResponse> = Vec::new();
-                for d in data {
-                    let eg = d.1.and_then(|eg| {
-                        (rmp_serde::decode::from_slice(&eg)
-                            as Result<Vec<Example>, rmp_serde::decode::Error>)
-                            .ok()
-                    });
-                    clusters.push((d.0, None, None, None, None, None, None, None, eg, None));
-                }
+                let clusters = data
+                    .into_iter()
+                    .map(|d| {
+                        let eg = d.1.and_then(|eg| {
+                            (rmp_serde::decode::from_slice(&eg)
+                                as Result<Vec<Example>, rmp_serde::decode::Error>)
+                                .ok()
+                        });
+                        (d.0, None, None, None, None, None, None, None, eg, None)
+                    })
+                    .collect();
                 Ok(clusters)
             });
         future::result(cluster)
@@ -190,27 +194,29 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let mut clusters: Vec<ClusterResponse> = Vec::new();
-                for d in data {
-                    let eg = d.0.examples.and_then(|eg| {
-                        (rmp_serde::decode::from_slice(&eg)
-                            as Result<Vec<Example>, rmp_serde::decode::Error>)
-                            .ok()
-                    });
-                    let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
-                    clusters.push((
-                        d.0.cluster_id,
-                        Some(d.0.detector_id),
-                        Some(d.2.qualifier),
-                        Some(d.1.status),
-                        Some(d.3.category),
-                        Some(d.0.signature),
-                        Some(d.0.data_source),
-                        Some(cluster_size),
-                        eg,
-                        d.0.last_modification_time,
-                    ));
-                }
+                let clusters = data
+                    .into_iter()
+                    .map(|d| {
+                        let eg = d.0.examples.and_then(|eg| {
+                            (rmp_serde::decode::from_slice(&eg)
+                                as Result<Vec<Example>, rmp_serde::decode::Error>)
+                                .ok()
+                        });
+                        let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                        (
+                            d.0.cluster_id,
+                            Some(d.0.detector_id),
+                            Some(d.2.qualifier),
+                            Some(d.1.status),
+                            Some(d.3.category),
+                            Some(d.0.signature),
+                            Some(d.0.data_source),
+                            Some(cluster_size),
+                            eg,
+                            d.0.last_modification_time,
+                        )
+                    })
+                    .collect();
                 Ok(clusters)
             });
 
