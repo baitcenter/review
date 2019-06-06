@@ -251,18 +251,21 @@ impl DB {
         new_outliers: &[OutlierUpdate],
     ) -> impl Future<Item = (), Error = Error> {
         let conn = self.pool.get().unwrap();
-        let mut insert_outliers: Vec<OutliersTable> = Vec::new();
-        for new_outlier in new_outliers {
-            let o_size = Some(new_outlier.event_ids.len().to_string());
-            let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
-            insert_outliers.push(OutliersTable {
-                outlier_id: None,
-                outlier_raw_event: new_outlier.outlier.to_vec(),
-                outlier_data_source: new_outlier.data_source.to_string(),
-                outlier_event_ids: event_ids,
-                outlier_size: o_size,
-            });
-        }
+        let insert_outliers: Vec<OutliersTable> = new_outliers
+            .iter()
+            .map(|new_outlier| {
+                let o_size = Some(new_outlier.event_ids.len().to_string());
+                let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
+                OutliersTable {
+                    outlier_id: None,
+                    outlier_raw_event: new_outlier.outlier.to_vec(),
+                    outlier_data_source: new_outlier.data_source.to_string(),
+                    outlier_event_ids: event_ids,
+                    outlier_size: o_size,
+                }
+            })
+            .collect();
+
         let execute_result = if !insert_outliers.is_empty() {
             match diesel::insert_into(Outliers)
                 .values(&insert_outliers)
@@ -574,45 +577,45 @@ impl DB {
         new_clusters: &[ClusterUpdate],
     ) -> impl Future<Item = (), Error = Error> {
         let conn = self.pool.get().unwrap();
-        let mut insert_clusters: Vec<ClustersTable> = Vec::new();
-        for c in new_clusters {
-            let example = match &c.examples {
-                Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                None => None,
-            };
+        let insert_clusters: Vec<ClustersTable> = new_clusters
+            .iter()
+            .map(|c| {
+                let example = match &c.examples {
+                    Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
+                    None => None,
+                };
 
-            // Signature is required field in central repo database
-            // but if new cluster information does not have signature field,
-            // we use '-' as a signature
-            let sig = match &c.signature {
-                Some(sig) => sig.clone(),
-                None => "-".to_string(),
-            };
-            let cluster_size = match c.size {
-                Some(cluster_size) => cluster_size.to_string(),
-                None => "1".to_string(),
-            };
-            // We always insert 1 for category_id and priority_id,
-            // "unknown" for qualifier_id, and "pending review" for status_id.
-            let cluster = ClustersTable {
-                id: None,
-                cluster_id: Some(c.cluster_id.to_string()),
-                description: None,
-                category_id: 1,
-                detector_id: c.detector_id,
-                examples: example,
-                priority_id: 1,
-                qualifier_id: 2,
-                status_id: 2,
-                rules: Some(sig.clone()),
-                signature: sig,
-                size: cluster_size,
-                data_source: c.data_source.to_string(),
-                last_modification_time: None,
-            };
-            insert_clusters.push(cluster);
-        }
-
+                // Signature is required field in central repo database
+                // but if new cluster information does not have signature field,
+                // we use '-' as a signature
+                let sig = match &c.signature {
+                    Some(sig) => sig.clone(),
+                    None => "-".to_string(),
+                };
+                let cluster_size = match c.size {
+                    Some(cluster_size) => cluster_size.to_string(),
+                    None => "1".to_string(),
+                };
+                // We always insert 1 for category_id and priority_id,
+                // "unknown" for qualifier_id, and "pending review" for status_id.
+                ClustersTable {
+                    id: None,
+                    cluster_id: Some(c.cluster_id.to_string()),
+                    description: None,
+                    category_id: 1,
+                    detector_id: c.detector_id,
+                    examples: example,
+                    priority_id: 1,
+                    qualifier_id: 2,
+                    status_id: 2,
+                    rules: Some(sig.clone()),
+                    signature: sig,
+                    size: cluster_size,
+                    data_source: c.data_source.to_string(),
+                    last_modification_time: None,
+                }
+            })
+            .collect();
         let insert_result = if !insert_clusters.is_empty() {
             match diesel::insert_into(Clusters)
                 .values(&insert_clusters)
