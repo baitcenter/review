@@ -19,6 +19,30 @@ pub mod models;
 mod schema;
 
 type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+/*
+    cluster_id,
+    detector_id,
+    qualifier,
+    status,
+    category,
+    signature,
+    data_source,
+    size,
+    examples,
+    last_modification_time,
+*/
+pub type ClusterResponse = (
+    Option<String>,
+    Option<i32>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<usize>,
+    Option<Vec<Example>>,
+    Option<chrono::NaiveDateTime>,
+);
 
 #[derive(Clone)]
 pub struct DB {
