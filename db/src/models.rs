@@ -15,13 +15,6 @@ pub struct CategoryTable {
     pub category: String,
 }
 
-#[derive(Debug, Queryable, QueryableByName, Serialize)]
-#[table_name = "Clusters"]
-pub struct ClusterExample {
-    pub cluster_id: Option<String>,
-    pub examples: Option<Vec<u8>>,
-}
-
 #[derive(
     Debug,
     AsChangeset,
