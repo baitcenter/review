@@ -62,8 +62,11 @@ impl ApiService {
                         match Filter::get_where_clause(&filter) {
                             Ok(where_clause) => {
                                 if where_clause.is_empty() {
-                                    let query = match hash_query.get("limit").and_then(|limit| limit.parse::<u64>().ok()) {
-                                        Some(limit) => format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit),
+                                    let query = match hash_query.get("limit") {
+                                        Some(limit) => match limit.parse::<u64>() {
+                                            Ok(limit) => format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit),
+                                            Err(_) => return Box::new(future::ok(ApiService::build_http_400_response())),
+                                        }
                                         None => "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id;".to_string(),
                                     };
                                     let result = db::DB::execute_select_cluster_query(
@@ -96,7 +99,7 @@ impl ApiService {
                                 .map_err(Into::into);
                         return Box::new(result);
                     } else if let (Some(limit), 2) = (hash_query.get("limit"), hash_query.len()) {
-                        if let Ok(limit) = limit.parse::<i64>() {
+                        if let Ok(limit) = limit.parse::<u64>() {
                             let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
                             let result =
                                 db::DB::execute_select_cluster_query(&self.db, &query, SELECT_ALL)
@@ -130,7 +133,7 @@ impl ApiService {
                         if let (Ok(select), Ok(limit)) = (
                             serde_json::from_str(&select)
                                 as Result<Select, serde_json::error::Error>,
-                            limit.parse::<i64>(),
+                            limit.parse::<u64>(),
                         ) {
                             let select = Select::response_type_builder(&select);
                             let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
