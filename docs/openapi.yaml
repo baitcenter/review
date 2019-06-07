@@ -156,35 +156,6 @@ paths:
           description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
-  /api/cluster/example:
-    get:
-      tags: [cluster]
-      summary: "Get pairs of cluster_id and examples"
-      description: "This endpoint returns pairs of cluster_id and examples."
-      parameters:
-        - name: "limit"
-          in: "query"
-          description: "Limit the number of clusters to be returned."
-          type: "string"
-      produces:
-        - "application/json"
-        - "text/plain"
-      responses:
-        200:
-          description: "OK"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/Examples"
-        500:
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-  
   /api/cluster/search:
     get:
       tags: [cluster]
@@ -194,7 +165,7 @@ paths:
         - name: "filter"
           in: "query"
           description: |
-            A JSON encoded value of the filters. Available filters:
+            A JSON encoded value of the filters. If the filter is empty, all clusters in database will be returned. Available filters:
               - `category:[string]` array of category names
               - `data_source:[string]` array of data_source names
               - `status:[string]` array of status names
@@ -207,6 +178,21 @@ paths:
           in: "query"
           description: "Limit the number of clusters to be returned by a query."
           type: "string"
+        - name: "select"
+          in: "query"
+          description: |
+            A JSON encoded value of the properties which will be returned if data is available in database. Available selects:
+              - `cluster_id:<boolean>` When set to `true`, `cluster_id` will be returned
+              - `detector_id:<boolean>` When set to `true`, `detector_id` will be returned
+              - `qualifier:<boolean>` When set to `true`, `qualifier` will be returned
+              - `status:<boolean>` When set to `true`, `status` will be returned
+              - `category:<boolean>` When set to `true`, `category` will be returned
+              - `signature:<boolean>` When set to `true`, `signature` will be returned
+              - `data_source:<boolean>` When set to `true`, `data_source` will be returned
+              - `size:<boolean>` When set to `true`, `size` will be returned
+              - `examples:<boolean>` When set to `true`, `examples` will be returned
+              - `last_modification_time:<boolean>` When set to `true`, `last_modification_time` will be returned
+          type: "string"  
       produces:
         - "application/json"
         - "text/plain"
