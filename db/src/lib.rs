@@ -416,7 +416,6 @@ impl DB {
         &self,
         cluster_update: &[ClusterUpdate],
     ) -> future::FutureResult<(), Error> {
-        //        use schema::*;
         use schema::Clusters::dsl::*;
         use serde::Serialize;
         #[derive(Debug, Queryable, Serialize)]
