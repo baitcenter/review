@@ -980,19 +980,15 @@ impl Filter {
             .map_err(Into::into)
             .and_then(|filter: Filter| {
                 let filter = Filter::query_builder(&filter);
-                if !filter.is_empty() {
-                    let mut where_clause = String::new();
-                    for (index, filter) in filter.iter().enumerate() {
-                        if index == 0 {
-                            where_clause.push_str(&filter);
-                        } else {
-                            where_clause.push_str(&format!(" or {}", filter))
-                        }
+                let mut where_clause = String::new();
+                for (index, filter) in filter.iter().enumerate() {
+                    if index == 0 {
+                        where_clause.push_str(&filter);
+                    } else {
+                        where_clause.push_str(&format!(" or {}", filter))
                     }
-                    Ok(where_clause)
-                } else {
-                    Ok(String::new())
                 }
+                Ok(where_clause)
             })
     }
 }
