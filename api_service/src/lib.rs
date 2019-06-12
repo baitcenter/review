@@ -62,51 +62,38 @@ impl ApiService {
                         match Filter::get_where_clause(&filter) {
                             Ok(where_clause) => {
                                 if where_clause.is_empty() {
-                                    let query = match hash_query.get("limit") {
-                                        Some(limit) => match limit.parse::<u64>() {
-                                            Ok(limit) => format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id LIMIT {};", limit),
-                                            Err(_) => return Box::new(future::ok(ApiService::build_http_400_response())),
-                                        }
-                                        None => "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id;".to_string(),
-                                    };
-                                    let result = db::DB::execute_select_cluster_query(
-                                        &self.db, &query, SELECT_ALL,
-                                    )
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
-                                    return Box::new(result);
+                                    None
                                 } else {
-                                    where_clause
+                                    Some(where_clause)
                                 }
                             }
                             Err(_) => {
-                                return Box::new(future::ok(ApiService::build_http_400_response()));
+                                return Box::new(future::ok(ApiService::build_http_400_response()))
                             }
                         }
                     } else {
                         return Box::new(future::ok(ApiService::build_http_400_response()));
                     };
-
                     if hash_query.len() == 1 {
-                        let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
-                        let result =
-                            db::DB::execute_select_cluster_query(&self.db, &query, SELECT_ALL)
-                                .and_then(|data| {
-                                    future::ok(ApiService::build_cluster_response(data))
-                                })
-                                .map_err(Into::into);
+                        let result = db::DB::execute_select_cluster_query(
+                            &self.db,
+                            where_clause,
+                            None,
+                            SELECT_ALL,
+                        )
+                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                        .map_err(Into::into);
                         return Box::new(result);
                     } else if let (Some(limit), 2) = (hash_query.get("limit"), hash_query.len()) {
                         if let Ok(limit) = limit.parse::<u64>() {
-                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
-                            let result =
-                                db::DB::execute_select_cluster_query(&self.db, &query, SELECT_ALL)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
+                            let result = db::DB::execute_select_cluster_query(
+                                &self.db,
+                                where_clause,
+                                Some(limit as i64),
+                                SELECT_ALL,
+                            )
+                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .map_err(Into::into);
                             return Box::new(result);
                         }
                     } else if let (Some(select), 2) = (hash_query.get("select"), hash_query.len()) {
@@ -114,13 +101,14 @@ impl ApiService {
                             as Result<Select, serde_json::error::Error>
                         {
                             let select = Select::response_type_builder(&select);
-                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {};", where_clause);
-                            let result =
-                                db::DB::execute_select_cluster_query(&self.db, &query, select)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
+                            let result = db::DB::execute_select_cluster_query(
+                                &self.db,
+                                where_clause,
+                                None,
+                                select,
+                            )
+                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .map_err(Into::into);
                             return Box::new(result);
                         } else {
                             return Box::new(future::ok(ApiService::build_http_400_response()));
@@ -136,13 +124,14 @@ impl ApiService {
                             limit.parse::<u64>(),
                         ) {
                             let select = Select::response_type_builder(&select);
-                            let query = format!("SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id WHERE {} LIMIT {};", where_clause, limit);
-                            let result =
-                                db::DB::execute_select_cluster_query(&self.db, &query, select)
-                                    .and_then(|data| {
-                                        future::ok(ApiService::build_cluster_response(data))
-                                    })
-                                    .map_err(Into::into);
+                            let result = db::DB::execute_select_cluster_query(
+                                &self.db,
+                                where_clause,
+                                Some(limit as i64),
+                                select,
+                            )
+                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .map_err(Into::into);
                             return Box::new(result);
                         } else {
                             return Box::new(future::ok(ApiService::build_http_400_response()));

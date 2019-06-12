@@ -154,7 +154,8 @@ impl DB {
 
     pub fn execute_select_cluster_query(
         &self,
-        query: &str,
+        where_clause: Option<String>,
+        limit: Option<i64>,
         select: SelectCluster,
     ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
         let cluster = self
@@ -162,6 +163,14 @@ impl DB {
             .get()
             .map_err(Into::into)
             .and_then(|conn| {
+                let mut query = "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id".to_string();
+                if let Some(where_clause) = where_clause {
+                    query.push_str(&format!(" WHERE {}", where_clause));
+                }
+                if let Some(limit) = limit {
+                    query.push_str(&format!(" LIMIT {}", limit));
+                }
+                query.push_str(";");
                 diesel::sql_query(query)
                     .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
                     .map_err(Into::into)
