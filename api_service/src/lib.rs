@@ -154,7 +154,7 @@ impl ApiService {
                     let query = url::form_urlencoded::parse(query.as_ref()).collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "category" {
                         let resp =
-                            db::DB::add_new_category(&self.db, &query[0].1).then(|insert_result| {
+                            db::DB::add_category(&self.db, &query[0].1).then(|insert_result| {
                                 match insert_result {
                                     Ok(_) => future::ok(
                                         Response::builder()
