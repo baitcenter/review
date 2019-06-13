@@ -295,19 +295,30 @@ impl DB {
 
     pub fn update_outliers(
         &self,
-        update_outliers: &[OutlierUpdate],
+        outlier_update: &[OutlierUpdate],
     ) -> impl Future<Item = (), Error = Error> {
+        use schema::Outliers::dsl::*;
+        let mut query = Outliers.into_boxed();
+        for outlier in outlier_update.iter() {
+            query = query.or_filter(
+                outlier_raw_event
+                    .eq(&outlier.outlier)
+                    .and(outlier_data_source.eq(&outlier.data_source)),
+            );
+        }
         let conn = self.pool.get().unwrap();
+        let outlier_list = match query.load::<OutliersTable>(&conn) {
+            Ok(result) => result,
+            Err(e) => return future::result(DB::error_handling(e)),
+        };
         let mut update_queries = String::new();
-
-        for o in update_outliers {
-            let record_check = schema::Outliers::dsl::Outliers
-                .filter(schema::Outliers::dsl::outlier_raw_event.eq(&o.outlier))
-                .filter(schema::Outliers::dsl::outlier_data_source.eq(&o.data_source))
-                .load::<OutliersTable>(&conn);
-            if let Some(record_check) = DB::check_db_query_result(record_check) {
+        for o in outlier_update {
+            if let Some(outlier) = outlier_list
+                .iter()
+                .find(|outlier| o.outlier == outlier.outlier_raw_event)
+            {
                 let new_size = o.event_ids.len();
-                let o_size = match &record_check[0].outlier_size {
+                let o_size = match &outlier.outlier_size {
                     Some(current_size) => {
                         if let Ok(current_size) = current_size.parse::<usize>() {
                             // check if sum of new_size and current_size exceeds max_value
@@ -323,7 +334,7 @@ impl DB {
                     }
                     None => new_size.to_string(),
                 };
-                let mut event_ids = match &record_check[0].outlier_event_ids {
+                let mut event_ids = match &outlier.outlier_event_ids {
                     Some(event_ids) => {
                         match rmp_serde::decode::from_slice(&event_ids)
                             as Result<Vec<u64>, rmp_serde::decode::Error>
