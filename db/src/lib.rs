@@ -712,26 +712,37 @@ impl DB {
         new_category: &str,
     ) -> impl Future<Item = (), Error = Error> {
         use schema::Category::dsl::*;
-        let conn = self.pool.get().unwrap();
 
-        let record_check = Category
-            .filter(category.eq(current_category))
-            .load::<CategoryTable>(&conn);
-        if DB::check_db_query_result(record_check).is_none() {
-            return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::RecordNotExist,
-            ))));
+        let record_check: Result<String, Error> =
+            self.pool.get().map_err(Into::into).and_then(|conn| {
+                Category
+                    .select(category)
+                    .filter(category.eq(current_category))
+                    .first::<String>(&conn)
+                    .map_err(Into::into)
+            });
+        if let Err(e) = record_check {
+            if e.to_string().contains("database query") {
+                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::RecordNotExist,
+                ))));
+            } else {
+                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                ))));
+            }
         }
 
         let target = Category.filter(category.eq(current_category));
-        let update_result = match diesel::update(target)
-            .set((category.eq(new_category),))
-            .execute(&conn)
-        {
-            Ok(_) => Ok(()),
-            Err(e) => DB::error_handling(e),
-        };
-
+        let update_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            match diesel::update(target)
+                .set((category.eq(new_category),))
+                .execute(&conn)
+            {
+                Ok(_) => Ok(()),
+                Err(e) => DB::error_handling(e),
+            }
+        });
         future::result(update_result)
     }
 
