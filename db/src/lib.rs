@@ -410,19 +410,6 @@ impl DB {
         future::result(execute_result)
     }
 
-    fn check_db_query_result<T>(result: Result<Vec<T>, diesel::result::Error>) -> Option<Vec<T>> {
-        match result {
-            Ok(result) => {
-                if result.is_empty() {
-                    None
-                } else {
-                    Some(result)
-                }
-            }
-            Err(_) => None,
-        }
-    }
-
     pub fn update_clusters(
         &self,
         cluster_update: &[ClusterUpdate],
