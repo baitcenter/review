@@ -410,6 +410,128 @@ impl DB {
         future::result(execute_result)
     }
 
+    fn get_category_id(&self, category: &str) -> Result<Option<i32>, Error> {
+        use schema::Category::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::Category
+                .select(dsl::category_id)
+                .filter(dsl::category.eq(category))
+                .first::<Option<i32>>(&conn)
+                .map_err(Into::into)
+        })
+    }
+
+    fn get_qualifier_id(&self, qualifier: &str) -> Result<Option<i32>, Error> {
+        use schema::Qualifier::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::Qualifier
+                .select(dsl::qualifier_id)
+                .filter(dsl::qualifier.eq(qualifier))
+                .first::<Option<i32>>(&conn)
+                .map_err(Into::into)
+        })
+    }
+
+    pub fn update_cluster(
+        &self,
+        cluster_id: &str,
+        data_source: &str,
+        new_cluster_id: Option<String>,
+        category: Option<String>,
+        qualifier: Option<String>,
+    ) -> future::FutureResult<(u8, bool, String), Error> {
+        use schema::Clusters::dsl;
+
+        let query = diesel::update(dsl::Clusters).filter(
+            dsl::cluster_id
+                .eq(cluster_id)
+                .and(dsl::data_source.eq(data_source)),
+        );
+        let timestamp = chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
+        let category_id = category.and_then(|category| DB::get_category_id(self, &category).ok());
+        let (qualifier_id, is_benign) = qualifier.map_or((None, false), |qualifier| {
+            (
+                DB::get_qualifier_id(self, &qualifier).ok(),
+                qualifier == "benign",
+            )
+        });
+        let conn = self.pool.get().unwrap();
+        let execution_result =
+            if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
+                (&new_cluster_id, &category_id, &qualifier_id)
+            {
+                query
+                    .set((
+                        dsl::cluster_id.eq(cluster_id),
+                        dsl::category_id.eq(category_id),
+                        dsl::qualifier_id.eq(qualifier_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let (Some(cluster_id), Some(Some(category_id))) =
+                (&new_cluster_id, &category_id)
+            {
+                query
+                    .set((
+                        dsl::cluster_id.eq(cluster_id),
+                        dsl::category_id.eq(category_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let (Some(cluster_id), Some(Some(qualifier_id))) =
+                (&new_cluster_id, &qualifier_id)
+            {
+                query
+                    .set((
+                        dsl::cluster_id.eq(cluster_id),
+                        dsl::qualifier_id.eq(qualifier_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let (Some(Some(category_id)), Some(Some(qualifier_id))) =
+                (&category_id, &qualifier_id)
+            {
+                query
+                    .set((
+                        dsl::category_id.eq(category_id),
+                        dsl::qualifier_id.eq(qualifier_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let Some(cluster_id) = &new_cluster_id {
+                query
+                    .set((
+                        dsl::cluster_id.eq(cluster_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let Some(Some(category_id)) = &category_id {
+                query
+                    .set((
+                        dsl::category_id.eq(category_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else if let Some(Some(qualifier_id)) = &qualifier_id {
+                query
+                    .set((
+                        dsl::qualifier_id.eq(qualifier_id),
+                        dsl::last_modification_time.eq(timestamp),
+                    ))
+                    .execute(&conn)
+            } else {
+                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                ))));
+            };
+
+        let execution_result = match execution_result {
+            Ok(row) => Ok((row as u8, is_benign, data_source.to_string())),
+            Err(e) => DB::error_handling(e),
+        };
+        future::result(execution_result)
+    }
+
     pub fn update_clusters(
         &self,
         cluster_update: &[ClusterUpdate],

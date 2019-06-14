@@ -237,6 +237,7 @@ impl ApiService {
                                 }
                                 let cluster_id_cloned = cluster_id.into_owned();
                                 let data_source_cloned = query[0].1.clone();
+                                let self_cloned = self.clone();
                                 let result = req
                                     .into_body()
                                     .concat2()
@@ -245,37 +246,7 @@ impl ApiService {
                                         serde_json::from_slice(&buf)
                                             .map(move |data: NewValues| {
                                                 if data.cluster_id.is_some() || data.category.is_some() || data.qualifier.is_some() {
-                                                    let mut set_query = String::new();
-                                                    if let Some(new_cluster_id) = data.cluster_id {
-                                                        set_query.push_str(&format!("SET cluster_id = '{}'", new_cluster_id));
-                                                    }
-                                                    if let Some(new_category) = data.category {
-                                                        if set_query.is_empty() {
-                                                            set_query.push_str(&format!("SET category_id = (SELECT category_id FROM category WHERE category = '{}')", new_category));
-                                                        }
-                                                        else {
-                                                            set_query.push_str(&format!(", category_id = (SELECT category_id FROM category WHERE category = '{}')", new_category));
-                                                        }
-                                                    }
-                                                    if let Some(new_qualifier) = data.qualifier {
-                                                        if set_query.is_empty() {
-                                                            set_query.push_str(&format!("SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", new_qualifier));
-                                                        }
-                                                        else {
-                                                            set_query.push_str(&format!(", qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", new_qualifier));
-                                                        }
-                                                        if new_qualifier == "benign" {
-                                                            let value = format!(
-                                                                r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
-                                                                &self.docker_host_addr, &data_source_cloned
-                                                            );
-                                                            ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
-                                                        }
-                                                    }
-                                                    let now = chrono::Utc::now();
-                                                    let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                                                    let query = format!("UPDATE clusters {} , last_modification_time = '{}' WHERE cluster_id = '{}' and data_source = '{}';", set_query, timestamp, cluster_id_cloned, data_source_cloned);
-                                                    db::DB::execute_update_query(&self.db, &query)
+                                                    db::DB::update_cluster(&self.db, &cluster_id_cloned, &data_source_cloned, data.cluster_id, data.category, data.qualifier, )
                                                 }
                                                 else {
                                                     future::result(Err(db::error::Error::from(db::error::ErrorKind::DatabaseTransactionError(
@@ -285,13 +256,29 @@ impl ApiService {
                                             })
                                             .map_err(Into::into)
                                     })
-                                    .and_then(|mut result| match result.poll() {
-                                        Ok(_) => future::ok(
-                                            Response::builder()
-                                                .status(StatusCode::OK)
-                                                .body(Body::from("Cluster has been successfully updated"))
-                                                .unwrap(),
-                                        ),
+                                    .and_then(move |mut result| match result.poll() {
+                                        Ok(fut) => {
+                                            if let futures::prelude::Async::Ready((row, is_benign, data_source)) = fut {
+                                                if row != 1 {
+                                                    return future::ok(ApiService::build_http_response(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "The specified record does not exist in database",
+                                                    ));
+                                                } else if is_benign {
+                                                    let value = format!(
+                                                        r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
+                                                        &self_cloned.docker_host_addr, data_source
+                                                    );
+                                                    ApiService::update_etcd(&self_cloned.etcd_url, &self_cloned.etcd_key, &value);
+                                                }
+                                            }
+                                            future::ok(
+                                                Response::builder()
+                                                    .status(StatusCode::OK)
+                                                    .body(Body::from("Cluster has been successfully updated"))
+                                                    .unwrap(),
+                                            )
+                                        }
                                         Err(e) => {
                                             if let db::error::ErrorKind::DatabaseTransactionError(reason) =
                                                 e.kind()
@@ -304,6 +291,11 @@ impl ApiService {
                                                     future::ok(ApiService::build_http_response(
                                                         StatusCode::BAD_REQUEST,
                                                         "The specified record does not exist in database",
+                                                    ))
+                                                } else if *reason == db::error::DatabaseError::Other {
+                                                    future::ok(ApiService::build_http_response(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "Please make sure that the values in your request are correct",
                                                     ))
                                                 } else {
                                                     future::ok(ApiService::build_http_500_response())
