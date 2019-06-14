@@ -233,7 +233,8 @@ impl ApiService {
                                 }
                                 let cluster_id_cloned = cluster_id.into_owned();
                                 let data_source_cloned = query[0].1.clone();
-                                let self_cloned = self.clone();
+                                let docker_host_addr = self.docker_host_addr.clone();
+                                let etcd_url = self.etcd_url.clone();
                                 let result = req
                                     .into_body()
                                     .concat2()
@@ -263,10 +264,10 @@ impl ApiService {
                                                 } else if is_benign {
                                                     let etcd_value = format!(
                                                         r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
-                                                        &self_cloned.docker_host_addr, data_source
+                                                        &docker_host_addr, data_source
                                                     );
                                                     let etcd_key = format!("benign_signatures_{}", &data_source);
-                                                    ApiService::update_etcd(&self_cloned.etcd_url, &etcd_key, &etcd_value);
+                                                    ApiService::update_etcd(&etcd_url, &etcd_key, &etcd_value);
                                                 }
                                             }
                                             future::ok(
