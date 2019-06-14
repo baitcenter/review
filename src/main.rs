@@ -140,7 +140,6 @@ fn main() {
         }
         let reviewd_addr = std::env::var("REVIEWD_ADDR").expect("REVIEWD_ADDR is not set");
         let etcd_addr = std::env::var("ETCD_ADDR").expect("ETCD_ADDR is not set");
-        let etcd_sig_key = std::env::var("ETCD_SIG_KEY").expect("ETCD_SIG_KEY is not set");
         let docker_host_ip = std::env::var("DOCKER_HOST_IP").expect("DOCKER_HOST_IP is not set");
         let docker_host_addr = format!("{}:8080", docker_host_ip);
 
@@ -150,7 +149,6 @@ fn main() {
                 &database_url,
                 docker_host_addr.as_str(),
                 etcd_url.as_str(),
-                etcd_sig_key.as_str(),
             )
             .map_err(|e| panic!("Initialization fails: {}", e))
             .and_then(|srv| {

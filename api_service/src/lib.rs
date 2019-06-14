@@ -17,7 +17,6 @@ const SELECT_ALL: db::SelectCluster = (true, true, true, true, true, true, true,
 pub struct ApiService {
     db: db::DB,
     docker_host_addr: String,
-    etcd_key: String,
     etcd_url: String,
     reviewd_url: String,
 }
@@ -27,10 +26,8 @@ impl ApiService {
         database_url: &str,
         docker_host_addr: &str,
         etcd_url: &str,
-        etcd_key: &str,
     ) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
         let docker_host_addr = docker_host_addr.to_string();
-        let etcd_key = etcd_key.to_string();
         let etcd_url = etcd_url.to_string();
         let reviewd_url = database_url.to_string();
 
@@ -39,7 +36,6 @@ impl ApiService {
                 future::ok(Self {
                     db,
                     docker_host_addr,
-                    etcd_key,
                     etcd_url,
                     reviewd_url,
                 })
@@ -265,11 +261,12 @@ impl ApiService {
                                                         "The specified record does not exist in database",
                                                     ));
                                                 } else if is_benign {
-                                                    let value = format!(
+                                                    let etcd_value = format!(
                                                         r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
                                                         &self_cloned.docker_host_addr, data_source
                                                     );
-                                                    ApiService::update_etcd(&self_cloned.etcd_url, &self_cloned.etcd_key, &value);
+                                                    let etcd_key = format!("benign_signatures_{}", &data_source);
+                                                    ApiService::update_etcd(&self_cloned.etcd_url, &etcd_key, &etcd_value);
                                                 }
                                             }
                                             future::ok(
@@ -488,11 +485,12 @@ impl ApiService {
                                         Ok(_) => {
                                             data.iter().for_each(|d| {
                                                 if d.qualifier == "benign" {
-                                                    let value = format!(
+                                                    let etcd_value = format!(
                                                         r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
                                                         &self.docker_host_addr, &d.data_source
                                                     );
-                                                    ApiService::update_etcd(&self.etcd_url, &self.etcd_key, &value);
+                                                    let etcd_key = format!("benign_signatures_{}", &d.data_source);
+                                                    ApiService::update_etcd(&self.etcd_url, &etcd_key, &etcd_value);
                                                 }
                                             });
                                             future::ok(
