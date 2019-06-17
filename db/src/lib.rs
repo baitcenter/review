@@ -249,48 +249,47 @@ impl DB {
     }
 
     pub fn execute_update_query(&self, query: &str) -> future::FutureResult<(), Error> {
-        let conn = self.pool.get().unwrap();
-        let execution_result = match conn.execute(query) {
-            Ok(_) => Ok(()),
-            Err(e) => DB::error_handling(e),
-        };
+        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            match conn.execute(query).map_err(Into::into) {
+                Ok(_) => Ok(()),
+                Err(e) => DB::error_handling(e),
+            }
+        });
         future::result(execution_result)
     }
 
     pub fn add_outliers(
         &self,
         new_outliers: &[OutlierUpdate],
-    ) -> impl Future<Item = (), Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let insert_outliers: Vec<OutliersTable> = new_outliers
-            .iter()
-            .map(|new_outlier| {
-                let o_size = Some(new_outlier.event_ids.len().to_string());
-                let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
-                OutliersTable {
-                    outlier_id: None,
-                    outlier_raw_event: new_outlier.outlier.to_vec(),
-                    outlier_data_source: new_outlier.data_source.to_string(),
-                    outlier_event_ids: event_ids,
-                    outlier_size: o_size,
-                }
-            })
-            .collect();
+    ) -> impl Future<Item = usize, Error = Error> {
+        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let insert_outliers: Vec<OutliersTable> = new_outliers
+                .iter()
+                .map(|new_outlier| {
+                    let o_size = Some(new_outlier.event_ids.len().to_string());
+                    let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
+                    OutliersTable {
+                        outlier_id: None,
+                        outlier_raw_event: new_outlier.outlier.to_vec(),
+                        outlier_data_source: new_outlier.data_source.to_string(),
+                        outlier_event_ids: event_ids,
+                        outlier_size: o_size,
+                    }
+                })
+                .collect();
 
-        let execute_result = if !insert_outliers.is_empty() {
-            match diesel::insert_into(schema::Outliers::dsl::Outliers)
-                .values(&insert_outliers)
-                .execute(&*conn)
-            {
-                Ok(_) => Ok(()),
-                Err(e) => DB::error_handling(e),
+            if !insert_outliers.is_empty() {
+                diesel::insert_into(schema::Outliers::dsl::Outliers)
+                    .values(&insert_outliers)
+                    .execute(&*conn)
+                    .map_err(Into::into)
+            } else {
+                Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                )))
             }
-        } else {
-            Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::Other,
-            )))
-        };
-        future::result(execute_result)
+        });
+        future::result(insert_result)
     }
 
     pub fn update_outliers(
