@@ -1,3 +1,4 @@
+use failure::Fail;
 use futures::future;
 use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
@@ -640,6 +641,34 @@ impl ApiService {
                     Box::new(future::ok(ApiService::build_http_404_response()))
                 }
             },
+        }
+    }
+
+    fn db_error_handler(e: &db::error::Error) -> Response<Body> {
+        if let Some(e) = e.cause() {
+            let cause = e.find_root_cause();
+            if cause.to_string().contains("database is locked") {
+                ApiService::build_http_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Service temporarily unavailable",
+                )
+            } else {
+                ApiService::build_http_500_response()
+            }
+        } else if let db::error::ErrorKind::DatabaseTransactionError(reason) = e.kind() {
+            match *reason {
+                db::error::DatabaseError::DatabaseLocked => ApiService::build_http_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Service temporarily unavailable",
+                ),
+                db::error::DatabaseError::RecordNotExist => ApiService::build_http_response(
+                    StatusCode::BAD_REQUEST,
+                    "The specified record does not exist in database",
+                ),
+                _ => ApiService::build_http_500_response(),
+            }
+        } else {
+            ApiService::build_http_500_response()
         }
     }
 
