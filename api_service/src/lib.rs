@@ -278,31 +278,7 @@ impl ApiService {
                                                     .unwrap(),
                                             )
                                         }
-                                        Err(e) => {
-                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                                e.kind()
-                                            {
-                                                if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                    future::ok(
-                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                    )
-                                                } else if *reason == db::error::DatabaseError::RecordNotExist {
-                                                    future::ok(ApiService::build_http_response(
-                                                        StatusCode::BAD_REQUEST,
-                                                        "The specified record does not exist in database",
-                                                    ))
-                                                } else if *reason == db::error::DatabaseError::Other {
-                                                    future::ok(ApiService::build_http_response(
-                                                        StatusCode::BAD_REQUEST,
-                                                        "Please make sure that the values in your request are correct",
-                                                    ))
-                                                } else {
-                                                    future::ok(ApiService::build_http_500_response())
-                                                }
-                                            } else {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
+                                        Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                     });
 
                                 return Box::new(result);
@@ -651,7 +627,10 @@ impl ApiService {
                     StatusCode::BAD_REQUEST,
                     "The specified record does not exist in database",
                 ),
-                _ => ApiService::build_http_500_response(),
+                db::error::DatabaseError::Other => ApiService::build_http_response(
+                    StatusCode::BAD_REQUEST,
+                    "Please make sure that the values in your request are correct",
+                ),
             }
         } else {
             ApiService::build_http_500_response()

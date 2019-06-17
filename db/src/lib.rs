@@ -455,80 +455,88 @@ impl DB {
                 qualifier == "benign",
             )
         });
-        let conn = self.pool.get().unwrap();
-        let execution_result =
-            if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
-                (&new_cluster_id, &category_id, &qualifier_id)
-            {
-                query
-                    .set((
-                        dsl::cluster_id.eq(cluster_id),
-                        dsl::category_id.eq(category_id),
-                        dsl::qualifier_id.eq(qualifier_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let (Some(cluster_id), Some(Some(category_id))) =
-                (&new_cluster_id, &category_id)
-            {
-                query
-                    .set((
-                        dsl::cluster_id.eq(cluster_id),
-                        dsl::category_id.eq(category_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let (Some(cluster_id), Some(Some(qualifier_id))) =
-                (&new_cluster_id, &qualifier_id)
-            {
-                query
-                    .set((
-                        dsl::cluster_id.eq(cluster_id),
-                        dsl::qualifier_id.eq(qualifier_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let (Some(Some(category_id)), Some(Some(qualifier_id))) =
-                (&category_id, &qualifier_id)
-            {
-                query
-                    .set((
-                        dsl::category_id.eq(category_id),
-                        dsl::qualifier_id.eq(qualifier_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let Some(cluster_id) = &new_cluster_id {
-                query
-                    .set((
-                        dsl::cluster_id.eq(cluster_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let Some(Some(category_id)) = &category_id {
-                query
-                    .set((
-                        dsl::category_id.eq(category_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else if let Some(Some(qualifier_id)) = &qualifier_id {
-                query
-                    .set((
-                        dsl::qualifier_id.eq(qualifier_id),
-                        dsl::last_modification_time.eq(timestamp),
-                    ))
-                    .execute(&conn)
-            } else {
-                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                ))));
-            };
+        let execution_result = self
+            .pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| {
+                if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
+                    (&new_cluster_id, &category_id, &qualifier_id)
+                {
+                    query
+                        .set((
+                            dsl::cluster_id.eq(cluster_id),
+                            dsl::category_id.eq(category_id),
+                            dsl::qualifier_id.eq(qualifier_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let (Some(cluster_id), Some(Some(category_id))) =
+                    (&new_cluster_id, &category_id)
+                {
+                    query
+                        .set((
+                            dsl::cluster_id.eq(cluster_id),
+                            dsl::category_id.eq(category_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let (Some(cluster_id), Some(Some(qualifier_id))) =
+                    (&new_cluster_id, &qualifier_id)
+                {
+                    query
+                        .set((
+                            dsl::cluster_id.eq(cluster_id),
+                            dsl::qualifier_id.eq(qualifier_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let (Some(Some(category_id)), Some(Some(qualifier_id))) =
+                    (&category_id, &qualifier_id)
+                {
+                    query
+                        .set((
+                            dsl::category_id.eq(category_id),
+                            dsl::qualifier_id.eq(qualifier_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let Some(cluster_id) = &new_cluster_id {
+                    query
+                        .set((
+                            dsl::cluster_id.eq(cluster_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let Some(Some(category_id)) = &category_id {
+                    query
+                        .set((
+                            dsl::category_id.eq(category_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else if let Some(Some(qualifier_id)) = &qualifier_id {
+                    query
+                        .set((
+                            dsl::qualifier_id.eq(qualifier_id),
+                            dsl::last_modification_time.eq(timestamp),
+                        ))
+                        .execute(&conn)
+                        .map_err(Into::into)
+                } else {
+                    Err(Error::from(ErrorKind::DatabaseTransactionError(
+                        DatabaseError::Other,
+                    )))
+                }
+            })
+            .and_then(|row| Ok((row as u8, is_benign, data_source.to_string())));
 
-        let execution_result = match execution_result {
-            Ok(row) => Ok((row as u8, is_benign, data_source.to_string())),
-            Err(e) => DB::error_handling(e),
-        };
         future::result(execution_result)
     }
 
