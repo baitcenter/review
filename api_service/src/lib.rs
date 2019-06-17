@@ -148,25 +148,7 @@ impl ApiService {
                                             .body(Body::from("New category has been added"))
                                             .unwrap(),
                                     ),
-                                    Err(err) => {
-                                        let is_temporary_error =
-                                            if let db::error::ErrorKind::DatabaseTransactionError(
-                                                reason,
-                                            ) = err.kind()
-                                            {
-                                                *reason == db::error::DatabaseError::DatabaseLocked
-                                            } else {
-                                                false
-                                            };
-                                        if is_temporary_error {
-                                            future::ok(ApiService::build_http_response(
-                                                StatusCode::SERVICE_UNAVAILABLE,
-                                                "Service temporarily unavailable",
-                                            ))
-                                        } else {
-                                            future::ok(ApiService::build_http_500_response())
-                                        }
-                                    }
+                                    Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                 }
                             });
                         return Box::new(resp);

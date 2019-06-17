@@ -54,17 +54,18 @@ impl DB {
         Box::new(future::result(db))
     }
 
-    pub fn add_category(&self, new_category: &str) -> impl Future<Item = (), Error = Error> {
+    pub fn add_category(&self, new_category: &str) -> impl Future<Item = usize, Error = Error> {
         use schema::Category::dsl::*;
-        let conn = self.pool.get().unwrap();
         let c = CategoryTable {
             category_id: None,
             category: new_category.to_string(),
         };
-        let insert_result = match diesel::insert_into(Category).values(&c).execute(&conn) {
-            Ok(_) => Ok(()),
-            Err(e) => return future::result(DB::error_handling(e)),
-        };
+        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::insert_into(Category)
+                .values(&c)
+                .execute(&conn)
+                .map_err(Into::into)
+        });
 
         future::result(insert_result)
     }
