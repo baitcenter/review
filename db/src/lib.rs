@@ -535,7 +535,7 @@ impl DB {
     pub fn update_clusters(
         &self,
         cluster_update: &[ClusterUpdate],
-    ) -> future::FutureResult<(), Error> {
+    ) -> future::FutureResult<usize, Error> {
         use schema::Clusters::dsl::*;
         use serde::Serialize;
         #[derive(Debug, Queryable, Serialize)]
@@ -557,149 +557,147 @@ impl DB {
                     .and(data_source.eq(&cluster.data_source)),
             );
         }
-        let conn = self.pool.get().unwrap();
-        let cluster_list = match query
-            .select((
-                cluster_id,
-                signature,
-                examples,
-                size,
-                category_id,
-                priority_id,
-                qualifier_id,
-                status_id,
-            ))
-            .load::<Cluster>(&conn)
-        {
-            Ok(result) => result,
-            Err(e) => return future::result(DB::error_handling(e)),
-        };
-        let mut update_queries = String::new();
-        for c in cluster_update {
-            if let Some(cluster) = cluster_list
-                .iter()
-                .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
-            {
-                let now = chrono::Utc::now();
-                let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                if c.signature.is_some() || c.examples.is_some() || c.size.is_some() {
-                    let sig = match &c.signature {
-                        Some(sig) => sig.clone(),
-                        None => cluster.signature.clone(),
-                    };
-                    let example =
-                        DB::merge_cluster_examples(cluster.examples.clone(), c.examples.clone());
-                    let cluster_size = match c.size {
-                        Some(new_size) => {
-                            if let Ok(current_size) = cluster.size.clone().parse::<usize>() {
-                                // check if sum of new_size and current_size exceeds max_value
-                                // if it does, we cannot calculate sum anymore, so reset the value of size
-                                if new_size > usize::max_value() - current_size {
-                                    new_size.to_string()
-                                } else {
-                                    (current_size + new_size).to_string()
+        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            query
+                .select((
+                    cluster_id,
+                    signature,
+                    examples,
+                    size,
+                    category_id,
+                    priority_id,
+                    qualifier_id,
+                    status_id,
+                ))
+                .load::<Cluster>(&conn)
+                .map_err(Into::into)
+                .and_then(|cluster_list| {
+                    let mut update_queries = String::new();
+                    for c in cluster_update {
+                        if let Some(cluster) = cluster_list
+                            .iter()
+                            .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
+                        {
+                            let now = chrono::Utc::now();
+                            let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
+                            if c.signature.is_some() || c.examples.is_some() || c.size.is_some() {
+                                let sig = match &c.signature {
+                                    Some(sig) => sig.clone(),
+                                    None => cluster.signature.clone(),
+                                };
+                                let example =
+                                    DB::merge_cluster_examples(cluster.examples.clone(), c.examples.clone());
+                                let cluster_size = match c.size {
+                                    Some(new_size) => {
+                                        if let Ok(current_size) = cluster.size.clone().parse::<usize>() {
+                                            // check if sum of new_size and current_size exceeds max_value
+                                            // if it does, we cannot calculate sum anymore, so reset the value of size
+                                            if new_size > usize::max_value() - current_size {
+                                                new_size.to_string()
+                                            } else {
+                                                (current_size + new_size).to_string()
+                                            }
+                                        } else {
+                                            cluster.size.clone()
+                                        }
+                                    }
+                                    None => cluster.size.clone(),
+                                };
+                                match example {
+                                    Some(example) => {
+                                        let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
+                                            c.cluster_id,
+                                            cluster.category_id,
+                                            c.detector_id,
+                                            hex::encode(example),
+                                            cluster.priority_id,
+                                            cluster.qualifier_id,
+                                            cluster.status_id,
+                                            sig,
+                                            sig,
+                                            cluster_size,
+                                            c.data_source,
+                                            timestamp,
+                                        );
+                                      update_queries.push_str(&query);
+                                    }
+                                    None => {
+                                        let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
+                                            c.cluster_id,
+                                            cluster.category_id,
+                                            c.detector_id,
+                                            cluster.priority_id,
+                                            cluster.qualifier_id,
+                                            cluster.status_id,
+                                            sig,
+                                            sig,
+                                            cluster_size,
+                                            c.data_source,
+                                            timestamp,
+                                        );
+                                       update_queries.push_str(&query);
+                                    }
                                 }
-                            } else {
-                                cluster.size.clone()
+                            }
+                        } else {
+                            let example = match &c.examples {
+                                Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
+                                None => None,
+                            };
+                            let sig = match &c.signature {
+                                Some(sig) => sig.clone(),
+                                None => "-".to_string(),
+                            };
+                            let cluster_size = match c.size {
+                                Some(cluster_size) => cluster_size.to_string(),
+                                None => "1".to_string(),
+                            };
+                            match example {
+                                Some(example) => {
+                                    let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
+                                        c.cluster_id,
+                                        1,
+                                        c.detector_id,
+                                        hex::encode(example),
+                                        1,
+                                        2,
+                                        2,
+                                        sig,
+                                        sig,
+                                        cluster_size,
+                                        c.data_source,
+                                    );
+                                    update_queries.push_str(&query);
+                                }
+                                None => {
+                                    let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
+                                        c.cluster_id,
+                                        1,
+                                        c.detector_id,
+                                        1,
+                                        2,
+                                        2,
+                                        sig,
+                                        sig,
+                                        cluster_size,
+                                        c.data_source,
+                                    );
+                                    update_queries.push_str(&query);
+                                }
                             }
                         }
-                        None => cluster.size.clone(),
-                    };
-                    match example {
-                        Some(example) => {
-                            let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
-                                c.cluster_id,
-                                cluster.category_id,
-                                c.detector_id,
-                                hex::encode(example),
-                                cluster.priority_id,
-                                cluster.qualifier_id,
-                                cluster.status_id,
-                                sig,
-                                sig,
-                                cluster_size,
-                                c.data_source,
-                                timestamp,
-                            );
-                            update_queries.push_str(&query);
-                        }
-                        None => {
-                            let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source, last_modification_time) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}', '{}');", 
-                                c.cluster_id,
-                                cluster.category_id,
-                                c.detector_id,
-                                cluster.priority_id,
-                                cluster.qualifier_id,
-                                cluster.status_id,
-                                sig,
-                                sig,
-                                cluster_size,
-                                c.data_source,
-                                timestamp,
-                            );
-                            update_queries.push_str(&query);
-                        }
                     }
-                }
-            } else {
-                let example = match &c.examples {
-                    Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                    None => None,
-                };
-                let sig = match &c.signature {
-                    Some(sig) => sig.clone(),
-                    None => "-".to_string(),
-                };
-                let cluster_size = match c.size {
-                    Some(cluster_size) => cluster_size.to_string(),
-                    None => "1".to_string(),
-                };
-                match example {
-                    Some(example) => {
-                        let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, examples, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', x'{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
-                            c.cluster_id,
-                            1,
-                            c.detector_id,
-                            hex::encode(example),
-                            1,
-                            2,
-                            2,
-                            sig,
-                            sig,
-                            cluster_size,
-                            c.data_source,
-                        );
-                        update_queries.push_str(&query);
-                    }
-                    None => {
-                        let query = format!("INSERT OR REPLACE INTO Clusters (cluster_id, category_id, detector_id, priority_id, qualifier_id, status_id, rules, signature, size, data_source) VALUES ('{}', {}, '{}', {}, {}, {}, '{}', '{}', '{}', '{}');", 
-                            c.cluster_id,
-                            1,
-                            c.detector_id,
-                            1,
-                            2,
-                            2,
-                            sig,
-                            sig,
-                            cluster_size,
-                            c.data_source,
-                        );
-                        update_queries.push_str(&query);
-                    }
-                }
-            }
-        }
 
-        let execution_result = if !update_queries.is_empty() {
-            match conn.execute(&update_queries) {
-                Ok(_) => Ok(()),
-                Err(e) => DB::error_handling(e),
-            }
-        } else {
-            Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::RecordNotExist,
-            )))
-        };
+                    if !update_queries.is_empty() {
+                        conn.execute(&update_queries).map_err(Into::into)
+                    } else {
+                        Err(Error::from(ErrorKind::DatabaseTransactionError(
+                            DatabaseError::RecordNotExist,
+                        )))
+                    }
+                })
+        });
+
         future::result(execution_result)
     }
 
