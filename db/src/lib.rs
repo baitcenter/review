@@ -704,60 +704,60 @@ impl DB {
     pub fn add_clusters(
         &self,
         new_clusters: &[ClusterUpdate],
-    ) -> impl Future<Item = (), Error = Error> {
-        let conn = self.pool.get().unwrap();
-        let insert_clusters: Vec<ClustersTable> = new_clusters
-            .iter()
-            .map(|c| {
-                let example = match &c.examples {
-                    Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                    None => None,
-                };
+    ) -> impl Future<Item = usize, Error = Error> {
+        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let insert_clusters: Vec<ClustersTable> = new_clusters
+                .iter()
+                .map(|c| {
+                    let example = match &c.examples {
+                        Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
+                        None => None,
+                    };
 
-                // Signature is required field in central repo database
-                // but if new cluster information does not have signature field,
-                // we use '-' as a signature
-                let sig = match &c.signature {
-                    Some(sig) => sig.clone(),
-                    None => "-".to_string(),
-                };
-                let cluster_size = match c.size {
-                    Some(cluster_size) => cluster_size.to_string(),
-                    None => "1".to_string(),
-                };
-                // We always insert 1 for category_id and priority_id,
-                // "unknown" for qualifier_id, and "pending review" for status_id.
-                ClustersTable {
-                    id: None,
-                    cluster_id: Some(c.cluster_id.to_string()),
-                    description: None,
-                    category_id: 1,
-                    detector_id: c.detector_id,
-                    examples: example,
-                    priority_id: 1,
-                    qualifier_id: 2,
-                    status_id: 2,
-                    rules: Some(sig.clone()),
-                    signature: sig,
-                    size: cluster_size,
-                    data_source: c.data_source.to_string(),
-                    last_modification_time: None,
-                }
-            })
-            .collect();
-        let insert_result = if !insert_clusters.is_empty() {
-            match diesel::insert_into(schema::Clusters::dsl::Clusters)
-                .values(&insert_clusters)
-                .execute(&*conn)
-            {
-                Ok(_) => Ok(()),
-                Err(e) => DB::error_handling(e),
+                    // Signature is required field in central repo database
+                    // but if new cluster information does not have signature field,
+                    // we use '-' as a signature
+                    let sig = match &c.signature {
+                        Some(sig) => sig.clone(),
+                        None => "-".to_string(),
+                    };
+                    let cluster_size = match c.size {
+                        Some(cluster_size) => cluster_size.to_string(),
+                        None => "1".to_string(),
+                    };
+                    // We always insert 1 for category_id and priority_id,
+                    // "unknown" for qualifier_id, and "pending review" for status_id.
+                    ClustersTable {
+                        id: None,
+                        cluster_id: Some(c.cluster_id.to_string()),
+                        description: None,
+                        category_id: 1,
+                        detector_id: c.detector_id,
+                        examples: example,
+                        priority_id: 1,
+                        qualifier_id: 2,
+                        status_id: 2,
+                        rules: Some(sig.clone()),
+                        signature: sig,
+                        size: cluster_size,
+                        data_source: c.data_source.to_string(),
+                        last_modification_time: None,
+                    }
+                })
+                .collect();
+
+            if !insert_clusters.is_empty() {
+                diesel::insert_into(schema::Clusters::dsl::Clusters)
+                    .values(&insert_clusters)
+                    .execute(&*conn)
+                    .map_err(Into::into)
+            } else {
+                Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                )))
             }
-        } else {
-            Err(Error::from(ErrorKind::DatabaseTransactionError(
-                DatabaseError::Other,
-            )))
-        };
+        });
+
         future::result(insert_result)
     }
 

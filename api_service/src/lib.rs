@@ -326,15 +326,16 @@ impl ApiService {
                                 })
                                 .map_err(Into::into)
                         })
-                        .and_then(|_| {
-                            future::ok(
+                        .and_then(|mut result| match result.poll() {
+                            Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::CREATED)
                                     .body(Body::from(
                                         "New clusters have been inserted into database",
                                     ))
                                     .unwrap(),
-                            )
+                            ),
+                            Err(e) => future::ok(ApiService::db_error_handler(&e)),
                         });
 
                     Box::new(result)
