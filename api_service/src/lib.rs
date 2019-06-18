@@ -363,25 +363,10 @@ impl ApiService {
                             Ok(_) => future::ok(
                                 Response::builder()
                                     .status(StatusCode::OK)
-                                    .body(Body::from("Cluster information has been updated"))
+                                    .body(Body::from("Outlier information has been updated"))
                                     .unwrap(),
                             ),
-                            Err(e) => {
-                                if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                    e.kind()
-                                {
-                                    if *reason == db::error::DatabaseError::DatabaseLocked {
-                                        future::ok(ApiService::build_http_response(
-                                            StatusCode::SERVICE_UNAVAILABLE,
-                                            "Service temporarily unavailable",
-                                        ))
-                                    } else {
-                                        future::ok(ApiService::build_http_500_response())
-                                    }
-                                } else {
-                                    future::ok(ApiService::build_http_500_response())
-                                }
-                            }
+                            Err(e) => future::ok(ApiService::db_error_handler(&e)),
                         });
 
                     Box::new(result)
