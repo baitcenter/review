@@ -160,18 +160,21 @@ impl ApiService {
                         .into_owned()
                         .collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "etcd_key" {
-                        let result = req.into_body().concat2().map_err(Into::into).and_then(
-                            move |buf| {
-                                let data = format!(
-                                    r#"{{"key": "{}", "value": "{}"}}"#,
-                                    base64::encode(&query[0].1),
-                                    base64::encode(&buf)
-                                );
-                                let client = reqwest::Client::new();
-                                match client.post(&self.etcd_url).body(data).send() {
-                                    Ok(_) => {
-                                        let msg = format!("{} has been updated.", &query[0].1);
-                                        future::ok(
+                        let result =
+                            req.into_body()
+                                .concat2()
+                                .map_err(Into::into)
+                                .and_then(move |buf| {
+                                    let data = format!(
+                                        r#"{{"key": "{}", "value": "{}"}}"#,
+                                        base64::encode(&query[0].1),
+                                        base64::encode(&buf)
+                                    );
+                                    let client = reqwest::Client::new();
+                                    match client.post(&self.etcd_url).body(data).send() {
+                                        Ok(_) => {
+                                            let msg = format!("{} has been updated.", &query[0].1);
+                                            future::ok(
                                             Response::builder()
                                                 .status(StatusCode::OK)
                                                 .body(Body::from(msg))
@@ -179,21 +182,20 @@ impl ApiService {
                                                     "builder with known status code must not fail",
                                                 ),
                                         )
+                                        }
+                                        Err(e) => {
+                                            let err_msg = format!(
+                                                "An error occurs while updating etcd value: {}",
+                                                e
+                                            );
+                                            eprintln!("{}", err_msg);
+                                            future::ok(ApiService::build_http_response(
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                &err_msg,
+                                            ))
+                                        }
                                     }
-                                    Err(e) => {
-                                        let err_msg = format!(
-                                            "An error occurs while updating etcd value: {}",
-                                            e
-                                        );
-                                        eprintln!("{}", err_msg);
-                                        future::ok(ApiService::build_http_response(
-                                            StatusCode::INTERNAL_SERVER_ERROR,
-                                            &err_msg,
-                                        ))
-                                    }
-                                }
-                            },
-                        );
+                                });
                         return Box::new(result);
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
