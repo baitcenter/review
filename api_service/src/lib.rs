@@ -160,40 +160,40 @@ impl ApiService {
                         .into_owned()
                         .collect::<Vec<_>>();
                     if query.len() == 1 && query[0].0 == "etcd_key" {
-                        let result =
-                            req.into_body()
-                                .concat2()
-                                .map_err(Into::into)
-                                .and_then(move |buf| {
-                                    let data = format!(
-                                        r#"{{"key": "{}", "value": "{}"}}"#,
-                                        base64::encode(&query[0].1),
-                                        base64::encode(&buf)
-                                    );
-                                    let client = reqwest::Client::new();
-                                    match client.post(&self.etcd_url).body(data).send() {
-                                        Ok(_) => {
-                                            let msg = format!("{} has been updated.", &query[0].1);
-                                            future::ok(
-                                                Response::builder()
-                                                    .status(StatusCode::OK)
-                                                    .body(Body::from(msg))
-                                                    .expect("builder with known status code must not fail"),
-                                            )
-                                        }
-                                        Err(e) => {
-                                            let err_msg = format!(
-                                                "An error occurs while updating etcd value: {}",
-                                                e
-                                            );
-                                            eprintln!("{}", err_msg);
-                                            future::ok(ApiService::build_http_response(
-                                                StatusCode::INTERNAL_SERVER_ERROR,
-                                                &err_msg,
-                                            ))
-                                        }
+                        let result = req.into_body().concat2().map_err(Into::into).and_then(
+                            move |buf| {
+                                let data = format!(
+                                    r#"{{"key": "{}", "value": "{}"}}"#,
+                                    base64::encode(&query[0].1),
+                                    base64::encode(&buf)
+                                );
+                                let client = reqwest::Client::new();
+                                match client.post(&self.etcd_url).body(data).send() {
+                                    Ok(_) => {
+                                        let msg = format!("{} has been updated.", &query[0].1);
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::OK)
+                                                .body(Body::from(msg))
+                                                .expect(
+                                                    "builder with known status code must not fail",
+                                                ),
+                                        )
                                     }
-                                });
+                                    Err(e) => {
+                                        let err_msg = format!(
+                                            "An error occurs while updating etcd value: {}",
+                                            e
+                                        );
+                                        eprintln!("{}", err_msg);
+                                        future::ok(ApiService::build_http_response(
+                                            StatusCode::INTERNAL_SERVER_ERROR,
+                                            &err_msg,
+                                        ))
+                                    }
+                                }
+                            },
+                        );
                         return Box::new(result);
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
@@ -376,6 +376,7 @@ impl ApiService {
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
                                 Response::builder()
+                                    .status(StatusCode::OK)
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
                                     .expect("builder with known status code must not fail"),
@@ -469,6 +470,7 @@ impl ApiService {
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
                                 Response::builder()
+                                    .status(StatusCode::OK)
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
                                     .expect("builder with known status code must not fail"),
@@ -484,6 +486,7 @@ impl ApiService {
                         .and_then(|data| match serde_json::to_string(&data) {
                             Ok(json) => future::ok(
                                 Response::builder()
+                                    .status(StatusCode::OK)
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
                                     .expect("builder with known status code must not fail"),
@@ -545,7 +548,9 @@ impl ApiService {
                                                 .body(Body::from(
                                                     "Category has been successfully updated",
                                                 ))
-                                                .expect("builder with known status code must not fail"),
+                                                .expect(
+                                                    "builder with known status code must not fail",
+                                                ),
                                         ),
                                         Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                     });
@@ -772,6 +777,7 @@ impl ApiService {
         }
         json.push_str("]");
         Response::builder()
+            .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(json))
             .expect("builder with known status code must not fail")
@@ -809,6 +815,7 @@ impl ApiService {
 
         match serde_json::to_string(&outliers) {
             Ok(json) => Response::builder()
+                .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json))
                 .expect("builder with known status code must not fail"),
