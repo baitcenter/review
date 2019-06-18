@@ -401,7 +401,7 @@ impl DB {
                         conn.execute(&update_queries).map_err(Into::into)
                     } else {
                         Err(Error::from(ErrorKind::DatabaseTransactionError(
-                            DatabaseError::RecordNotExist,
+                            DatabaseError::Other,
                         )))
                     }
                 })
@@ -699,7 +699,7 @@ impl DB {
                         conn.execute(&update_queries).map_err(Into::into)
                     } else {
                         Err(Error::from(ErrorKind::DatabaseTransactionError(
-                            DatabaseError::RecordNotExist,
+                            DatabaseError::Other,
                         )))
                     }
                 })
@@ -835,38 +835,16 @@ impl DB {
         &self,
         current_category: &str,
         new_category: &str,
-    ) -> impl Future<Item = (), Error = Error> {
+    ) -> impl Future<Item = usize, Error = Error> {
         use schema::Category::dsl::*;
-
-        let record_check: Result<String, Error> =
+        let update_result = DB::get_category_id(&self, current_category).and_then(|_| {
+            let target = Category.filter(category.eq(current_category));
             self.pool.get().map_err(Into::into).and_then(|conn| {
-                Category
-                    .select(category)
-                    .filter(category.eq(current_category))
-                    .first::<String>(&conn)
+                diesel::update(target)
+                    .set((category.eq(new_category),))
+                    .execute(&conn)
                     .map_err(Into::into)
-            });
-        if let Err(e) = record_check {
-            if e.to_string().contains("database query") {
-                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::RecordNotExist,
-                ))));
-            } else {
-                return future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                ))));
-            }
-        }
-
-        let target = Category.filter(category.eq(current_category));
-        let update_result = self.pool.get().map_err(Into::into).and_then(|conn| {
-            match diesel::update(target)
-                .set((category.eq(new_category),))
-                .execute(&conn)
-            {
-                Ok(_) => Ok(()),
-                Err(e) => DB::error_handling(e),
-            }
+            })
         });
         future::result(update_result)
     }

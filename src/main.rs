@@ -154,7 +154,7 @@ fn main() {
             .and_then(|srv| {
                 service_fn(move |req| {
                     api_service::ApiService::request_handler(srv.clone(), req)
-                        .then(api_service::ApiService::error_handler)
+                        .then(api_service::ApiService::api_error_handler)
                 })
             });
             Box::new(api_service)

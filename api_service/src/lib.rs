@@ -530,7 +530,11 @@ impl ApiService {
                                     .and_then(|buf| {
                                         serde_json::from_slice(&buf)
                                             .map(move |new_category: NewCategory| {
-                                                db::DB::update_category(&self.db, &category_cloned, &new_category.category)
+                                                db::DB::update_category(
+                                                    &self.db,
+                                                    &category_cloned,
+                                                    &new_category.category,
+                                                )
                                             })
                                             .map_err(Into::into)
                                     })
@@ -538,29 +542,12 @@ impl ApiService {
                                         Ok(_) => future::ok(
                                             Response::builder()
                                                 .status(StatusCode::OK)
-                                                .body(Body::from("Category has been successfully updated"))
+                                                .body(Body::from(
+                                                    "Category has been successfully updated",
+                                                ))
                                                 .unwrap(),
                                         ),
-                                        Err(e) => {
-                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                                e.kind()
-                                            {
-                                                if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                    future::ok(
-                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                    )
-                                                } else if *reason == db::error::DatabaseError::RecordNotExist {
-                                                    future::ok(ApiService::build_http_response(
-                                                        StatusCode::BAD_REQUEST,
-                                                        "The specified record does not exist in database",
-                                                    ))
-                                                } else {
-                                                    future::ok(ApiService::build_http_500_response())
-                                                }
-                                            } else {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
+                                        Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                     });
 
                                 return Box::new(result);
@@ -573,38 +560,7 @@ impl ApiService {
         }
     }
 
-    fn db_error_handler(e: &db::error::Error) -> Response<Body> {
-        if let Some(e) = e.cause() {
-            let cause = e.find_root_cause();
-            if cause.to_string().contains("database is locked") {
-                ApiService::build_http_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "Service temporarily unavailable",
-                )
-            } else {
-                ApiService::build_http_500_response()
-            }
-        } else if let db::error::ErrorKind::DatabaseTransactionError(reason) = e.kind() {
-            match *reason {
-                db::error::DatabaseError::DatabaseLocked => ApiService::build_http_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "Service temporarily unavailable",
-                ),
-                db::error::DatabaseError::RecordNotExist => ApiService::build_http_response(
-                    StatusCode::BAD_REQUEST,
-                    "The specified record does not exist in database",
-                ),
-                db::error::DatabaseError::Other => ApiService::build_http_response(
-                    StatusCode::BAD_REQUEST,
-                    "Please make sure that the values in your request are correct",
-                ),
-            }
-        } else {
-            ApiService::build_http_500_response()
-        }
-    }
-
-    pub fn error_handler(
+    pub fn api_error_handler(
         res_body: Result<Response<Body>, Error>,
     ) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send + 'static> {
         match res_body {
@@ -626,6 +582,42 @@ impl ApiService {
 
                 Box::new(future::ok(res.map(Into::into)))
             }
+        }
+    }
+
+    fn db_error_handler(e: &db::error::Error) -> Response<Body> {
+        if let Some(e) = e.cause() {
+            let cause = e.find_root_cause().to_string();
+            if cause.contains("database is locked") {
+                ApiService::build_http_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Service temporarily unavailable",
+                )
+            } else if cause.contains("NotFound") {
+                ApiService::build_http_response(
+                    StatusCode::BAD_REQUEST,
+                    "The specified record does not exist in database",
+                )
+            } else {
+                ApiService::build_http_500_response()
+            }
+        } else if let db::error::ErrorKind::DatabaseTransactionError(reason) = e.kind() {
+            match *reason {
+                db::error::DatabaseError::DatabaseLocked => ApiService::build_http_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Service temporarily unavailable",
+                ),
+                db::error::DatabaseError::RecordNotExist => ApiService::build_http_response(
+                    StatusCode::BAD_REQUEST,
+                    "The specified record does not exist in database",
+                ),
+                db::error::DatabaseError::Other => ApiService::build_http_response(
+                    StatusCode::BAD_REQUEST,
+                    "Please make sure that the values in your request are correct",
+                ),
+            }
+        } else {
+            ApiService::build_http_500_response()
         }
     }
 
