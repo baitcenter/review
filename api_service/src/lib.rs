@@ -146,7 +146,7 @@ impl ApiService {
                                         Response::builder()
                                             .status(StatusCode::CREATED)
                                             .body(Body::from("New category has been added"))
-                                            .unwrap(),
+                                            .expect("builder with known status code must not fail"),
                                     ),
                                     Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                 }
@@ -178,7 +178,7 @@ impl ApiService {
                                                 Response::builder()
                                                     .status(StatusCode::OK)
                                                     .body(Body::from(msg))
-                                                    .unwrap(),
+                                                    .expect("builder with known status code must not fail"),
                                             )
                                         }
                                         Err(e) => {
@@ -257,7 +257,7 @@ impl ApiService {
                                                 Response::builder()
                                                     .status(StatusCode::OK)
                                                     .body(Body::from("Cluster has been successfully updated"))
-                                                    .unwrap(),
+                                                    .expect("builder with known status code must not fail"),
                                             )
                                         }
                                         Err(e) => future::ok(ApiService::db_error_handler(&e)),
@@ -291,7 +291,7 @@ impl ApiService {
                                     .body(Body::from(
                                         "New clusters have been inserted into database",
                                     ))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(e) => future::ok(ApiService::db_error_handler(&e)),
                         });
@@ -317,7 +317,7 @@ impl ApiService {
                                     .body(Body::from(
                                         "New outliers have been inserted into database",
                                     ))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             )
                         });
 
@@ -340,7 +340,7 @@ impl ApiService {
                                 Response::builder()
                                     .status(StatusCode::OK)
                                     .body(Body::from("Clusters have been updated"))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(e) => future::ok(ApiService::db_error_handler(&e)),
                         });
@@ -364,7 +364,7 @@ impl ApiService {
                                 Response::builder()
                                     .status(StatusCode::OK)
                                     .body(Body::from("Outlier information has been updated"))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(e) => future::ok(ApiService::db_error_handler(&e)),
                         });
@@ -378,7 +378,7 @@ impl ApiService {
                                 Response::builder()
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(_) => future::ok(ApiService::build_http_500_response()),
                         })
@@ -428,7 +428,7 @@ impl ApiService {
                                                 Response::builder()
                                                     .status(StatusCode::OK)
                                                     .body(Body::from("Qualifier has been successfully updated"))
-                                                    .unwrap(),
+                                                    .expect("builder with known status code must not fail"),
                                             )
                                         }
                                         Err(e) => {
@@ -471,7 +471,7 @@ impl ApiService {
                                 Response::builder()
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(_) => future::ok(ApiService::build_http_500_response()),
                         })
@@ -486,7 +486,7 @@ impl ApiService {
                                 Response::builder()
                                     .header(header::CONTENT_TYPE, "application/json")
                                     .body(Body::from(json))
-                                    .unwrap(),
+                                    .expect("builder with known status code must not fail"),
                             ),
                             Err(_) => future::ok(ApiService::build_http_500_response()),
                         })
@@ -545,7 +545,7 @@ impl ApiService {
                                                 .body(Body::from(
                                                     "Category has been successfully updated",
                                                 ))
-                                                .unwrap(),
+                                                .expect("builder with known status code must not fail"),
                                         ),
                                         Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                     });
@@ -578,7 +578,7 @@ impl ApiService {
                     .header(CONTENT_TYPE, "application/json")
                     .header(CONTENT_LENGTH, body.len().to_string().as_str())
                     .body(body.into())
-                    .unwrap();
+                    .expect("builder with known status code must not fail");
 
                 Box::new(future::ok(res.map(Into::into)))
             }
@@ -631,7 +631,7 @@ impl ApiService {
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, body.len().to_string().as_str())
             .body(body.into())
-            .unwrap()
+            .expect("builder with known status code must not fail")
     }
 
     fn build_http_400_response() -> Response<Body> {
@@ -644,7 +644,7 @@ impl ApiService {
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, body.len().to_string().as_str())
             .body(body.into())
-            .unwrap()
+            .expect("builder with known status code must not fail")
     }
 
     fn build_http_404_response() -> Response<Body> {
@@ -657,7 +657,7 @@ impl ApiService {
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, body.len().to_string().as_str())
             .body(body.into())
-            .unwrap()
+            .expect("builder with known status code must not fail")
     }
 
     fn build_http_500_response() -> Response<Body> {
@@ -670,7 +670,7 @@ impl ApiService {
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, body.len().to_string().as_str())
             .body(body.into())
-            .unwrap()
+            .expect("builder with known status code must not fail")
     }
 
     fn build_cluster_response(data: Vec<db::ClusterResponse>) -> Response<Body> {
@@ -774,7 +774,7 @@ impl ApiService {
         Response::builder()
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(json))
-            .unwrap()
+            .expect("builder with known status code must not fail")
     }
 
     fn bytes_to_string(bytes: &[u8]) -> String {
@@ -811,7 +811,7 @@ impl ApiService {
             Ok(json) => Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json))
-                .unwrap(),
+                .expect("builder with known status code must not fail"),
             Err(_) => ApiService::build_http_500_response(),
         }
     }
