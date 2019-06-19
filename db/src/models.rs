@@ -103,6 +103,13 @@ pub struct PriorityTable {
     pub priority: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct QualifierUpdate {
+    pub cluster_id: String,
+    pub data_source: String,
+    pub qualifier: String,
+}
+
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Qualifier"]
 #[primary_key(qualifier_id)]

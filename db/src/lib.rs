@@ -3,7 +3,6 @@ extern crate diesel;
 
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
-use failure::Fail;
 use futures::future;
 use futures::prelude::*;
 use models::*;
@@ -249,16 +248,6 @@ impl DB {
         future::result(result)
     }
 
-    pub fn execute_update_query(&self, query: &str) -> future::FutureResult<(), Error> {
-        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
-            match conn.execute(query).map_err(Into::into) {
-                Ok(_) => Ok(()),
-                Err(e) => DB::error_handling(e),
-            }
-        });
-        future::result(execution_result)
-    }
-
     pub fn add_outliers(
         &self,
         new_outliers: &[OutlierUpdate],
@@ -407,6 +396,53 @@ impl DB {
                 })
         });
         future::result(execute_result)
+    }
+
+    pub fn update_qualifiers(
+        &self,
+        qualifier_update: &[QualifierUpdate],
+    ) -> impl Future<Item = usize, Error = Error> {
+        use schema::Clusters::dsl;
+        let result = self.pool.get().map_err(Into::into).and_then(|conn| {
+            let timestamp =
+                chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
+            let row = qualifier_update
+                .iter()
+                .map(|q| {
+                    if let Ok(Some(qualifier_id)) = DB::get_qualifier_id(&self, &q.qualifier) {
+                        let target = dsl::Clusters.filter(
+                            dsl::cluster_id
+                                .eq(&q.cluster_id)
+                                .and(dsl::data_source.eq(&q.data_source)),
+                        );
+                        diesel::update(target)
+                            .set((
+                                dsl::qualifier_id.eq(qualifier_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else {
+                        Err(Error::from(ErrorKind::DatabaseTransactionError(
+                            DatabaseError::RecordNotExist,
+                        )))
+                    }
+                })
+                .filter_map(Result::ok)
+                .collect::<Vec<usize>>()
+                .iter()
+                .sum();
+
+            if row == 0 {
+                Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::Other,
+                )))
+            } else {
+                Ok(row)
+            }
+        });
+
+        future::result(result)
     }
 
     fn get_category_id(&self, category: &str) -> Result<Option<i32>, Error> {
@@ -766,25 +802,6 @@ impl DB {
         });
 
         future::result(insert_result)
-    }
-
-    fn error_handling<T>(e: diesel::result::Error) -> Result<T, error::Error> {
-        match e {
-            diesel::result::Error::DatabaseError(_, _) => {
-                if e.to_string().contains("database is locked") {
-                    Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
-                        DatabaseError::DatabaseLocked,
-                    ))))
-                } else {
-                    Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
-                        DatabaseError::Other,
-                    ))))
-                }
-            }
-            _ => Err(Error::from(e.context(ErrorKind::DatabaseTransactionError(
-                DatabaseError::Other,
-            )))),
-        }
     }
 
     fn merge_cluster_examples(

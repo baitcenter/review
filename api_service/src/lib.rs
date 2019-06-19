@@ -396,25 +396,14 @@ impl ApiService {
                     Box::new(result)
                 }
                 (&Method::PUT, "/api/cluster/qualifier") => {
-                    #[derive(Debug, Deserialize)]
-                    struct NewQualifier {
-                        cluster_id: String,
-                        data_source: String,
-                        qualifier: String,
-                    }
                     let result = req
                         .into_body()
                         .concat2()
                         .map_err(Into::into)
                         .and_then(move |buf| {
-                            match serde_json::from_slice(&buf) as Result<Vec<NewQualifier>, serde_json::error::Error> {
+                            match serde_json::from_slice(&buf) as Result<Vec<db::models::QualifierUpdate>, serde_json::error::Error> {
                                 Ok(data) => {
-                                    let now = chrono::Utc::now();
-                                    let timestamp = chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
-                                    let mut query = String::new();
-                                    data.iter().for_each(|d| query.push_str(&format!("UPDATE clusters SET qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}'), last_modification_time = '{}' WHERE cluster_id = '{}' and data_source = '{}';", d.qualifier, timestamp, d.cluster_id, d.data_source)));
-
-                                    let mut result = db::DB::execute_update_query(&self.db, &query);
+                                    let mut result = db::DB::update_qualifiers(&self.db, &data);
                                     match result.poll() {
                                         Ok(_) => {
                                             data.iter().for_each(|d| {
@@ -434,21 +423,7 @@ impl ApiService {
                                                     .expect("builder with known status code must not fail"),
                                             )
                                         }
-                                        Err(e) => {
-                                            if let db::error::ErrorKind::DatabaseTransactionError(reason) =
-                                                e.kind()
-                                            {
-                                                if *reason == db::error::DatabaseError::DatabaseLocked {
-                                                    future::ok(
-                                                        ApiService::build_http_response(StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
-                                                    )
-                                                } else {
-                                                    future::ok(ApiService::build_http_500_response())
-                                                }
-                                            } else {
-                                                future::ok(ApiService::build_http_500_response())
-                                            }
-                                        }
+                                        Err(e) => future::ok(ApiService::db_error_handler(&e)),
                                     }
 
                                 }
