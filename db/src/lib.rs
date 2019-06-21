@@ -295,99 +295,92 @@ impl DB {
                     .and(outlier_data_source.eq(&outlier.data_source)),
             );
         }
-        let execute_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
             query
                 .load::<OutliersTable>(&conn)
                 .map_err(Into::into)
                 .and_then(|outlier_list| {
-                    let mut update_queries = String::new();
-                    for o in outlier_update {
-                        if let Some(outlier) = outlier_list
-                            .iter()
-                            .find(|outlier| o.outlier == outlier.outlier_raw_event)
-                        {
-                            let new_size = o.event_ids.len();
-                            let o_size = match &outlier.outlier_size {
-                                Some(current_size) => {
-                                    if let Ok(current_size) = current_size.parse::<usize>() {
-                                        // check if sum of new_size and current_size exceeds max_value
-                                        // if it does, we cannot calculate sum anymore, so reset the value of size
-                                        if new_size > usize::max_value() - current_size {
-                                            new_size.to_string()
+                    let replace_outliers: Vec<OutliersTable> = outlier_update
+                        .iter()
+                        .map(|o| {
+                            if let Some(outlier) = outlier_list
+                                .iter()
+                                .find(|outlier| o.outlier == outlier.outlier_raw_event)
+                            {
+                                let new_size = o.event_ids.len();
+                                let o_size = match &outlier.outlier_size {
+                                    Some(current_size) => {
+                                        if let Ok(current_size) = current_size.parse::<usize>() {
+                                            // check if sum of new_size and current_size exceeds max_value
+                                            // if it does, we cannot calculate sum anymore, so reset the value of size
+                                            if new_size > usize::max_value() - current_size {
+                                                new_size.to_string()
+                                            } else {
+                                                (current_size + new_size).to_string()
+                                            }
                                         } else {
-                                            (current_size + new_size).to_string()
+                                            new_size.to_string()
                                         }
-                                    } else {
-                                        new_size.to_string()
                                     }
-                                }
-                                None => new_size.to_string(),
-                            };
-                            let mut event_ids = match &outlier.outlier_event_ids {
-                                Some(event_ids) => {
-                                    match rmp_serde::decode::from_slice(&event_ids)
-                                        as Result<Vec<u64>, rmp_serde::decode::Error>
-                                    {
-                                        Ok(event_ids) => event_ids,
-                                        Err(_) => Vec::<u64>::new(),
+                                    None => new_size.to_string(),
+                                };
+                                let mut event_ids = match &outlier.outlier_event_ids {
+                                    Some(event_ids) => {
+                                        match rmp_serde::decode::from_slice(&event_ids)
+                                            as Result<Vec<u64>, rmp_serde::decode::Error>
+                                        {
+                                            Ok(event_ids) => event_ids,
+                                            Err(_) => Vec::<u64>::new(),
+                                        }
                                     }
+                                    None => Vec::<u64>::new(),
+                                };
+                                event_ids.extend(&o.event_ids);
+                                // only store most recent 100 event_ids per outlier
+                                let event_ids = if event_ids.len() > 100 {
+                                    event_ids.sort();
+                                    let (_, event_ids) = event_ids.split_at(event_ids.len() - 100);
+                                    event_ids
+                                } else {
+                                    &event_ids
+                                };
+                                let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
+                                OutliersTable {
+                                    outlier_id: None,
+                                    outlier_raw_event: o.outlier.clone(),
+                                    outlier_data_source: o.data_source.clone(),
+                                    outlier_event_ids: event_ids,
+                                    outlier_size: Some(o_size),
                                 }
-                                None => Vec::<u64>::new(),
-                            };
-                            event_ids.extend(&o.event_ids);
-                            // only store most recent 100 event_ids per outlier
-                            let event_ids = if event_ids.len() > 100 {
-                                event_ids.sort();
-                                let (_, event_ids) = event_ids.split_at(event_ids.len() - 100);
-                                event_ids
                             } else {
-                                &event_ids
-                            };
-                            let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
-                            match event_ids {
-                                Some(event_ids) => {
-                                    let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_event_ids, outlier_size, outlier_data_source) VALUES (x'{}', x'{}', '{}', '{}');", 
-                                        hex::encode(DB::bytes_to_string(&o.outlier)),
-                                        hex::encode(event_ids),
-                                        o_size,
-                                        o.data_source,
-                                    );
-                                    update_queries.push_str(&query);
-                                }
-                                None => {
-                                    let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_size, outlier_data_source) VALUES (x'{}', '{}', '{}');", 
-                                        hex::encode(DB::bytes_to_string(&o.outlier)),
-                                        o_size,
-                                        o.data_source,
-                                    );
-                                    update_queries.push_str(&query);
+                                // only store most recent 100 event_ids per outlier
+                                let mut event_ids_cloned = o.event_ids.clone();
+                                let event_ids = if event_ids_cloned.len() > 100 {
+                                    event_ids_cloned.sort();
+                                    let (_, event_ids) =
+                                        event_ids_cloned.split_at(o.event_ids.len() - 100);
+                                    event_ids
+                                } else {
+                                    &o.event_ids
+                                };
+                                let size = o.event_ids.len();
+                                let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
+                                OutliersTable {
+                                    outlier_id: None,
+                                    outlier_raw_event: o.outlier.clone(),
+                                    outlier_data_source: o.data_source.clone(),
+                                    outlier_event_ids: event_ids,
+                                    outlier_size: Some(size.to_string()),
                                 }
                             }
-                        } else {
-                            let event_ids = rmp_serde::encode::to_vec(&o.event_ids).ok();
-                            match event_ids {
-                                Some(event_ids) => {
-                                    let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_event_ids, outlier_size, outlier_data_source) VALUES (x'{}', x'{}', '{}', '{}');", 
-                                        hex::encode(DB::bytes_to_string(&o.outlier)),
-                                        hex::encode(event_ids),
-                                        o.event_ids.len(),
-                                        o.data_source,
-                                    );
-                                    update_queries.push_str(&query);
-                                }
-                                None => {
-                                    let query = format!("INSERT OR REPLACE INTO Outliers (outlier_raw_event, outlier_size, outlier_data_source) VALUES (x'{}', '{}', '{}');", 
-                                        hex::encode(DB::bytes_to_string(&o.outlier)),
-                                        o.event_ids.len(),
-                                        o.data_source,
-                                    );
-                                    update_queries.push_str(&query);
-                                }
-                            }
-                        }
-                    }
-                    if !update_queries.is_empty() {
-                        conn.execute(&update_queries).map_err(Into::into)
+                        })
+                        .collect();
+
+                    if !replace_outliers.is_empty() {
+                        diesel::replace_into(Outliers)
+                            .values(&replace_outliers)
+                            .execute(&*conn)
+                            .map_err(Into::into)
                     } else {
                         Err(Error::from(ErrorKind::DatabaseTransactionError(
                             DatabaseError::Other,
@@ -395,7 +388,8 @@ impl DB {
                     }
                 })
         });
-        future::result(execute_result)
+
+        future::result(execution_result)
     }
 
     pub fn update_qualifiers(
