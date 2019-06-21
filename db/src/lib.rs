@@ -832,8 +832,4 @@ impl DB {
         });
         future::result(update_result)
     }
-
-    fn bytes_to_string(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| char::from(*b)).collect()
-    }
 }
