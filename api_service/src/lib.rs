@@ -594,7 +594,7 @@ impl ApiService {
                     "The specified record does not exist in database",
                 ),
                 db::error::DatabaseError::Other => ApiService::build_http_response(
-                    StatusCode::BAD_REQUEST,
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     "Please make sure that the values in your request are correct",
                 ),
             }
