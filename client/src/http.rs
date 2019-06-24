@@ -101,7 +101,7 @@ impl<'a> ClusterView<'a> {
             .find(|&x| x.1.to_lowercase() == "pending review")
             .unwrap()
             .0;
-        let cluster_url = format!("{}/api/cluster?status_id={}", url, review_id);
+        let cluster_url = format!(r#"{}/api/cluster/search?filter={{"status":["pending review"]}}"#, url);
         let clusters = match reqwest::get(cluster_url.as_str()) {
             Ok(mut resp) => match resp.json() as Result<Vec<Cluster>, reqwest::Error> {
                 Ok(data) => data,
