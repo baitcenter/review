@@ -400,6 +400,10 @@ impl DB {
         let result = self.pool.get().map_err(Into::into).and_then(|conn| {
             let timestamp =
                 chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
+            let status_id = match DB::get_status_id(self, "reviewed") {
+                Ok(Some(id)) => id,
+                _ => 1,
+            };
             let row = qualifier_update
                 .iter()
                 .map(|q| {
@@ -412,6 +416,7 @@ impl DB {
                         diesel::update(target)
                             .set((
                                 dsl::qualifier_id.eq(qualifier_id),
+                                dsl::status_id.eq(status_id),
                                 dsl::last_modification_time.eq(timestamp),
                             ))
                             .execute(&conn)
@@ -461,6 +466,17 @@ impl DB {
         })
     }
 
+    fn get_status_id(&self, status: &str) -> Result<Option<i32>, Error> {
+        use schema::Status::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::Status
+                .select(dsl::status_id)
+                .filter(dsl::status.eq(status))
+                .first::<Option<i32>>(&conn)
+                .map_err(Into::into)
+        })
+    }
+
     pub fn update_cluster(
         &self,
         cluster_id: &str,
@@ -484,6 +500,10 @@ impl DB {
                 qualifier == "benign",
             )
         });
+        let status_id = match DB::get_status_id(self, "reviewed") {
+            Ok(Some(id)) => id,
+            _ => 1,
+        };
         let execution_result = self
             .pool
             .get()
@@ -497,6 +517,7 @@ impl DB {
                             dsl::cluster_id.eq(cluster_id),
                             dsl::category_id.eq(category_id),
                             dsl::qualifier_id.eq(qualifier_id),
+                            dsl::status_id.eq(status_id),
                             dsl::last_modification_time.eq(timestamp),
                         ))
                         .execute(&conn)
@@ -519,6 +540,7 @@ impl DB {
                         .set((
                             dsl::cluster_id.eq(cluster_id),
                             dsl::qualifier_id.eq(qualifier_id),
+                            dsl::status_id.eq(status_id),
                             dsl::last_modification_time.eq(timestamp),
                         ))
                         .execute(&conn)
@@ -530,6 +552,7 @@ impl DB {
                         .set((
                             dsl::category_id.eq(category_id),
                             dsl::qualifier_id.eq(qualifier_id),
+                            dsl::status_id.eq(status_id),
                             dsl::last_modification_time.eq(timestamp),
                         ))
                         .execute(&conn)
@@ -554,6 +577,7 @@ impl DB {
                     query
                         .set((
                             dsl::qualifier_id.eq(qualifier_id),
+                            dsl::status_id.eq(status_id),
                             dsl::last_modification_time.eq(timestamp),
                         ))
                         .execute(&conn)
