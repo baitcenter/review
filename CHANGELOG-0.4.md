@@ -1,5 +1,18 @@
 <hr>
 
+## [0.4.2](https://gitlab.com/resolutions/review/tree/0.4.2) (2019-06-24) 
+
+### Added
+- API documentation has been added [here](https://gitlab.com/resolutions/review/tree/0.4.2/docs). Please refer to the documentation for changes on endpoints.
+
+### Changed
+- Environment variable `ETCD_SIG_KEY` is no longer needed. REview dynamically generates etcd keys as `benign_signatures_<kafka_topic_name>`.
+
+### Fixed
+- Fix a bug where a cluster insertion/update to database may fail.
+
+<hr>
+
 ## [0.4.1](https://gitlab.com/resolutions/review/tree/0.4.1) (2019-05-20) 
 
 ### Changed
