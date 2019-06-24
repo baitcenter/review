@@ -57,27 +57,6 @@ impl<'a> ClusterView<'a> {
 
         let url = url.trim_end_matches('/');
         let qualifier_url = format!("{}/api/qualifier", url);
-        let status_url = format!("{}/api/status", url);
-
-        let status: HashMap<_, _> = match reqwest::get(status_url.as_str()) {
-            Ok(mut resp) => match resp.json() as Result<Vec<StatusTable>, reqwest::Error> {
-                Ok(data) => data
-                    .iter()
-                    .map(|s| (s.status_id.unwrap(), s.status.clone()))
-                    .collect(),
-                Err(e) => {
-                    eprintln!(
-                        "Unexpected response from server. cannot deserialize status table. {}",
-                        e
-                    );
-                    std::process::exit(1);
-                }
-            },
-            Err(e) => {
-                eprintln!("Err: {}", e);
-                std::process::exit(1);
-            }
-        };
         let qualifier: HashMap<_, _> = match reqwest::get(qualifier_url.as_str()) {
             Ok(mut resp) => {
                 match resp.json() as Result<Vec<QualifierTable>, reqwest::Error> {
@@ -96,12 +75,10 @@ impl<'a> ClusterView<'a> {
                 std::process::exit(1);
             }
         };
-        let review_id = status
-            .iter()
-            .find(|&x| x.1.to_lowercase() == "pending review")
-            .unwrap()
-            .0;
-        let cluster_url = format!(r#"{}/api/cluster/search?filter={{"status":["pending review"]}}"#, url);
+        let cluster_url = format!(
+            r#"{}/api/cluster/search?filter={{"status":["pending review"]}}"#,
+            url
+        );
         let clusters = match reqwest::get(cluster_url.as_str()) {
             Ok(mut resp) => match resp.json() as Result<Vec<Cluster>, reqwest::Error> {
                 Ok(data) => data,
