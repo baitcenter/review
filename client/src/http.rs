@@ -3,7 +3,7 @@ use cursive::traits::*;
 use cursive::view::{Position, SizeConstraint};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::Cursive;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use std::error::Error;
@@ -47,7 +47,7 @@ pub struct ClusterView<'a> {
     cluster_view_tx: mpsc::Sender<ClusterViewMessage>,
     clusters: Vec<Cluster>,
     qualifier: HashMap<u32, String>,
-    is_cluster_updated: HashMap<String, u32>,
+    is_cluster_updated: HashMap<String, usize>,
     url: &'a str,
 }
 
@@ -99,7 +99,7 @@ impl<'a> ClusterView<'a> {
             eprintln!("Cluster with review status was not found.");
             std::process::exit(1);
         }
-        let is_cluster_updated: HashMap<String, u32> = HashMap::new();
+        let is_cluster_updated: HashMap<String, usize> = HashMap::new();
         let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
             cluster_view_tx,
@@ -257,53 +257,49 @@ impl<'a> ClusterView<'a> {
                         if self.clusters[item.0].qualifier != self.qualifier[&item.1] {
                             self.clusters[item.0].qualifier = self.qualifier[&item.1].clone();
                             self.is_cluster_updated
-                                .insert(self.clusters[item.0].cluster_id.clone(), item.1);
+                                .insert(self.clusters[item.0].cluster_id.clone(), item.0);
                         }
                     }
 
                     ClusterViewMessage::SendUpdateRequest() => {
-                        let mut resp_err: Vec<String> = Vec::new();
-                        let mut send_err: Vec<String> = Vec::new();
-                        for (cluster_id, qualifier_id) in &self.is_cluster_updated {
-                            let url = format!(
-                                "{}/api/cluster?cluster_id={}&qualifier_id={}",
-                                self.url, cluster_id, qualifier_id
-                            );
+                        #[derive(Debug, Serialize)]
+                        struct QualifierUpdate<'a> {
+                            cluster_id: &'a str,
+                            data_source: &'a str,
+                            qualifier: &'a str,
+                        }
+                        let qualifier_update: Vec<QualifierUpdate> = self
+                            .is_cluster_updated
+                            .iter()
+                            .map(|(key, value)| QualifierUpdate {
+                                cluster_id: key,
+                                data_source: &self.clusters[*value].data_source,
+                                qualifier: &self.clusters[*value].qualifier,
+                            })
+                            .collect();
+                        let url = format!("{}/api/cluster/qualifier", self.url);
+                        let body = serde_json::to_string(&qualifier_update);
+                        let popup_message = if let Ok(body) = body {
+                            let body = reqwest::Body::from(body);
                             let client = reqwest::Client::new();
-                            match client.put(url.as_str()).send() {
+                            match client.put(url.as_str()).body(body).send() {
                                 Ok(resp) => {
-                                    if !resp.status().is_success() {
-                                        resp_err.push(cluster_id.clone());
+                                    if resp.status().is_success() {
+                                        "Your changes have been successfully saved.".to_string()
+                                    } else {
+                                        "Failed to update the qualifiers for some reason."
+                                            .to_string()
                                     }
                                 }
-                                Err(_) => send_err.push(cluster_id.clone()),
+                                Err(e) => format!(
+                                    "Failed to send update requests to backend server:\n\n{:?}",
+                                    e
+                                ),
                             }
-                        }
-                        if resp_err.is_empty() && send_err.is_empty() {
-                            let popup_message = "Your changes have been successfully saved.";
-                            ClusterView::create_popup_window(
-                                &mut self.cursive,
-                                popup_message,
-                                &"OK",
-                            );
-                        } else if !resp_err.is_empty() {
-                            let popup_message = format!(
-                                "Failed to update the following cluster_id:\n\n{:?}",
-                                resp_err
-                            );
-                            ClusterView::create_popup_window(
-                                &mut self.cursive,
-                                popup_message.as_str(),
-                                &"OK",
-                            );
-                        } else if !send_err.is_empty() {
-                            let popup_message = format!("Failed to send update requests of the following cluster_id to backend server:\n\n{:?}", send_err);
-                            ClusterView::create_popup_window(
-                                &mut self.cursive,
-                                popup_message.as_str(),
-                                &"OK",
-                            );
-                        }
+                        } else {
+                            "Something went wrong".to_string()
+                        };
+                        ClusterView::create_popup_window(&mut self.cursive, &popup_message, &"OK");
                     }
                 }
             }
