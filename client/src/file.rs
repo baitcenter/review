@@ -1,8 +1,8 @@
 use chrono::Utc;
 use cursive::direction::Orientation;
 use cursive::traits::*;
-use cursive::view::{Position, SizeConstraint, ViewWrapper};
-use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
+use cursive::view::{Identifiable, Position, SizeConstraint};
+use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, TextView};
 use cursive::Cursive;
 use remake::classification::EventClassifier;
 use remake::event::RawEventDatabase;
@@ -18,11 +18,11 @@ use std::error::Error;
 use std::sync::mpsc;
 
 #[derive(Deserialize, Serialize)]
-pub struct Cluster {
+pub(crate) struct Cluster {
     cluster_id: usize,
-    signature: String,
+    pub(crate) signature: String,
     size: usize,
-    suspicious: String,
+    pub(crate) suspicious: String,
     examples: Vec<String>,
     event_ids: Vec<u64>,
 }
@@ -53,7 +53,6 @@ pub struct ClusterView<'a> {
     cursive: Cursive,
     cl_view_rx: mpsc::Receiver<ClusterViewMessage>,
     cl_view_tx: mpsc::Sender<ClusterViewMessage>,
-    clusters: Vec<Cluster>,
     cluster_path: &'a str,
     raw_db_path: &'a str,
 }
@@ -61,8 +60,6 @@ pub struct ClusterView<'a> {
 pub enum ClusterViewMessage {
     DeleteOldEvents(),
     PopupQuitWindows(),
-    PrintClusterProps(usize),
-    SaveClusterQualifier((usize, i64)),
     WriteBenignRules(),
 }
 
@@ -73,7 +70,6 @@ impl<'a> ClusterView<'a> {
         raw_db_path: &'a str,
     ) -> Result<ClusterView<'a>, Box<Error>> {
         let (cl_view_tx, cl_view_rx) = mpsc::channel::<ClusterViewMessage>();
-        let mut clusters: Vec<Cluster> = Vec::new();
 
         let model = match ClusterView::read_model_file(model_path) {
             Ok(model) => model,
@@ -109,6 +105,7 @@ impl<'a> ClusterView<'a> {
             }
         };
 
+        let mut clusters: Vec<Cluster> = Vec::new();
         for (cluster_id, events) in cls.iter() {
             let signature = if let Some(sig) = sigs.get(cluster_id) {
                 if let Ok(sig) = std::str::from_utf8(&sig) {
@@ -175,33 +172,11 @@ impl<'a> ClusterView<'a> {
             cursive: Cursive::default(),
             cl_view_tx,
             cl_view_rx,
-            clusters,
             cluster_path,
             raw_db_path,
         };
 
-        let names: Vec<String> = cluster_view
-            .clusters
-            .iter()
-            .map(|c| c.signature.clone())
-            .collect();
-
-        let mut cluster_select = crate::views::ClusterSelectView::new();
-        let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
-        for (i, label) in names.iter().enumerate() {
-            let index_str = (i + 1).to_string();
-            cluster_select.with_view_mut(|v| v.add_item(
-                " ".repeat(index_width - index_str.len()) + &index_str + " " + label,
-                i,
-            ));
-        }
-
-        let cl_view_tx_clone = cluster_view.cl_view_tx.clone();
-        cluster_select.with_view_mut(|v| v.set_on_submit(move |_, i| {
-            cl_view_tx_clone
-                .send(ClusterViewMessage::PrintClusterProps(*i))
-                .unwrap();
-        }));
+        let cluster_select = crate::views::ClusterSelectView::new(clusters);
 
         let quit_view = TextView::new("Press q to exit.".to_string());
         let save_view = TextView::new(
@@ -209,7 +184,13 @@ impl<'a> ClusterView<'a> {
                 .to_string(),
         );
         let top_layout = LinearLayout::new(Orientation::Vertical)
-            .child(cluster_select.scrollable().full_width().fixed_height(30))
+            .child(
+                cluster_select
+                    .with_id("cluster_select")
+                    .scrollable()
+                    .full_width()
+                    .fixed_height(30),
+            )
             .child(DummyView)
             .child(DummyView)
             .child(quit_view)
@@ -377,52 +358,6 @@ impl<'a> ClusterView<'a> {
                                 })
                         );
                     }
-
-                    ClusterViewMessage::PrintClusterProps(item) => {
-                        let mut cluster_prop_window1 = self
-                            .cursive
-                            .find_id::<TextView>("cluster_properties")
-                            .unwrap();
-                        cluster_prop_window1
-                            .set_content(Cluster::get_cluster_properties(&self.clusters[item]));
-
-                        let mut cluster_prop_window2 = self
-                            .cursive
-                            .find_id::<Dialog>("cluster_properties2")
-                            .unwrap();
-                        let cl_view_tx_clone = self.cl_view_tx.clone();
-
-                        let mut qualifier_select = SelectView::new();
-                        qualifier_select.add_item("Suspicious".to_string(), 1);
-                        qualifier_select.add_item("Benign".to_string(), 2);
-                        qualifier_select.add_item("None".to_string(), 3);
-
-                        cluster_prop_window2.set_content(qualifier_select.on_submit(
-                            move |_, qualifier: &i64| {
-                                cl_view_tx_clone
-                                    .send(ClusterViewMessage::SaveClusterQualifier((
-                                        item, *qualifier,
-                                    )))
-                                    .unwrap();
-                            },
-                        ))
-                    }
-
-                    ClusterViewMessage::SaveClusterQualifier(item) => {
-                        let qualifier: String;
-                        if item.1 == 1 {
-                            qualifier = "Suspicious".to_string();
-                        } else if item.1 == 2 {
-                            qualifier = "Benign".to_string();
-                        } else {
-                            qualifier = "None".to_string();
-                        }
-
-                        if self.clusters[item.0].suspicious != qualifier {
-                            self.clusters[item.0].suspicious = qualifier;
-                        }
-                    }
-
                     ClusterViewMessage::WriteBenignRules() => {
                         let mut file_path = match Path::new(self.cluster_path).parent() {
                             Some(path) => match path.to_str() {
@@ -461,10 +396,19 @@ impl<'a> ClusterView<'a> {
                         file_path.push_str(&Utc::now().format("%Y%m%d%H%M%S").to_string());
                         file_path.push_str("_benign_rules.txt");
 
-                        match Cluster::write_benign_rules_to_file(
-                            &file_path.as_str(),
-                            &self.clusters,
-                        ) {
+                        let result = self
+                            .cursive
+                            .call_on_id(
+                                "cluster_select",
+                                |view: &mut crate::views::ClusterSelectView| {
+                                    Cluster::write_benign_rules_to_file(
+                                        &file_path.as_str(),
+                                        &view.clusters,
+                                    )
+                                },
+                            )
+                            .unwrap();
+                        match result {
                             Ok(_) => {
                                 let popup_message = format!(
                                     "The benign rules have been saved to \n\n{:?}.",
