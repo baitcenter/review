@@ -1,7 +1,7 @@
 use chrono::Utc;
 use cursive::direction::Orientation;
 use cursive::traits::*;
-use cursive::view::{Position, SizeConstraint};
+use cursive::view::{Position, SizeConstraint, ViewWrapper};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::Cursive;
 use remake::classification::EventClassifier;
@@ -186,22 +186,22 @@ impl<'a> ClusterView<'a> {
             .map(|c| c.signature.clone())
             .collect();
 
-        let mut cluster_select = SelectView::new();
+        let mut cluster_select = crate::views::ClusterSelectView::new();
         let index_width = ((names.len() + 1) as f64).log10() as usize + 1;
         for (i, label) in names.iter().enumerate() {
             let index_str = (i + 1).to_string();
-            cluster_select.add_item(
+            cluster_select.with_view_mut(|v| v.add_item(
                 " ".repeat(index_width - index_str.len()) + &index_str + " " + label,
                 i,
-            );
+            ));
         }
 
         let cl_view_tx_clone = cluster_view.cl_view_tx.clone();
-        cluster_select.set_on_submit(move |_, i| {
+        cluster_select.with_view_mut(|v| v.set_on_submit(move |_, i| {
             cl_view_tx_clone
                 .send(ClusterViewMessage::PrintClusterProps(*i))
                 .unwrap();
-        });
+        }));
 
         let quit_view = TextView::new("Press q to exit.".to_string());
         let save_view = TextView::new(
