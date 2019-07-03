@@ -11,14 +11,19 @@ pub(crate) struct ClusterSelectView {
 impl ClusterSelectView {
     pub(crate) fn new(clusters: Vec<Cluster>) -> Self {
         let index_width = ((clusters.len() + 1) as f64).log10() as usize + 1;
-        let mut view = SelectView::<usize>::new();
-        for (i, label) in clusters.iter().map(|c| &c.signature).enumerate() {
-            let index_str = (i + 1).to_string();
-            view.add_item(
-                " ".repeat(index_width - index_str.len()) + &index_str + " " + label,
-                i,
-            );
-        }
+        let mut view = SelectView::<usize>::new().with_all(
+            clusters
+                .iter()
+                .map(|c| &c.signature)
+                .enumerate()
+                .map(|(i, label)| {
+                    let index_str = (i + 1).to_string();
+                    (
+                        " ".repeat(index_width - index_str.len()) + &index_str + " " + label,
+                        i,
+                    )
+                }),
+        );
 
         view.set_on_submit(|siv, &i| {
             let mut cluster_prop_window1 = siv.find_id::<TextView>("cluster_properties").unwrap();
