@@ -62,3 +62,15 @@ impl ClusterSelectView {
 impl ViewWrapper for ClusterSelectView {
     wrap_impl!(self.view: SelectView<usize>);
 }
+
+pub(crate) fn bin2str(bin: &[u8]) -> String {
+    bin.iter()
+        .map(|&c| {
+            if 0x20 <= c && c <= 0x7e {
+                c as char
+            } else {
+                '.'
+            }
+        })
+        .collect::<String>()
+}

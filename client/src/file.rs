@@ -1,3 +1,4 @@
+use crate::views::bin2str;
 use chrono::Utc;
 use cursive::direction::Orientation;
 use cursive::traits::*;
@@ -8,13 +9,12 @@ use remake::classification::EventClassifier;
 use remake::event::RawEventDatabase;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
-
-use std::error::Error;
 use std::sync::mpsc;
 
 #[derive(Deserialize, Serialize)]
@@ -108,24 +108,19 @@ impl<'a> ClusterView<'a> {
         let mut clusters: Vec<Cluster> = Vec::new();
         for (cluster_id, events) in cls.iter() {
             let signature = if let Some(sig) = sigs.get(cluster_id) {
-                if let Ok(sig) = std::str::from_utf8(&sig) {
-                    sig.to_string()
-                } else {
-                    "".to_string()
-                }
+                bin2str(sig)
             } else {
-                "".to_string()
+                String::new()
             };
 
             // REview displays at most 10 event ids for each cluster
             let event_ids = events.iter().take(10).cloned().collect::<Vec<_>>();
-            let mut examples = event_ids
+            let examples = event_ids
                 .iter()
                 .map(|event_id| ro_txn.get(*event_id))
                 .filter_map(Result::ok)
-                .map(|event| std::str::from_utf8(event))
-                .filter_map(Result::ok)
                 .map(|event| {
+                    let event = bin2str(event);
                     // if the length of an example is longer than 500,
                     // REview only uses first 500
                     if event.len() > 500 {
@@ -135,11 +130,6 @@ impl<'a> ClusterView<'a> {
                     }
                 })
                 .collect::<Vec<_>>();
-
-            let min_example_count = std::cmp::min(events.len(), 3);
-            while examples.len() < min_example_count {
-                examples.push("<undecodable>".to_string());
-            }
 
             let size = events.len();
             // REview displays at most 3 examples for each cluster
