@@ -86,9 +86,13 @@ pub(crate) struct ClusterSet {
 
 impl ClusterSet {
     pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
-        let reader = BufReader::new(File::open(model)?);
-        let model: EventClassifier = rmp_serde::from_read(reader)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let reader = BufReader::new(
+            File::open(model)
+                .map_err(|e| io::Error::new(e.kind(), format!("cannot open model: {}", e)))?,
+        );
+        let model: EventClassifier = rmp_serde::from_read(reader).map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidData, format!("invalid model: {}", e))
+        })?;
         let sigs = model
             .clustering
             .index()
@@ -96,12 +100,23 @@ impl ClusterSet {
             .map(|(sig, id)| (id, sig))
             .collect::<HashMap<_, _>>();
 
-        let reader = BufReader::new(File::open(clusters)?);
-        let cluster_ids: HashMap<usize, HashSet<u64>> = rmp_serde::from_read(reader)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let reader = BufReader::new(
+            File::open(clusters)
+                .map_err(|e| io::Error::new(e.kind(), format!("cannot open clusters: {}", e)))?,
+        );
+        let cluster_ids: HashMap<usize, HashSet<u64>> =
+            rmp_serde::from_read(reader).map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("invalid model: {}", e))
+            })?;
 
-        let raw = RawEventDatabase::new(raw.as_ref())?;
-        let ro_txn = raw.begin_ro_txn()?;
+        let raw = RawEventDatabase::new(raw.as_ref())
+            .map_err(|e| io::Error::new(e.kind(), format!("cannot open event database: {}", e)))?;
+        let ro_txn = raw.begin_ro_txn().map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("cannot begin database transaction: {}", e),
+            )
+        })?;
 
         let mut clusters = Vec::with_capacity(cluster_ids.len());
         for (id, events) in cluster_ids {

@@ -16,7 +16,6 @@ pub(crate) struct MainView {
 impl MainView {
     pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
         let clusters = ClusterSet::from_paths(model, clusters, raw)?;
-        println!("clusters: {:?}", clusters.clusters);
 
         let cluster_select = ClusterSelectView::new(clusters.clusters);
         let quit_view = TextView::new("Press q to exit.".to_string());
