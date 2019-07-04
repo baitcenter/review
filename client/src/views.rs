@@ -1,7 +1,69 @@
-use crate::file::Cluster;
-use cursive::view::ViewWrapper;
-use cursive::views::{Dialog, SelectView, TextView};
+use cursive::direction::Orientation;
+use cursive::traits::*;
+use cursive::view::{SizeConstraint, ViewWrapper};
+use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::wrap_impl;
+
+use std::io;
+use std::path::Path;
+
+use crate::models::{Cluster, ClusterSet};
+
+pub(crate) struct MainView {
+    view: LinearLayout,
+}
+
+impl MainView {
+    pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
+        let clusters = ClusterSet::from_paths(model, clusters, raw)?;
+        println!("clusters: {:?}", clusters.clusters);
+
+        let cluster_select = ClusterSelectView::new(clusters.clusters);
+        let quit_view = TextView::new("Press q to exit.".to_string());
+        let save_view = TextView::new(
+            "Press w to write the signatures of clusters qualified as benign into a file."
+                .to_string(),
+        );
+        let top_layout = LinearLayout::new(Orientation::Vertical)
+            .child(
+                cluster_select
+                    .with_id("cluster_select")
+                    .scrollable()
+                    .full_width()
+                    .fixed_height(30),
+            )
+            .child(DummyView)
+            .child(DummyView)
+            .child(quit_view)
+            .child(save_view);
+
+        let cluster_prop_box1 =
+            BoxView::new(SizeConstraint::Full, SizeConstraint::Full, top_layout)
+                .with_id("cluster_view");
+        let cluster_prop_box2 = BoxView::new(
+            SizeConstraint::Fixed(60),
+            SizeConstraint::Fixed(60),
+            Panel::new(
+                LinearLayout::vertical()
+                    .child(TextView::new("").with_id("cluster_properties"))
+                    .child(
+                        Dialog::around(TextView::new(
+                            "Please Select a cluster from the left lists",
+                        ))
+                        .with_id("cluster_properties2"),
+                    ),
+            ),
+        );
+        let mut view = LinearLayout::horizontal();
+        view.add_child(cluster_prop_box1);
+        view.add_child(cluster_prop_box2);
+        Ok(MainView { view })
+    }
+}
+
+impl ViewWrapper for MainView {
+    wrap_impl!(self.view: LinearLayout);
+}
 
 pub(crate) struct ClusterSelectView {
     view: SelectView<usize>,
