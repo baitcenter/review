@@ -67,19 +67,6 @@ impl Cluster {
             self.cluster_id, self.signature, self.suspicious, self.size, self.examples, self.event_ids
         )
     }
-
-    pub(crate) fn write_benign_rules_to_file(path: &str, clusters: &[Cluster]) -> io::Result<()> {
-        let mut file = File::create(path)?;
-        let mut buff = String::new();
-        for cluster in clusters {
-            if cluster.suspicious == "Benign" {
-                buff.push_str(&cluster.signature);
-                buff.push_str(&"\n");
-            }
-        }
-        file.write_all(buff.as_bytes())?;
-        Ok(())
-    }
 }
 
 pub(crate) struct ClusterSet {
@@ -141,6 +128,19 @@ impl ClusterSet {
             )
         })?;
         Ok(shrunk_clusters)
+    }
+
+    pub(crate) fn write_benign_rules<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        let mut file = File::create(path)?;
+        let mut buff = String::new();
+        for cluster in &self.clusters {
+            if cluster.suspicious == "Benign" {
+                buff.push_str(&cluster.signature);
+                buff.push_str(&"\n");
+            }
+        }
+        file.write_all(buff.as_bytes())?;
+        Ok(())
     }
 
     #[inline]
