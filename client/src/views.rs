@@ -5,7 +5,7 @@ use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView
 use cursive::wrap_impl;
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::models::{Cluster, ClusterSet};
 
@@ -15,9 +15,7 @@ pub(crate) struct MainView {
 
 impl MainView {
     pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
-        let clusters = ClusterSet::from_paths(model, clusters, raw)?;
-
-        let cluster_select = ClusterSelectView::new(clusters.clusters);
+        let cluster_select = ClusterSelectView::from_paths(model, clusters, raw)?;
         let quit_view = TextView::new("Press q to exit.".to_string());
         let save_view = TextView::new(
             "Press w to write the signatures of clusters qualified as benign into a file."
@@ -66,14 +64,19 @@ impl ViewWrapper for MainView {
 
 pub(crate) struct ClusterSelectView {
     view: SelectView<usize>,
-    pub(crate) clusters: Vec<Cluster>,
+    pub(crate) clusters_path: PathBuf,
+    pub(crate) clusters: ClusterSet,
 }
 
 impl ClusterSelectView {
-    pub(crate) fn new(clusters: Vec<Cluster>) -> Self {
+    pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
+        let clusters_path = clusters.as_ref().to_path_buf();
+        let clusters = ClusterSet::from_paths(model, clusters, raw)?;
+
         let index_width = ((clusters.len() + 1) as f64).log10() as usize + 1;
         let mut view = SelectView::<usize>::new().with_all(
             clusters
+                .clusters
                 .iter()
                 .map(|c| &c.signature)
                 .enumerate()
@@ -116,7 +119,11 @@ impl ClusterSelectView {
             ));
         });
 
-        ClusterSelectView { view, clusters }
+        Ok(ClusterSelectView {
+            view,
+            clusters_path,
+            clusters,
+        })
     }
 }
 

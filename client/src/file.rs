@@ -2,28 +2,22 @@ use chrono::Utc;
 use cursive::view::Position;
 use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
-use remake::event::RawEventDatabase;
-use serde::Serialize;
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fs;
-use std::io::BufReader;
+use std::io;
 use std::path::Path;
 use std::sync::mpsc;
 
-use crate::models::Cluster;
-use crate::views::MainView;
+use crate::models::{write_clusters, Cluster};
+use crate::views::{ClusterSelectView, MainView};
 
 pub struct ClusterView<'a> {
     cursive: Cursive,
     cl_view_rx: mpsc::Receiver<ClusterViewMessage>,
     cl_view_tx: mpsc::Sender<ClusterViewMessage>,
     cluster_path: &'a str,
-    raw_db_path: &'a str,
 }
 
 pub enum ClusterViewMessage {
-    DeleteOldEvents(),
     WriteBenignRules(),
 }
 
@@ -41,7 +35,6 @@ impl<'a> ClusterView<'a> {
             cl_view_tx,
             cl_view_rx,
             cluster_path,
-            raw_db_path,
         };
 
         cluster_view.cursive.add_layer(main_view);
@@ -58,101 +51,10 @@ impl<'a> ClusterView<'a> {
         Ok(cluster_view)
     }
 
-    fn read_clusters_file<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<HashMap<usize, HashSet<u64>>, Box<std::error::Error>> {
-        let file = fs::File::open(path)?;
-        let reader = BufReader::new(file);
-        let cluster: HashMap<usize, HashSet<u64>> = rmp_serde::from_read(reader)?;
-
-        Ok(cluster)
-    }
-
-    fn write_clusters_file(
-        path: &str,
-        clusters: &HashMap<usize, HashSet<u64>>,
-    ) -> std::io::Result<()> {
-        let file = fs::File::create(path)?;
-        if let Err(e) = clusters.serialize(&mut rmp_serde::Serializer::new(file)) {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
-        }
-        Ok(())
-    }
-
     pub fn run_feedback_mode(&mut self) {
         while self.cursive.is_running() {
             while let Some(message) = self.cl_view_rx.try_iter().next() {
                 match message {
-                    ClusterViewMessage::DeleteOldEvents() => {
-                        let cls = match ClusterView::read_clusters_file(self.cluster_path) {
-                            Ok(cls) => cls,
-                            Err(e) => {
-                                let err_msg = format!(
-                                    "Cluster file {} could not be opened: {}",
-                                    self.cluster_path, e
-                                );
-                                ClusterView::create_popup_window_then_quit(
-                                    &mut self.cursive,
-                                    err_msg.as_str(),
-                                );
-                                // If we use unreachable or panic here,
-                                // Cursive stops working without displaying
-                                // above err_msg
-                                HashMap::<usize, HashSet<u64>>::new()
-                            }
-                        };
-                        if let Ok(mut raw_event_db) =
-                            RawEventDatabase::new(&Path::new(self.raw_db_path))
-                        {
-                            let shrunken_clusters = remake::cluster::delete_old_events(&cls, 25);
-                            let mut event_ids_to_keep =
-                                shrunken_clusters
-                                    .iter()
-                                    .fold(Vec::new(), |mut ids, (_, set)| {
-                                        ids.extend(set.iter());
-                                        ids
-                                    });
-                            event_ids_to_keep.sort_unstable();
-                            match raw_event_db.shrink_to_fit(&event_ids_to_keep) {
-                                Ok(_) => {
-                                    match ClusterView::write_clusters_file(&self.cluster_path, &cls)
-                                    {
-                                        Ok(_) => {
-                                            ClusterView::create_popup_window_then_quit(
-                                                &mut self.cursive,
-                                                "Old events has been successfully deleted.",
-                                            );
-                                        }
-                                        Err(e) => {
-                                            let err_msg = format!(
-                                                "An error occurs while writing clusters to a file: {}",
-                                                e
-                                            );
-                                            ClusterView::create_popup_window_then_quit(
-                                                &mut self.cursive,
-                                                err_msg.as_str(),
-                                            );
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    let err_msg =
-                                        format!("An error occurs while deleting events: {}", e);
-                                    ClusterView::create_popup_window_then_quit(
-                                        &mut self.cursive,
-                                        err_msg.as_str(),
-                                    );
-                                }
-                            };
-                        } else {
-                            let err_msg =
-                                format!("Raw database {} could not be opened", self.raw_db_path);
-                            ClusterView::create_popup_window_then_quit(
-                                &mut self.cursive,
-                                err_msg.as_str(),
-                            );
-                        }
-                    }
                     ClusterViewMessage::WriteBenignRules() => {
                         let mut file_path = match Path::new(self.cluster_path).parent() {
                             Some(path) => match path.to_str() {
@@ -198,7 +100,7 @@ impl<'a> ClusterView<'a> {
                                 |view: &mut crate::views::ClusterSelectView| {
                                     Cluster::write_benign_rules_to_file(
                                         &file_path.as_str(),
-                                        &view.clusters,
+                                        &view.clusters.clusters,
                                     )
                                 },
                             )
@@ -269,4 +171,28 @@ fn delete_and_quit(s: &mut Cursive) {
     );
 }
 
-fn delete_old_events(s: &mut Cursive) {}
+fn delete_old_events(s: &mut Cursive) {
+    let mut path = cursive::view::ViewPath::new();
+    path.path = vec![0];
+    match s
+        .call_on_id(
+            "cluster_select",
+            |v: &mut ClusterSelectView| -> io::Result<()> {
+                let clusters = v.clusters.delete_old_events().map_err(|e| {
+                    io::Error::new(
+                        e.kind(),
+                        format!("An error occurred while deleting events: {}", e),
+                    )
+                })?;
+                write_clusters(&v.clusters_path, &clusters).map_err(|e| {
+                    io::Error::new(e.kind(), format!("Writing clusters failed: {}", e))
+                })?;
+                Ok(())
+            },
+        )
+        .unwrap()
+    {
+        Ok(_) => ClusterView::create_popup_window_then_quit(s, "Deleted successfully."),
+        Err(e) => ClusterView::create_popup_window_then_quit(s, &format!("{}", e)),
+    }
+}

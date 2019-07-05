@@ -2,12 +2,14 @@ use remake::classification::EventClassifier;
 use remake::event::{RawEventDatabase, RawEventRoTransaction};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Write};
-use std::path::Path;
 
 use crate::views::bin2str;
+use std::ops::{Index, IndexMut};
+use std::path::Path;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Cluster {
@@ -82,6 +84,8 @@ impl Cluster {
 
 pub(crate) struct ClusterSet {
     pub(crate) clusters: Vec<Cluster>,
+    cluster_ids: HashMap<usize, HashSet<u64>>,
+    raw_db: RawEventDatabase,
 }
 
 impl ClusterSet {
@@ -97,7 +101,7 @@ impl ClusterSet {
             .clustering
             .index()
             .iter()
-            .map(|(sig, id)| (id, sig))
+            .map(|(sig, id)| (*id, sig))
             .collect::<HashMap<_, _>>();
 
         let reader = BufReader::new(
@@ -109,22 +113,84 @@ impl ClusterSet {
                 io::Error::new(io::ErrorKind::InvalidData, format!("invalid model: {}", e))
             })?;
 
-        let raw = RawEventDatabase::new(raw.as_ref())
+        let raw_db = RawEventDatabase::new(raw.as_ref())
             .map_err(|e| io::Error::new(e.kind(), format!("cannot open event database: {}", e)))?;
-        let ro_txn = raw.begin_ro_txn().map_err(|e| {
+        let clusters = read_raw_events(&cluster_ids, &sigs, &raw_db)?;
+
+        Ok(ClusterSet {
+            clusters,
+            cluster_ids,
+            raw_db,
+        })
+    }
+
+    pub(crate) fn delete_old_events(&mut self) -> io::Result<HashMap<usize, HashSet<u64>>> {
+        let shrunk_clusters = remake::cluster::delete_old_events(&self.cluster_ids, 25);
+        let mut event_ids_to_keep =
+            shrunk_clusters
+                .iter()
+                .fold(Vec::<u64>::new(), |mut ids, (_, set)| {
+                    ids.extend(set.iter());
+                    ids
+                });
+        event_ids_to_keep.sort_unstable();
+        self.raw_db.shrink_to_fit(&event_ids_to_keep).map_err(|e| {
             io::Error::new(
                 e.kind(),
-                format!("cannot begin database transaction: {}", e),
+                format!("failed to delete events in database: {}", e),
             )
         })?;
-
-        let mut clusters = Vec::with_capacity(cluster_ids.len());
-        for (id, events) in cluster_ids {
-            let cluster = Cluster::with_examples(id, &events, sigs.get(&id).map(|e| *e), &ro_txn)?;
-            clusters.push(cluster);
-        }
-        clusters.sort_by(|a, b| b.size.cmp(&a.size));
-
-        Ok(ClusterSet { clusters })
+        Ok(shrunk_clusters)
     }
+
+    #[inline]
+    pub(crate) fn len(&self) -> usize {
+        self.clusters.len()
+    }
+}
+
+impl Index<usize> for ClusterSet {
+    type Output = Cluster;
+
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.clusters[i]
+    }
+}
+
+impl IndexMut<usize> for ClusterSet {
+    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
+        &mut self.clusters[i]
+    }
+}
+
+fn read_raw_events(
+    ids: &HashMap<usize, HashSet<u64>>,
+    sigs: &HashMap<usize, &Vec<u8>>,
+    db: &RawEventDatabase,
+) -> io::Result<Vec<Cluster>> {
+    let ro_txn = db.begin_ro_txn().map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("cannot begin database transaction: {}", e),
+        )
+    })?;
+
+    let mut clusters = Vec::with_capacity(ids.len());
+    for (id, events) in ids {
+        let cluster = Cluster::with_examples(*id, events, sigs.get(id).cloned(), &ro_txn)?;
+        clusters.push(cluster);
+    }
+    clusters.sort_by(|a, b| b.size.cmp(&a.size));
+    Ok(clusters)
+}
+
+pub(crate) fn write_clusters<P: AsRef<Path>>(
+    path: P,
+    clusters: &HashMap<usize, HashSet<u64>>,
+) -> io::Result<()> {
+    let file = fs::File::create(path)?;
+    if let Err(e) = clusters.serialize(&mut rmp_serde::Serializer::new(file)) {
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+    }
+    Ok(())
 }
