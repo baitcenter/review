@@ -1,7 +1,9 @@
 use remake::classification::EventClassifier;
+use remake::cluster::{Load, PacketPrefixClustering, PrefixClustering, PrefixClusteringAccess};
 use remake::event::{RawEventDatabase, RawEventRoTransaction};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -76,20 +78,19 @@ pub(crate) struct ClusterSet {
 }
 
 impl ClusterSet {
-    pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
-        let reader = BufReader::new(
-            File::open(model)
-                .map_err(|e| io::Error::new(e.kind(), format!("cannot open model: {}", e)))?,
-        );
-        let model: EventClassifier = rmp_serde::from_read(reader).map_err(|e| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("invalid model: {}", e))
-        })?;
-        let sigs = model
-            .clustering
-            .index()
-            .iter()
-            .map(|(sig, id)| (*id, sig))
-            .collect::<HashMap<_, _>>();
+    pub(crate) fn from_paths<P: AsRef<Path> + Display>(
+        model: P,
+        clusters: P,
+        raw: P,
+    ) -> io::Result<Self> {
+        let sigs = match EventClassifier::<PrefixClustering>::from_path(&model) {
+            Ok(model) => read_signatures(model),
+            Err(_) => EventClassifier::<PacketPrefixClustering>::from_path(&model)
+                .map(read_signatures)
+                .map_err(|e| {
+                    io::Error::new(io::ErrorKind::InvalidData, format!("invalid model: {}", e))
+                })?,
+        };
 
         let reader = BufReader::new(
             File::open(clusters)
@@ -102,7 +103,7 @@ impl ClusterSet {
 
         let raw_db = RawEventDatabase::new(raw.as_ref())
             .map_err(|e| io::Error::new(e.kind(), format!("cannot open event database: {}", e)))?;
-        let clusters = read_raw_events(&cluster_ids, &sigs, &raw_db)?;
+        let clusters = read_raw_events(&cluster_ids, sigs, &raw_db)?;
 
         Ok(ClusterSet {
             clusters,
@@ -163,9 +164,20 @@ impl IndexMut<usize> for ClusterSet {
     }
 }
 
+fn read_signatures<T: PrefixClusteringAccess>(
+    model: EventClassifier<T>,
+) -> HashMap<usize, Vec<u8>> {
+    model
+        .clustering
+        .raw_index()
+        .into_iter()
+        .map(|(sig, id)| (id, sig))
+        .collect::<HashMap<_, _>>()
+}
+
 fn read_raw_events(
     ids: &HashMap<usize, HashSet<u64>>,
-    sigs: &HashMap<usize, &Vec<u8>>,
+    sigs: HashMap<usize, Vec<u8>>,
     db: &RawEventDatabase,
 ) -> io::Result<Vec<Cluster>> {
     let ro_txn = db.begin_ro_txn().map_err(|e| {
@@ -177,7 +189,7 @@ fn read_raw_events(
 
     let mut clusters = Vec::with_capacity(ids.len());
     for (id, events) in ids {
-        let cluster = Cluster::with_examples(*id, events, sigs.get(id).cloned(), &ro_txn)?;
+        let cluster = Cluster::with_examples(*id, events, sigs.get(id), &ro_txn)?;
         clusters.push(cluster);
     }
     clusters.sort_by(|a, b| b.size.cmp(&a.size));

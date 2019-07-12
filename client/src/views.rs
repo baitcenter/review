@@ -4,6 +4,7 @@ use cursive::view::{SizeConstraint, ViewWrapper};
 use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView, TextView};
 use cursive::wrap_impl;
 
+use std::fmt::Display;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -14,7 +15,11 @@ pub(crate) struct MainView {
 }
 
 impl MainView {
-    pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
+    pub(crate) fn from_paths<P: AsRef<Path> + Display>(
+        model: P,
+        clusters: P,
+        raw: P,
+    ) -> io::Result<Self> {
         let cluster_select = ClusterSelectView::from_paths(model, clusters, raw)?;
         let quit_view = TextView::new("Press q to exit.".to_string());
         let save_view = TextView::new(
@@ -69,7 +74,11 @@ pub(crate) struct ClusterSelectView {
 }
 
 impl ClusterSelectView {
-    pub(crate) fn from_paths<P: AsRef<Path>>(model: P, clusters: P, raw: P) -> io::Result<Self> {
+    pub(crate) fn from_paths<P: AsRef<Path> + Display>(
+        model: P,
+        clusters: P,
+        raw: P,
+    ) -> io::Result<Self> {
         let clusters_path = clusters.as_ref().to_path_buf();
         let clusters = ClusterSet::from_paths(model, clusters, raw)?;
 
