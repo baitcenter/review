@@ -9,6 +9,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
     ca-certificates \
+    clang \
     g++ \
     libhyperscan-dev \
     librdkafka-dev \
