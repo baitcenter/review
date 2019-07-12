@@ -17,7 +17,7 @@ rust-latest:
       - target/
   before_script:
     - apt-get update -yqq
-    - apt-get install -yqq --no-install-recommends libhyperscan-dev
+    - apt-get install -yqq --no-install-recommends clang libhyperscan-dev
   script:
     - rustup component add rustfmt
     - cargo fmt -- --check
