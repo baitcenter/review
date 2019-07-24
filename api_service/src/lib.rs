@@ -12,7 +12,9 @@ use url::percent_encoding::percent_decode;
 mod error;
 use error::Error;
 
-const SELECT_ALL: db::SelectCluster = (true, true, true, true, true, true, true, true, true, true);
+const SELECT_ALL: db::SelectCluster = (
+    true, true, true, true, true, true, true, true, true, true, true,
+);
 
 #[derive(Clone)]
 pub struct ApiService {
@@ -662,58 +664,69 @@ impl ApiService {
             json.push_str("{");
             let mut j = String::new();
             if let Some(cluster_id) = &d.0 {
-                j.push_str(&format!(r#""cluster_id":{:?}"#, cluster_id));
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "cluster_id",
+                    cluster_id,
+                ));
             }
             if let Some(detector_id) = d.1 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","detector_id":{}"#, detector_id));
-                } else {
-                    j.push_str(&format!(r#""detector_id":{}"#, detector_id));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "detector_id",
+                    detector_id,
+                ));
             }
             if let Some(qualifier) = &d.2 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","qualifier":{:?}"#, qualifier));
-                } else {
-                    j.push_str(&format!(r#""qualifier":"{:?}"#, qualifier));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "qualifier",
+                    qualifier,
+                ));
             }
             if let Some(status) = &d.3 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","status":{:?}"#, status));
-                } else {
-                    j.push_str(&format!(r#""status":{:?}"#, status));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "status",
+                    status,
+                ));
             }
             if let Some(category) = &d.4 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","category":{:?}"#, category));
-                } else {
-                    j.push_str(&format!(r#""category":{:?}"#, category));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "category",
+                    category,
+                ));
             }
             if let Some(signature) = &d.5 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","signature":{:?}"#, signature));
-                } else {
-                    j.push_str(&format!(r#""signature":{:?}"#, signature));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "signature",
+                    signature,
+                ));
             }
             if let Some(data_source) = &d.6 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","data_source":{:?}"#, data_source));
-                } else {
-                    j.push_str(&format!(r#""data_source":{:?}"#, data_source));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "data_source",
+                    data_source,
+                ));
             }
             if let Some(size) = &d.7 {
-                if !j.is_empty() {
-                    j.push_str(&format!(r#","size":{}"#, size));
-                } else {
-                    j.push_str(&format!(r#""size":{}"#, size));
-                }
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "size",
+                    size,
+                ));
             }
-            if let Some(examples) = &d.8 {
+            if let Some(score) = &d.8 {
+                j.push_str(&ApiService::build_response_string(
+                    j.is_empty(),
+                    "score",
+                    score,
+                ));
+            }
+            if let Some(examples) = &d.9 {
                 match serde_json::to_string(&examples) {
                     Ok(e) => {
                         if !j.is_empty() {
@@ -731,7 +744,7 @@ impl ApiService {
                     }
                 }
             }
-            if let Some(last_modification_time) = &d.9 {
+            if let Some(last_modification_time) = &d.10 {
                 if !j.is_empty() {
                     j.push_str(&format!(
                         r#","last_modification_time":"{}""#,
@@ -758,6 +771,18 @@ impl ApiService {
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(json))
             .expect("builder with known status code must not fail")
+    }
+
+    fn build_response_string<T: std::fmt::Debug>(
+        is_first_property: bool,
+        property_name: &str,
+        property_value: T,
+    ) -> String {
+        if is_first_property {
+            format!(r#""{}":{:?}"#, property_name, property_value)
+        } else {
+            format!(r#","{}":{:?}"#, property_name, property_value)
+        }
     }
 
     fn bytes_to_string(bytes: &[u8]) -> String {
@@ -931,6 +956,7 @@ struct Select {
     signature: Option<bool>,
     data_source: Option<bool>,
     size: Option<bool>,
+    score: Option<bool>,
     examples: Option<bool>,
     last_modification_time: Option<bool>,
 }
@@ -946,6 +972,7 @@ impl Select {
             self.signature.unwrap_or_else(|| false),
             self.data_source.unwrap_or_else(|| false),
             self.size.unwrap_or_else(|| false),
+            self.score.unwrap_or_else(|| false),
             self.examples.unwrap_or_else(|| false),
             self.last_modification_time.unwrap_or_else(|| false),
         )

@@ -22,6 +22,7 @@ pub type ClusterResponse = (
     Option<String>,                // signature
     Option<String>,                // data_source
     Option<usize>,                 // size
+    Option<f64>,                   // score
     Option<Vec<Example>>,          // examples
     Option<chrono::NaiveDateTime>, // last_modification_time
 );
@@ -34,6 +35,7 @@ pub type SelectCluster = (
     bool, // signature
     bool, // data_source
     bool, // size
+    bool, // score
     bool, // examples
     bool, // last_modification_time
 );
@@ -111,6 +113,7 @@ impl DB {
                             Some(d.0.signature),
                             Some(d.0.data_source),
                             Some(cluster_size),
+                            Some(d.0.score),
                             examples,
                             d.0.last_modification_time,
                         )
@@ -199,7 +202,8 @@ impl DB {
                         } else {
                             None
                         };
-                        let examples = if select.8 {
+                        let score = if select.8 { Some(d.0.score) } else { None };
+                        let examples = if select.9 {
                             d.0.examples.and_then(|eg| {
                                 (rmp_serde::decode::from_slice(&eg)
                                     as Result<Vec<Example>, rmp_serde::decode::Error>)
@@ -208,7 +212,7 @@ impl DB {
                         } else {
                             None
                         };
-                        let time = if select.9 {
+                        let time = if select.10 {
                             d.0.last_modification_time
                         } else {
                             None
@@ -222,6 +226,7 @@ impl DB {
                             signature,
                             data_source,
                             cluster_size,
+                            score,
                             examples,
                             time,
                         )
