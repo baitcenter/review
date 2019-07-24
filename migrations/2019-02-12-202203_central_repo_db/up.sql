@@ -26,6 +26,7 @@ CREATE TABLE Clusters (
   rules TEXT,
   signature TEXT NOT NULL,
   size TEXT NOT NULL DEFAULT "1",
+  score REAL NOT NULL,
   data_source TEXT NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (cluster_id, detector_id, data_source) ON CONFLICT REPLACE,

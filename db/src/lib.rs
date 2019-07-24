@@ -683,6 +683,7 @@ impl DB {
                                     rules: Some(sig.clone()),
                                     signature: sig,
                                     size: cluster_size,
+                                    score: c.score,
                                     data_source: c.data_source.clone(),
                                     last_modification_time: Some(timestamp),
                                 }
@@ -712,6 +713,7 @@ impl DB {
                                     rules: Some(sig.clone()),
                                     signature: sig,
                                     size: cluster_size,
+                                    score: c.score,
                                     data_source: c.data_source.clone(),
                                     last_modification_time: None,
                                 }
@@ -774,6 +776,7 @@ impl DB {
                         rules: Some(sig.clone()),
                         signature: sig,
                         size: cluster_size,
+                        score: c.score,
                         data_source: c.data_source.to_string(),
                         last_modification_time: None,
                     }

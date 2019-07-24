@@ -28,6 +28,7 @@ table! {
         rules -> Nullable<Text>,
         signature -> Text,
         size -> Text,
+        score -> Double,
         data_source -> Text,
         last_modification_time -> Nullable<Timestamp>,
     }
