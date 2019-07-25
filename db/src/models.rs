@@ -42,7 +42,7 @@ pub struct ClustersTable {
     pub rules: Option<String>,
     pub signature: String,
     pub size: String,
-    pub score: f64,
+    pub score: Option<f64>,
     pub data_source: String,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
@@ -52,7 +52,7 @@ pub struct ClusterUpdate {
     pub cluster_id: String,
     pub detector_id: i32,
     pub signature: Option<String>,
-    pub score: f64,
+    pub score: Option<f64>,
     pub data_source: String,
     pub size: Option<usize>,
     pub examples: Option<Vec<Example>>,

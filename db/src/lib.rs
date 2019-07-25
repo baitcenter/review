@@ -113,7 +113,7 @@ impl DB {
                             Some(d.0.signature),
                             Some(d.0.data_source),
                             Some(cluster_size),
-                            Some(d.0.score),
+                            d.0.score,
                             examples,
                             d.0.last_modification_time,
                         )
@@ -202,7 +202,7 @@ impl DB {
                         } else {
                             None
                         };
-                        let score = if select.8 { Some(d.0.score) } else { None };
+                        let score = if select.8 { d.0.score } else { None };
                         let examples = if select.9 {
                             d.0.examples.and_then(|eg| {
                                 (rmp_serde::decode::from_slice(&eg)
