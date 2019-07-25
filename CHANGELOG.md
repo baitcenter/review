@@ -9,7 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.3] - 2019-07-24
 ### Added
 
-- A new filed called `score` is added to `Clusters` table to store score value. Note that database files created by an older version of REview are not compatible with this version.
+- A new field called `score` is added to `Clusters` table to store score value. Note that database files created by an older version of REview are not compatible with this version.
 
 ### Changed
 
