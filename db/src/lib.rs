@@ -160,7 +160,7 @@ impl DB {
         where_clause: Option<String>,
         limit: Option<i64>,
         select: SelectCluster,
-    ) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
+    ) -> impl Future<Item = (Vec<ClusterResponse>, bool), Error = Error> {
         let cluster = self
             .pool
             .get()
@@ -232,7 +232,7 @@ impl DB {
                         )
                     })
                     .collect();
-                Ok(clusters)
+                Ok((clusters, select.8))
             });
 
         future::result(cluster)

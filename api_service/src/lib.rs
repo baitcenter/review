@@ -80,7 +80,9 @@ impl ApiService {
                             None,
                             SELECT_ALL,
                         )
-                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                        .and_then(|(data, return_score)| {
+                            future::ok(ApiService::build_cluster_response(data, return_score))
+                        })
                         .map_err(Into::into);
                         return Box::new(result);
                     } else if let (Some(limit), 2) = (hash_query.get("limit"), hash_query.len()) {
@@ -91,7 +93,9 @@ impl ApiService {
                                 Some(limit as i64),
                                 SELECT_ALL,
                             )
-                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .and_then(|(data, return_score)| {
+                                future::ok(ApiService::build_cluster_response(data, return_score))
+                            })
                             .map_err(Into::into);
                             return Box::new(result);
                         }
@@ -106,7 +110,9 @@ impl ApiService {
                                 None,
                                 select,
                             )
-                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .and_then(|(data, return_score)| {
+                                future::ok(ApiService::build_cluster_response(data, return_score))
+                            })
                             .map_err(Into::into);
                             return Box::new(result);
                         } else {
@@ -129,7 +135,9 @@ impl ApiService {
                                 Some(limit as i64),
                                 select,
                             )
-                            .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                            .and_then(|(data, return_score)| {
+                                future::ok(ApiService::build_cluster_response(data, return_score))
+                            })
                             .map_err(Into::into);
                             return Box::new(result);
                         } else {
@@ -393,7 +401,7 @@ impl ApiService {
                 }
                 (&Method::GET, "/api/cluster") => {
                     let result = db::DB::get_cluster_table(&self.db)
-                        .and_then(|data| future::ok(ApiService::build_cluster_response(data)))
+                        .and_then(|data| future::ok(ApiService::build_cluster_response(data, true)))
                         .map_err(Into::into);
                     Box::new(result)
                 }
@@ -657,7 +665,10 @@ impl ApiService {
             .expect("builder with known status code must not fail")
     }
 
-    fn build_cluster_response(data: Vec<db::ClusterResponse>) -> Response<Body> {
+    fn build_cluster_response(
+        data: Vec<db::ClusterResponse>,
+        return_score: bool,
+    ) -> Response<Body> {
         let mut json = String::new();
         json.push_str("[");
         for (index, d) in data.iter().enumerate() {
@@ -719,12 +730,20 @@ impl ApiService {
                     size,
                 ));
             }
-            if let Some(score) = &d.8 {
-                j.push_str(&ApiService::build_response_string(
-                    j.is_empty(),
-                    "score",
-                    score,
-                ));
+            if return_score {
+                if let Some(score) = d.8 {
+                    j.push_str(&ApiService::build_response_string(
+                        j.is_empty(),
+                        "score",
+                        score,
+                    ));
+                } else {
+                    j.push_str(&ApiService::build_response_string(
+                        j.is_empty(),
+                        "score",
+                        "-",
+                    ));
+                }
             }
             if let Some(examples) = &d.9 {
                 match serde_json::to_string(&examples) {
