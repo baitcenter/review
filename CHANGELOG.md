@@ -94,7 +94,8 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
-[Unreleased]: https://gitlab.com/resolutions/review/compare/0.4.2...master
+[Unreleased]: https://gitlab.com/resolutions/review/compare/0.5.0...master
+[0.5.0]: https://gitlab.com/resolutions/review/compare/0.4.2...0.5.0
 [0.4.2]: https://gitlab.com/resolutions/review/compare/0.4.1...0.4.2
 [0.4.1]: https://gitlab.com/resolutions/review/compare/0.4.0...0.4.1
 [0.4.0]: https://gitlab.com/resolutions/review/compare/0.3.9...0.4.0
