@@ -1,6 +1,7 @@
 fn main() {
+    env_logger::init();
     if let Err(e) = review::app::init() {
-        eprintln!("{}", e);
+        review::log_error(&e);
         std::process::exit(1);
     }
 }
