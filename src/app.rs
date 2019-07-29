@@ -75,7 +75,9 @@ pub fn init() -> Result<(), Error> {
     let matches = create_app().get_matches();
     if let Some(review_matches) = matches.subcommand_matches("client") {
         if let Some(url) = review_matches.value_of("url") {
-            validate_url(url);
+            validate_url(url)?;
+            // TODO: After REview http client mode gets updated,
+            //       modify the error handing here to use context()
             let cluster_view = client::http::ClusterView::new(&url);
             match cluster_view {
                 Ok(mut cluster_view) => cluster_view.run(),
@@ -94,23 +96,18 @@ pub fn init() -> Result<(), Error> {
     } else if matches.subcommand_matches("reviewd").is_some() {
         dotenv::dotenv().ok();
         let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is not set.");
-        if fs::metadata(&database_url).is_err() {
-            if fs::metadata("/central_repo.db").is_ok() {
-                if fs::copy("/central_repo.db", &database_url).is_err() {
-                    eprintln!(
-                        "cannot find the database file: {} and failed to initialize database",
-                        database_url
-                    );
-                    std::process::exit(1);
-                }
-            } else {
-                eprintln!("cannot find the database file: {}", database_url);
-                std::process::exit(1);
-            }
-        }
         let reviewd_addr = std::env::var("REVIEWD_ADDR").expect("REVIEWD_ADDR is not set");
         let etcd_addr = std::env::var("ETCD_ADDR").expect("ETCD_ADDR is not set");
         let docker_host_ip = std::env::var("DOCKER_HOST_IP").expect("DOCKER_HOST_IP is not set");
+
+        if fs::metadata(&database_url).is_err() {
+            fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
+                InitializeErrorReason::DatabaseFileNotFound,
+            ))?;
+            fs::copy("/central_repo.db", &database_url).context(ErrorKind::Initialize(
+                InitializeErrorReason::DatabaseInitialization,
+            ))?;
+        }
         let docker_host_addr = format!("{}:8080", docker_host_ip);
 
         let new_service = move || {
@@ -120,7 +117,7 @@ pub fn init() -> Result<(), Error> {
                 docker_host_addr.as_str(),
                 etcd_url.as_str(),
             )
-            .map_err(|e| panic!("Initialization fails: {}", e))
+            .map_err(|e| panic!("Reviewd initialization fails: {}", e))
             .and_then(|srv| {
                 service_fn(move |req| {
                     api_service::ApiService::request_handler(srv.clone(), req)
@@ -129,37 +126,28 @@ pub fn init() -> Result<(), Error> {
             });
             Box::new(api_service)
         };
-        if let Ok(reviewd_addr) = reviewd_addr.parse() {
-            let server = Server::bind(&reviewd_addr)
-                .serve(new_service)
-                .map_err(|e| panic!("Failed to build server: {}", e));
+        let reviewd_addr = reviewd_addr
+            .parse::<std::net::SocketAddr>()
+            .context(ErrorKind::Initialize(InitializeErrorReason::REviewdUrl))?;
+        let server = Server::bind(&reviewd_addr)
+            .serve(new_service)
+            .map_err(|e| panic!("Failed to build server: {}", e));
 
-            hyper::rt::run(server);
-        } else {
-            eprintln!("IP address and/or port number for reviewd is bad/illegal format.");
-            std::process::exit(1);
-        }
+        hyper::rt::run(server);
     }
 
     Ok(())
 }
 
-fn validate_url(url: &str) {
-    if let Ok(url) = url::Url::parse(url) {
-        match url.path_segments() {
-            Some(mut path_segments) => {
-                if path_segments.next() != Some("") {
-                    eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-                    std::process::exit(1);
-                }
-            }
-            None => {
-                eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-        std::process::exit(1);
+fn validate_url(url: &str) -> Result<(), Error> {
+    let url =
+        url::Url::parse(url).context(ErrorKind::Initialize(InitializeErrorReason::ClientUrl))?;
+
+    if url.scheme() != "http" || url.path() != "/" || url.port().is_none() {
+        return Err(Error::from(ErrorKind::Initialize(
+            InitializeErrorReason::ClientUrl,
+        )));
     }
+
+    Ok(())
 }
