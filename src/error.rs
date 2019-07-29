@@ -61,7 +61,6 @@ pub enum InitializeErrorReason {
     DatabaseInitialization,
     REviewd,
     REviewdUrl,
-    Other,
 }
 
 impl Display for InitializeErrorReason {
@@ -86,7 +85,6 @@ impl Display for InitializeErrorReason {
                 f,
                 "IP address and/or port number for reviewd is bad/illegal format"
             ),
-            InitializeErrorReason::Other => write!(f, "An error occurred"),
         }
     }
 }
