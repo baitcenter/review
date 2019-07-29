@@ -1,31 +1,14 @@
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
+use failure::ResultExt;
 use futures::prelude::*;
 use hyper::service::service_fn;
 use hyper::Server;
 use std::fs;
 
-fn validate_url(url: &str) {
-    if let Ok(url) = url::Url::parse(url) {
-        match url.path_segments() {
-            Some(mut path_segments) => {
-                if path_segments.next() != Some("") {
-                    eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-                    std::process::exit(1);
-                }
-            }
-            None => {
-                eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
-        std::process::exit(1);
-    }
-}
+use crate::error::{Error, ErrorKind, InitializeErrorReason};
 
-pub fn init() {
-    let matches = App::new("REview")
+fn create_app() -> App<'static, 'static> {
+    App::new("REview")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Petabi, Inc.")
         .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -86,8 +69,10 @@ pub fn init() {
                 ),
         )
         .subcommand(SubCommand::with_name("reviewd").about("Runs REviewd (http server mode)"))
-        .get_matches();
+}
 
+pub fn init() -> Result<(), Error> {
+    let matches = create_app().get_matches();
     if let Some(review_matches) = matches.subcommand_matches("client") {
         if let Some(url) = review_matches.value_of("url") {
             validate_url(url);
@@ -102,14 +87,9 @@ pub fn init() {
         } else if let Some(cluster) = review_matches.value_of("cluster") {
             let model = review_matches.value_of("model").unwrap();
             let raw = review_matches.value_of("raw").unwrap();
-            let cluster_view = client::file::ClusterView::new(cluster, model, raw);
-            match cluster_view {
-                Ok(mut cluster_view) => cluster_view.run_feedback_mode(),
-                Err(e) => {
-                    eprintln!("Failed to create a cluster_view: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            let mut cluster_view = client::file::ClusterView::new(cluster, model, raw)
+                .context(ErrorKind::Initialize(InitializeErrorReason::ClientMode))?;
+            cluster_view.run_feedback_mode();
         }
     } else if matches.subcommand_matches("reviewd").is_some() {
         dotenv::dotenv().ok();
@@ -159,5 +139,27 @@ pub fn init() {
             eprintln!("IP address and/or port number for reviewd is bad/illegal format.");
             std::process::exit(1);
         }
+    }
+
+    Ok(())
+}
+
+fn validate_url(url: &str) {
+    if let Ok(url) = url::Url::parse(url) {
+        match url.path_segments() {
+            Some(mut path_segments) => {
+                if path_segments.next() != Some("") {
+                    eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
+                    std::process::exit(1);
+                }
+            }
+            None => {
+                eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        eprintln!("Wrong url format. Please specify a url in the following format: http://<hostname>:<port number>");
+        std::process::exit(1);
     }
 }

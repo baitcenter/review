@@ -13,6 +13,7 @@ api_service = { path = "./api_service" }
 clap = "2"
 client = { path = "./client" }
 dotenv = "0.13"
+failure = "0.1"
 futures = "0.1"
 hyper = "0.12"
 percent-encoding = "1"
