@@ -75,7 +75,16 @@ pub fn init() -> Result<(), Error> {
     let matches = create_app().get_matches();
     if let Some(review_matches) = matches.subcommand_matches("client") {
         if let Some(url) = review_matches.value_of("url") {
-            validate_url(url)?;
+            let parsed_url = url::Url::parse(url)
+                .context(ErrorKind::Initialize(InitializeErrorReason::ClientUrl))?;
+            if parsed_url.scheme() != "http"
+                || parsed_url.path() != "/"
+                || parsed_url.port().is_none()
+            {
+                return Err(Error::from(ErrorKind::Initialize(
+                    InitializeErrorReason::ClientUrl,
+                )));
+            }
             // TODO: After REview http client mode gets updated,
             //       modify the error handing here to use context()
             let cluster_view = client::http::ClusterView::new(&url);
@@ -134,19 +143,6 @@ pub fn init() -> Result<(), Error> {
             .map_err(|e| panic!("Failed to build server: {}", e));
 
         hyper::rt::run(server);
-    }
-
-    Ok(())
-}
-
-fn validate_url(url: &str) -> Result<(), Error> {
-    let url =
-        url::Url::parse(url).context(ErrorKind::Initialize(InitializeErrorReason::ClientUrl))?;
-
-    if url.scheme() != "http" || url.path() != "/" || url.port().is_none() {
-        return Err(Error::from(ErrorKind::Initialize(
-            InitializeErrorReason::ClientUrl,
-        )));
     }
 
     Ok(())
