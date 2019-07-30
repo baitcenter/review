@@ -1,12 +1,12 @@
 use failure::Fail;
-use log::{log, Level};
+use log::error;
 
 pub mod app;
 mod error;
 
 pub fn log_error(fail: &Fail) {
-    log!(Level::Error, "{}", fail);
+    error!("{}", fail);
     for cause in fail.iter_causes() {
-        log!(Level::Error, "\tcaused by: {}", cause);
+        error!("\tcaused by: {}", cause);
     }
 }
