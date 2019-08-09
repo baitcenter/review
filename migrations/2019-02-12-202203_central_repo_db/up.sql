@@ -66,7 +66,7 @@ INSERT INTO Priority VALUES(3,'high');
 
 CREATE TABLE RawEvent (
   event_id TEXT NOT NULL,
-  raw_event TEXT NOT NULL,
+  raw_event BLOB NOT NULL,
   data_source TEXT NOT NULL,
   UNIQUE (event_id, data_source) ON CONFLICT REPLACE
 );

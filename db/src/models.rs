@@ -124,7 +124,7 @@ pub struct QualifierTable {
 #[table_name = "RawEvent"]
 pub struct RawEventTable {
     pub event_id: String,
-    pub raw_event: String,
+    pub raw_event: Vec<u8>,
     pub data_source: String,
 }
 

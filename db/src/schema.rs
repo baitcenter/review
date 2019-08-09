@@ -61,7 +61,7 @@ table! {
 table! {
     RawEvent (event_id) {
         event_id -> Text,
-        raw_event -> Text,
+        raw_event -> Binary,
         data_source -> Text,
     }
 }
