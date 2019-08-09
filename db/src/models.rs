@@ -120,6 +120,14 @@ pub struct QualifierTable {
     pub qualifier: String,
 }
 
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[table_name = "RawEvent"]
+pub struct RawEventTable {
+    pub event_id: String,
+    pub raw_event: String,
+    pub data_source: String,
+}
+
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Status"]
 #[primary_key(status_id)]

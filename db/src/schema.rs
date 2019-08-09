@@ -59,6 +59,14 @@ table! {
 }
 
 table! {
+    RawEvent (event_id) {
+        event_id -> Text,
+        raw_event -> Text,
+        data_source -> Text,
+    }
+}
+
+table! {
     Status (status_id) {
         status_id -> Nullable<Integer>,
         status -> Text,
@@ -71,5 +79,5 @@ joinable!(Clusters -> Qualifier (qualifier_id));
 joinable!(Clusters -> Status (status_id));
 
 allow_tables_to_appear_in_same_query!(
-    Action, Category, Clusters, Outliers, Priority, Qualifier, Status,
+    Action, Category, Clusters, Outliers, Priority, Qualifier, RawEvent, Status,
 );

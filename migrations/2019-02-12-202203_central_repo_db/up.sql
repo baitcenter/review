@@ -64,6 +64,13 @@ INSERT INTO Priority VALUES(1,'low');
 INSERT INTO Priority VALUES(2,'mid');
 INSERT INTO Priority VALUES(3,'high');
 
+CREATE TABLE RawEvent (
+  event_id TEXT NOT NULL,
+  raw_event TEXT NOT NULL,
+  data_source TEXT NOT NULL,
+  UNIQUE (event_id, data_source) ON CONFLICT REPLACE
+);
+
 -- Status is the current system status of the cluster. --
 -- Changes in status may warrant publication, or republication --
 -- of a rule. It also offers a means to turn on or off --
