@@ -640,11 +640,12 @@ impl DB {
                 .and_then(|cluster_list| {
                     let replace_clusters: Vec<ClustersTable> = cluster_update
                         .iter()
-                        .map(|c| {
+                        .filter_map(|c| {
                             if let Some(cluster) = cluster_list
                                 .iter()
                                 .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
                             {
+                                c.examples.as_ref()?;
                                 let now = chrono::Utc::now();
                                 let timestamp =
                                     chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
@@ -675,7 +676,7 @@ impl DB {
                                     }
                                     None => cluster.size.clone(),
                                 };
-                                ClustersTable {
+                                Some(ClustersTable {
                                     id: None,
                                     cluster_id: Some(c.cluster_id.clone()),
                                     description: None,
@@ -691,7 +692,7 @@ impl DB {
                                     score: c.score,
                                     data_source: c.data_source.clone(),
                                     last_modification_time: Some(timestamp),
-                                }
+                                })
                             } else {
                                 let example = match &c.examples {
                                     Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
@@ -705,7 +706,7 @@ impl DB {
                                     Some(cluster_size) => cluster_size.to_string(),
                                     None => "1".to_string(),
                                 };
-                                ClustersTable {
+                                Some(ClustersTable {
                                     id: None,
                                     cluster_id: Some(c.cluster_id.clone()),
                                     description: None,
@@ -721,7 +722,7 @@ impl DB {
                                     score: c.score,
                                     data_source: c.data_source.clone(),
                                     last_modification_time: None,
-                                }
+                                })
                             }
                         })
                         .collect();
@@ -732,9 +733,7 @@ impl DB {
                             .execute(&*conn)
                             .map_err(Into::into)
                     } else {
-                        Err(Error::from(ErrorKind::DatabaseTransactionError(
-                            DatabaseError::Other,
-                        )))
+                        Ok(0)
                     }
                 })
         });
