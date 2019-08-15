@@ -29,7 +29,7 @@ impl ApiService {
         database_url: &str,
         docker_host_addr: &str,
         etcd_url: &str,
-    ) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
+    ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
         let docker_host_addr = docker_host_addr.to_string();
         let etcd_url = etcd_url.to_string();
         let reviewd_url = database_url.to_string();
@@ -51,7 +51,7 @@ impl ApiService {
     pub fn request_handler(
         self,
         req: Request<Body>,
-    ) -> Box<Future<Item = Response<Body>, Error = Error> + Send + 'static> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = Error> + Send + 'static> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
                 (&Method::GET, "/api/cluster/search") => {
@@ -554,7 +554,7 @@ impl ApiService {
 
     pub fn api_error_handler(
         res_body: Result<Response<Body>, Error>,
-    ) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send + 'static> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send + 'static> {
         match res_body {
             Ok(res) => Box::new(future::ok(res)),
             Err(err) => {

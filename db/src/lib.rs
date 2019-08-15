@@ -46,7 +46,7 @@ pub struct DB {
 }
 
 impl DB {
-    pub fn new(database_url: &str) -> Box<Future<Item = Self, Error = Error> + Send + 'static> {
+    pub fn new(database_url: &str) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
         let manager = ConnectionManager::<SqliteConnection>::new(database_url);
         let db = Pool::new(manager)
             .map(|pool| Self { pool })

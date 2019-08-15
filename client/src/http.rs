@@ -52,7 +52,7 @@ pub struct ClusterView<'a> {
 }
 
 impl<'a> ClusterView<'a> {
-    pub fn new(url: &str) -> Result<ClusterView, Box<Error>> {
+    pub fn new(url: &str) -> Result<ClusterView, Box<dyn Error>> {
         let (cluster_view_tx, cluster_view_rx) = mpsc::channel::<ClusterViewMessage>();
 
         let url = url.trim_end_matches('/');
