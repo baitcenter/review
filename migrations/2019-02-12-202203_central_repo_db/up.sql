@@ -47,10 +47,11 @@ CREATE TABLE DataSource (
 CREATE TABLE Outliers (
   outlier_id INTEGER PRIMARY KEY,
   outlier_raw_event BLOB NOT NULL,
-  outlier_data_source TEXT NOT NULL,
+  data_source_id TEXT NOT NULL,
   outlier_event_ids BLOB,
   outlier_size TEXT,
-  UNIQUE (outlier_raw_event, outlier_data_source) ON CONFLICT REPLACE
+  UNIQUE (outlier_raw_event, data_source_id) ON CONFLICT REPLACE,
+  FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE
 );
 
 -- Qualifier is the qualification of a cluster (i.e. good or bad). --

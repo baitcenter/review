@@ -93,12 +93,13 @@ impl PartialEq for Example {
     }
 }
 
-#[derive(Debug, Insertable, AsChangeset, Queryable, Serialize)]
+#[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
 #[table_name = "Outliers"]
+#[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 pub struct OutliersTable {
     pub outlier_id: Option<i32>,
     pub outlier_raw_event: Vec<u8>,
-    pub outlier_data_source: String,
+    pub data_source_id: i32,
     pub outlier_event_ids: Option<Vec<u8>>,
     pub outlier_size: Option<String>,
 }
@@ -107,6 +108,7 @@ pub struct OutliersTable {
 pub struct OutlierUpdate {
     pub outlier: Vec<u8>,
     pub data_source: String,
+    pub data_source_type: String,
     pub event_ids: Vec<u64>,
 }
 

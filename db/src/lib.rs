@@ -168,10 +168,13 @@ impl DB {
         future::result(status_table)
     }
 
-    pub fn get_outliers_table(&self) -> impl Future<Item = Vec<OutliersTable>, Error = Error> {
+    pub fn get_outliers_table(
+        &self,
+    ) -> impl Future<Item = Vec<(OutliersTable, DataSourceTable)>, Error = Error> {
         let outliers_table = self.pool.get().map_err(Into::into).and_then(|conn| {
             schema::Outliers::dsl::Outliers
-                .load::<OutliersTable>(&conn)
+                .inner_join(schema::DataSource::dsl::DataSource)
+                .load::<(OutliersTable, DataSourceTable)>(&conn)
                 .map_err(Into::into)
         });
 
@@ -264,13 +267,20 @@ impl DB {
     pub fn execute_select_outlier_query(
         &self,
         data_source: &str,
-    ) -> impl Future<Item = Vec<OutliersTable>, Error = Error> {
-        use schema::Outliers::dsl::*;
+    ) -> impl Future<Item = Vec<(OutliersTable, DataSourceTable)>, Error = Error> {
+        use schema::Outliers::dsl;
         let result = self.pool.get().map_err(Into::into).and_then(|conn| {
-            Outliers
-                .filter(outlier_data_source.eq(data_source))
-                .load::<OutliersTable>(&conn)
-                .map_err(Into::into)
+            if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
+                dsl::Outliers
+                    .inner_join(schema::DataSource::dsl::DataSource)
+                    .filter(dsl::data_source_id.eq(data_source_id))
+                    .load::<(OutliersTable, DataSourceTable)>(&conn)
+                    .map_err(Into::into)
+            } else {
+                Err(Error::from(ErrorKind::DatabaseTransactionError(
+                    DatabaseError::RecordNotExist,
+                )))
+            }
         });
 
         future::result(result)
@@ -283,15 +293,21 @@ impl DB {
         let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
             let insert_outliers: Vec<OutliersTable> = new_outliers
                 .iter()
-                .map(|new_outlier| {
+                .filter_map(|new_outlier| {
                     let o_size = Some(new_outlier.event_ids.len().to_string());
                     let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
-                    OutliersTable {
-                        outlier_id: None,
-                        outlier_raw_event: new_outlier.outlier.to_vec(),
-                        outlier_data_source: new_outlier.data_source.to_string(),
-                        outlier_event_ids: event_ids,
-                        outlier_size: o_size,
+                    if let Ok(data_source_id) =
+                        DB::get_data_source_id(self, &new_outlier.data_source)
+                    {
+                        Some(OutliersTable {
+                            outlier_id: None,
+                            outlier_raw_event: new_outlier.outlier.to_vec(),
+                            data_source_id,
+                            outlier_event_ids: event_ids,
+                            outlier_size: o_size,
+                        })
+                    } else {
+                        None
                     }
                 })
                 .collect();
@@ -314,14 +330,16 @@ impl DB {
         &self,
         outlier_update: &[OutlierUpdate],
     ) -> impl Future<Item = usize, Error = Error> {
-        use schema::Outliers::dsl::*;
-        let mut query = Outliers.into_boxed();
+        use schema::Outliers::dsl;
+        let mut query = dsl::Outliers.into_boxed();
         for outlier in outlier_update.iter() {
-            query = query.or_filter(
-                outlier_raw_event
-                    .eq(&outlier.outlier)
-                    .and(outlier_data_source.eq(&outlier.data_source)),
-            );
+            if let Ok(data_source_id) = DB::get_data_source_id(self, &outlier.data_source) {
+                query = query.or_filter(
+                    dsl::outlier_raw_event
+                        .eq(&outlier.outlier)
+                        .and(dsl::data_source_id.eq(data_source_id)),
+                );
+            }
         }
         let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
             query
@@ -330,7 +348,7 @@ impl DB {
                 .and_then(|outlier_list| {
                     let replace_outliers: Vec<OutliersTable> = outlier_update
                         .iter()
-                        .map(|o| {
+                        .filter_map(|o| {
                             if let Some(outlier) = outlier_list
                                 .iter()
                                 .find(|outlier| o.outlier == outlier.outlier_raw_event)
@@ -373,12 +391,18 @@ impl DB {
                                     &event_ids
                                 };
                                 let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
-                                OutliersTable {
-                                    outlier_id: None,
-                                    outlier_raw_event: o.outlier.clone(),
-                                    outlier_data_source: o.data_source.clone(),
-                                    outlier_event_ids: event_ids,
-                                    outlier_size: Some(o_size),
+                                let data_source_id = DB::get_data_source_id(self, &o.data_source)
+                                    .unwrap_or_default();
+                                if data_source_id != 0 {
+                                    Some(OutliersTable {
+                                        outlier_id: None,
+                                        outlier_raw_event: o.outlier.clone(),
+                                        data_source_id,
+                                        outlier_event_ids: event_ids,
+                                        outlier_size: Some(o_size),
+                                    })
+                                } else {
+                                    None
                                 }
                             } else {
                                 // only store most recent 100 event_ids per outlier
@@ -393,19 +417,31 @@ impl DB {
                                 };
                                 let size = o.event_ids.len();
                                 let event_ids = rmp_serde::encode::to_vec(event_ids).ok();
-                                OutliersTable {
-                                    outlier_id: None,
-                                    outlier_raw_event: o.outlier.clone(),
-                                    outlier_data_source: o.data_source.clone(),
-                                    outlier_event_ids: event_ids,
-                                    outlier_size: Some(size.to_string()),
+                                let data_source_id = DB::get_data_source_id(self, &o.data_source)
+                                    .unwrap_or_else(|_| {
+                                        DB::add_data_source(
+                                            self,
+                                            &o.data_source,
+                                            &o.data_source_type,
+                                        )
+                                    });
+                                if data_source_id != 0 {
+                                    Some(OutliersTable {
+                                        outlier_id: None,
+                                        outlier_raw_event: o.outlier.clone(),
+                                        data_source_id,
+                                        outlier_event_ids: event_ids,
+                                        outlier_size: Some(size.to_string()),
+                                    })
+                                } else {
+                                    None
                                 }
                             }
                         })
                         .collect();
 
                     if !replace_outliers.is_empty() {
-                        diesel::replace_into(Outliers)
+                        diesel::replace_into(dsl::Outliers)
                             .values(&replace_outliers)
                             .execute(&*conn)
                             .map_err(Into::into)

@@ -808,7 +808,9 @@ impl ApiService {
         bytes.iter().map(|b| char::from(*b)).collect()
     }
 
-    fn process_outliers(data: Vec<db::models::OutliersTable>) -> Response<Body> {
+    fn process_outliers(
+        data: Vec<(db::models::OutliersTable, db::models::DataSourceTable)>,
+    ) -> Response<Body> {
         #[derive(Debug, Serialize)]
         struct Outliers {
             outlier: String,
@@ -818,17 +820,19 @@ impl ApiService {
         }
         let mut outliers: Vec<Outliers> = Vec::new();
         for d in data {
-            let event_ids = d.outlier_event_ids.map_or(Vec::<u64>::new(), |event_ids| {
-                (rmp_serde::decode::from_slice(&event_ids)
-                    as Result<Vec<u64>, rmp_serde::decode::Error>)
-                    .unwrap_or_default()
-            });
-            let size = d
-                .outlier_size
-                .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
+            let event_ids =
+                d.0.outlier_event_ids
+                    .map_or(Vec::<u64>::new(), |event_ids| {
+                        (rmp_serde::decode::from_slice(&event_ids)
+                            as Result<Vec<u64>, rmp_serde::decode::Error>)
+                            .unwrap_or_default()
+                    });
+            let size =
+                d.0.outlier_size
+                    .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
             outliers.push(Outliers {
-                outlier: ApiService::bytes_to_string(&d.outlier_raw_event),
-                data_source: d.outlier_data_source,
+                outlier: ApiService::bytes_to_string(&d.0.outlier_raw_event),
+                data_source: d.1.topic_name,
                 size,
                 event_ids,
             });

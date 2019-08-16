@@ -46,7 +46,7 @@ table! {
     Outliers (outlier_id) {
         outlier_id -> Nullable<Integer>,
         outlier_raw_event -> Binary,
-        outlier_data_source -> Text,
+        data_source_id -> Integer,
         outlier_event_ids -> Nullable<Binary>,
         outlier_size -> Nullable<Text>,
     }
@@ -86,6 +86,7 @@ joinable!(Clusters -> Priority (priority_id));
 joinable!(Clusters -> Qualifier (qualifier_id));
 joinable!(Clusters -> Status (status_id));
 joinable!(Clusters -> DataSource (data_source_id));
+joinable!(Outliers -> DataSource (data_source_id));
 
 allow_tables_to_appear_in_same_query!(
     Action, Category, Clusters, DataSource, Outliers, Priority, Qualifier, RawEvent, Status,
