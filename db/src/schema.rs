@@ -43,12 +43,12 @@ table! {
 }
 
 table! {
-    Outliers (outlier_id) {
-        outlier_id -> Nullable<Integer>,
-        outlier_raw_event -> Binary,
+    Outliers (id) {
+        id -> Nullable<Integer>,
+        raw_event -> Binary,
         data_source_id -> Integer,
-        outlier_event_ids -> Nullable<Binary>,
-        outlier_size -> Nullable<Text>,
+        event_ids -> Nullable<Binary>,
+        size -> Nullable<Text>,
     }
 }
 

@@ -300,11 +300,11 @@ impl DB {
                         DB::get_data_source_id(self, &new_outlier.data_source)
                     {
                         Some(OutliersTable {
-                            outlier_id: None,
-                            outlier_raw_event: new_outlier.outlier.to_vec(),
+                            id: None,
+                            raw_event: new_outlier.outlier.to_vec(),
                             data_source_id,
-                            outlier_event_ids: event_ids,
-                            outlier_size: o_size,
+                            event_ids,
+                            size: o_size,
                         })
                     } else {
                         None
@@ -335,7 +335,7 @@ impl DB {
         for outlier in outlier_update.iter() {
             if let Ok(data_source_id) = DB::get_data_source_id(self, &outlier.data_source) {
                 query = query.or_filter(
-                    dsl::outlier_raw_event
+                    dsl::raw_event
                         .eq(&outlier.outlier)
                         .and(dsl::data_source_id.eq(data_source_id)),
                 );
@@ -351,10 +351,10 @@ impl DB {
                         .filter_map(|o| {
                             if let Some(outlier) = outlier_list
                                 .iter()
-                                .find(|outlier| o.outlier == outlier.outlier_raw_event)
+                                .find(|outlier| o.outlier == outlier.raw_event)
                             {
                                 let new_size = o.event_ids.len();
-                                let o_size = match &outlier.outlier_size {
+                                let o_size = match &outlier.size {
                                     Some(current_size) => {
                                         if let Ok(current_size) = current_size.parse::<usize>() {
                                             // check if sum of new_size and current_size exceeds max_value
@@ -370,7 +370,7 @@ impl DB {
                                     }
                                     None => new_size.to_string(),
                                 };
-                                let mut event_ids = match &outlier.outlier_event_ids {
+                                let mut event_ids = match &outlier.event_ids {
                                     Some(event_ids) => {
                                         match rmp_serde::decode::from_slice(&event_ids)
                                             as Result<Vec<u64>, rmp_serde::decode::Error>
@@ -395,11 +395,11 @@ impl DB {
                                     .unwrap_or_default();
                                 if data_source_id != 0 {
                                     Some(OutliersTable {
-                                        outlier_id: None,
-                                        outlier_raw_event: o.outlier.clone(),
+                                        id: None,
+                                        raw_event: o.outlier.clone(),
                                         data_source_id,
-                                        outlier_event_ids: event_ids,
-                                        outlier_size: Some(o_size),
+                                        event_ids,
+                                        size: Some(o_size),
                                     })
                                 } else {
                                     None
@@ -427,11 +427,11 @@ impl DB {
                                     });
                                 if data_source_id != 0 {
                                     Some(OutliersTable {
-                                        outlier_id: None,
-                                        outlier_raw_event: o.outlier.clone(),
+                                        id: None,
+                                        raw_event: o.outlier.clone(),
                                         data_source_id,
-                                        outlier_event_ids: event_ids,
-                                        outlier_size: Some(size.to_string()),
+                                        event_ids,
+                                        size: Some(size.to_string()),
                                     })
                                 } else {
                                     None

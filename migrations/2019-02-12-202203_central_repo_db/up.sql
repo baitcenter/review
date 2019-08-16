@@ -45,12 +45,12 @@ CREATE TABLE DataSource (
 );
 
 CREATE TABLE Outliers (
-  outlier_id INTEGER PRIMARY KEY,
-  outlier_raw_event BLOB NOT NULL,
+  id INTEGER PRIMARY KEY,
+  raw_event BLOB NOT NULL,
   data_source_id TEXT NOT NULL,
-  outlier_event_ids BLOB,
-  outlier_size TEXT,
-  UNIQUE (outlier_raw_event, data_source_id) ON CONFLICT REPLACE,
+  event_ids BLOB,
+  size TEXT,
+  UNIQUE (raw_event, data_source_id) ON CONFLICT REPLACE,
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE
 );
 

@@ -97,11 +97,11 @@ impl PartialEq for Example {
 #[table_name = "Outliers"]
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 pub struct OutliersTable {
-    pub outlier_id: Option<i32>,
-    pub outlier_raw_event: Vec<u8>,
+    pub id: Option<i32>,
+    pub raw_event: Vec<u8>,
     pub data_source_id: i32,
-    pub outlier_event_ids: Option<Vec<u8>>,
-    pub outlier_size: Option<String>,
+    pub event_ids: Option<Vec<u8>>,
+    pub size: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
