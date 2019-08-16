@@ -27,13 +27,21 @@ CREATE TABLE Clusters (
   signature TEXT NOT NULL,
   size TEXT NOT NULL DEFAULT "1",
   score REAL,
-  data_source TEXT NOT NULL,
+  data_source_id INTEGER NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (cluster_id, detector_id, data_source) ON CONFLICT REPLACE,
+  UNIQUE (cluster_id, data_source_id) ON CONFLICT REPLACE,
   FOREIGN KEY(category_id) REFERENCES Category(category_id) ON UPDATE CASCADE,
+  FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE,
   FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
   FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
   FOREIGN KEY(status_id) REFERENCES Status(status_id) ON UPDATE CASCADE
+);
+
+CREATE TABLE DataSource (
+  data_source_id INTEGER NOT NULL PRIMARY KEY, 
+  topic_name TEXT NOT NULL,
+  data_type TEXT NOT NULL,
+  UNIQUE (topic_name, data_type) ON CONFLICT REPLACE
 );
 
 CREATE TABLE Outliers (
@@ -68,6 +76,7 @@ CREATE TABLE RawEvent (
   event_id TEXT NOT NULL,
   raw_event BLOB NOT NULL,
   data_source TEXT NOT NULL,
+  PRIMARY KEY (event_id, data_source),
   UNIQUE (event_id, data_source) ON CONFLICT REPLACE
 );
 

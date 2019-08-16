@@ -1,5 +1,6 @@
 DROP TABLE Action;
 DROP TABLE Category;
+DROP TABLE DataSource;
 DROP TABLE Qualifier;
 DROP TABLE Priority;
 DROP TABLE RawEvent;

@@ -29,8 +29,16 @@ table! {
         signature -> Text,
         size -> Text,
         score -> Nullable<Double>,
-        data_source -> Text,
+        data_source_id -> Integer,
         last_modification_time -> Nullable<Timestamp>,
+    }
+}
+
+table! {
+    DataSource (data_source_id) {
+        data_source_id -> Integer,
+        topic_name -> Text,
+        data_type -> Text,
     }
 }
 
@@ -77,7 +85,8 @@ joinable!(Clusters -> Category (category_id));
 joinable!(Clusters -> Priority (priority_id));
 joinable!(Clusters -> Qualifier (qualifier_id));
 joinable!(Clusters -> Status (status_id));
+joinable!(Clusters -> DataSource (data_source_id));
 
 allow_tables_to_appear_in_same_query!(
-    Action, Category, Clusters, Outliers, Priority, Qualifier, RawEvent, Status,
+    Action, Category, Clusters, DataSource, Outliers, Priority, Qualifier, RawEvent, Status,
 );

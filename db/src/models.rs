@@ -27,6 +27,7 @@ pub struct CategoryTable {
 )]
 #[table_name = "Clusters"]
 #[belongs_to(CategoryTable, foreign_key = "category_id")]
+#[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 #[belongs_to(StatusTable, foreign_key = "status_id")]
 #[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
 pub struct ClustersTable {
@@ -43,7 +44,7 @@ pub struct ClustersTable {
     pub signature: String,
     pub size: String,
     pub score: Option<f64>,
-    pub data_source: String,
+    pub data_source_id: i32,
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
@@ -56,6 +57,15 @@ pub struct ClusterUpdate {
     pub data_source: String,
     pub size: Option<usize>,
     pub examples: Option<Vec<Example>>,
+}
+
+#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
+#[table_name = "DataSource"]
+#[primary_key(data_source_id)]
+pub struct DataSourceTable {
+    pub data_source_id: i32,
+    pub topic_name: String,
+    pub data_type: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Serialize)]
