@@ -761,7 +761,11 @@ impl DB {
                                 };
                                 let data_source_id = DB::get_data_source_id(self, &c.data_source)
                                     .unwrap_or_else(|_| {
-                                        DB::add_data_source(self, &c.data_source, "tmp")
+                                        DB::add_data_source(
+                                            self,
+                                            &c.data_source,
+                                            &c.data_source_type,
+                                        )
                                     });
                                 if data_source_id != 0 {
                                     Some(ClustersTable {
@@ -827,7 +831,9 @@ impl DB {
                         None => "1".to_string(),
                     };
                     let data_source_id = DB::get_data_source_id(self, &c.data_source)
-                        .unwrap_or_else(|_| DB::add_data_source(self, &c.data_source, "tmp"));
+                        .unwrap_or_else(|_| {
+                            DB::add_data_source(self, &c.data_source, &c.data_source_type)
+                        });
                     if data_source_id != 0 {
                         // We always insert 1 for category_id and priority_id,
                         // "unknown" for qualifier_id, and "pending review" for status_id.

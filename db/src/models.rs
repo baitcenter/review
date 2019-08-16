@@ -55,6 +55,7 @@ pub struct ClusterUpdate {
     pub signature: Option<String>,
     pub score: Option<f64>,
     pub data_source: String,
+    pub data_source_type: String,
     pub size: Option<usize>,
     pub examples: Option<Vec<Example>>,
 }
