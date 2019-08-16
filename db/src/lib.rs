@@ -71,6 +71,22 @@ impl DB {
         future::result(insert_result)
     }
 
+    fn add_data_source(&self, data_source: &str, data_type: &str) -> i32 {
+        use schema::DataSource::dsl;
+
+        let _: Result<usize, Error> = self.pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::insert_into(dsl::DataSource)
+                .values((
+                    dsl::topic_name.eq(data_source),
+                    dsl::data_type.eq(data_type),
+                ))
+                .execute(&conn)
+                .map_err(Into::into)
+        });
+
+        DB::get_data_source_id(self, data_source).unwrap_or_default()
+    }
+
     pub fn get_category_table(&self) -> impl Future<Item = Vec<CategoryTable>, Error = Error> {
         let category_table = self.pool.get().map_err(Into::into).and_then(|conn| {
             schema::Category::dsl::Category
@@ -91,7 +107,14 @@ impl DB {
                     .inner_join(schema::Status::dsl::Status)
                     .inner_join(schema::Qualifier::dsl::Qualifier)
                     .inner_join(schema::Category::dsl::Category)
-                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                    .inner_join(schema::DataSource::dsl::DataSource)
+                    .load::<(
+                        ClustersTable,
+                        StatusTable,
+                        QualifierTable,
+                        CategoryTable,
+                        DataSourceTable,
+                    )>(&conn)
                     .map_err(Into::into)
             })
             .and_then(|data| {
@@ -111,7 +134,7 @@ impl DB {
                             Some(d.1.status),
                             Some(d.3.category),
                             Some(d.0.signature),
-                            Some(d.0.data_source),
+                            Some(d.4.topic_name),
                             Some(cluster_size),
                             d.0.score,
                             examples,
@@ -166,7 +189,7 @@ impl DB {
             .get()
             .map_err(Into::into)
             .and_then(|conn| {
-                let mut query = "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id".to_string();
+                let mut query = "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id INNER JOIN DataSource ON Clusters.data_source_id = DataSource.data_source_id".to_string();
                 if let Some(where_clause) = where_clause {
                     query.push_str(&format!(" WHERE {}", where_clause));
                 }
@@ -175,7 +198,7 @@ impl DB {
                 }
                 query.push_str(";");
                 diesel::sql_query(query)
-                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable)>(&conn)
+                    .load::<(ClustersTable, StatusTable, QualifierTable, CategoryTable, DataSourceTable)>(&conn)
                     .map_err(Into::into)
             })
             .and_then(|data| {
@@ -193,7 +216,7 @@ impl DB {
                         let category = if select.4 { Some(d.3.category) } else { None };
                         let signature = if select.5 { Some(d.0.signature) } else { None };
                         let data_source = if select.6 {
-                            Some(d.0.data_source)
+                            Some(d.4.topic_name)
                         } else {
                             None
                         };
@@ -412,11 +435,14 @@ impl DB {
             let row = qualifier_update
                 .iter()
                 .map(|q| {
-                    if let Ok(Some(qualifier_id)) = DB::get_qualifier_id(&self, &q.qualifier) {
+                    if let (Ok(Some(qualifier_id)), Ok(data_source_id)) = (
+                        DB::get_qualifier_id(&self, &q.qualifier),
+                        DB::get_data_source_id(self, &q.data_source),
+                    ) {
                         let target = dsl::Clusters.filter(
                             dsl::cluster_id
                                 .eq(&q.cluster_id)
-                                .and(dsl::data_source.eq(&q.data_source)),
+                                .and(dsl::data_source_id.eq(data_source_id)),
                         );
                         diesel::update(target)
                             .set((
@@ -460,6 +486,17 @@ impl DB {
         })
     }
 
+    fn get_data_source_id(&self, data_source: &str) -> Result<i32, Error> {
+        use schema::DataSource::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::DataSource
+                .select(dsl::data_source_id)
+                .filter(dsl::topic_name.eq(data_source))
+                .first::<i32>(&conn)
+                .map_err(Into::into)
+        })
+    }
+
     fn get_qualifier_id(&self, qualifier: &str) -> Result<Option<i32>, Error> {
         use schema::Qualifier::dsl;
         self.pool.get().map_err(Into::into).and_then(|conn| {
@@ -492,117 +529,125 @@ impl DB {
     ) -> future::FutureResult<(u8, bool, String), Error> {
         use schema::Clusters::dsl;
 
-        let query = diesel::update(dsl::Clusters).filter(
-            dsl::cluster_id
-                .eq(cluster_id)
-                .and(dsl::data_source.eq(data_source)),
-        );
-        let timestamp = chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
-        let category_id = category.and_then(|category| DB::get_category_id(self, &category).ok());
-        let (qualifier_id, is_benign) = qualifier.map_or((None, false), |qualifier| {
-            (
-                DB::get_qualifier_id(self, &qualifier).ok(),
-                qualifier == "benign",
-            )
-        });
-        let status_id = match DB::get_status_id(self, "reviewed") {
-            Ok(Some(id)) => id,
-            _ => 1,
-        };
-        let execution_result = self
-            .pool
-            .get()
-            .map_err(Into::into)
-            .and_then(|conn| {
-                if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
-                    (&new_cluster_id, &category_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::category_id.eq(category_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(cluster_id), Some(Some(category_id))) =
-                    (&new_cluster_id, &category_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::category_id.eq(category_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(cluster_id), Some(Some(qualifier_id))) =
-                    (&new_cluster_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(Some(category_id)), Some(Some(qualifier_id))) =
-                    (&category_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::category_id.eq(category_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(cluster_id) = &new_cluster_id {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(Some(category_id)) = &category_id {
-                    query
-                        .set((
-                            dsl::category_id.eq(category_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(Some(qualifier_id)) = &qualifier_id {
-                    query
-                        .set((
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else {
-                    Err(Error::from(ErrorKind::DatabaseTransactionError(
-                        DatabaseError::Other,
-                    )))
-                }
-            })
-            .and_then(|row| Ok((row as u8, is_benign, data_source.to_string())));
+        if let Ok(data_source_id) = DB::get_data_source_id(self, &data_source) {
+            let query = diesel::update(dsl::Clusters).filter(
+                dsl::cluster_id
+                    .eq(cluster_id)
+                    .and(dsl::data_source_id.eq(data_source_id)),
+            );
+            let timestamp =
+                chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
+            let category_id =
+                category.and_then(|category| DB::get_category_id(self, &category).ok());
+            let (qualifier_id, is_benign) = qualifier.map_or((None, false), |qualifier| {
+                (
+                    DB::get_qualifier_id(self, &qualifier).ok(),
+                    qualifier == "benign",
+                )
+            });
+            let status_id = match DB::get_status_id(self, "reviewed") {
+                Ok(Some(id)) => id,
+                _ => 1,
+            };
+            let execution_result = self
+                .pool
+                .get()
+                .map_err(Into::into)
+                .and_then(|conn| {
+                    if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
+                        (&new_cluster_id, &category_id, &qualifier_id)
+                    {
+                        query
+                            .set((
+                                dsl::cluster_id.eq(cluster_id),
+                                dsl::category_id.eq(category_id),
+                                dsl::qualifier_id.eq(qualifier_id),
+                                dsl::status_id.eq(status_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let (Some(cluster_id), Some(Some(category_id))) =
+                        (&new_cluster_id, &category_id)
+                    {
+                        query
+                            .set((
+                                dsl::cluster_id.eq(cluster_id),
+                                dsl::category_id.eq(category_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let (Some(cluster_id), Some(Some(qualifier_id))) =
+                        (&new_cluster_id, &qualifier_id)
+                    {
+                        query
+                            .set((
+                                dsl::cluster_id.eq(cluster_id),
+                                dsl::qualifier_id.eq(qualifier_id),
+                                dsl::status_id.eq(status_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let (Some(Some(category_id)), Some(Some(qualifier_id))) =
+                        (&category_id, &qualifier_id)
+                    {
+                        query
+                            .set((
+                                dsl::category_id.eq(category_id),
+                                dsl::qualifier_id.eq(qualifier_id),
+                                dsl::status_id.eq(status_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let Some(cluster_id) = &new_cluster_id {
+                        query
+                            .set((
+                                dsl::cluster_id.eq(cluster_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let Some(Some(category_id)) = &category_id {
+                        query
+                            .set((
+                                dsl::category_id.eq(category_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else if let Some(Some(qualifier_id)) = &qualifier_id {
+                        query
+                            .set((
+                                dsl::qualifier_id.eq(qualifier_id),
+                                dsl::status_id.eq(status_id),
+                                dsl::last_modification_time.eq(timestamp),
+                            ))
+                            .execute(&conn)
+                            .map_err(Into::into)
+                    } else {
+                        Err(Error::from(ErrorKind::DatabaseTransactionError(
+                            DatabaseError::Other,
+                        )))
+                    }
+                })
+                .and_then(|row| Ok((row as u8, is_benign, data_source.to_string())));
 
-        future::result(execution_result)
+            future::result(execution_result)
+        } else {
+            future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+                DatabaseError::Other,
+            ))))
+        }
     }
 
     pub fn update_clusters(
         &self,
         cluster_update: &[ClusterUpdate],
     ) -> future::FutureResult<usize, Error> {
-        use schema::Clusters::dsl::*;
+        use schema::Clusters::dsl;
         use serde::Serialize;
         #[derive(Debug, Queryable, Serialize)]
         pub struct Cluster {
@@ -615,25 +660,27 @@ impl DB {
             qualifier_id: i32,
             status_id: i32,
         }
-        let mut query = Clusters.into_boxed();
+        let mut query = dsl::Clusters.into_boxed();
         for cluster in cluster_update.iter() {
-            query = query.or_filter(
-                cluster_id
-                    .eq(&cluster.cluster_id)
-                    .and(data_source.eq(&cluster.data_source)),
-            );
+            if let Ok(data_source_id) = DB::get_data_source_id(self, &cluster.data_source) {
+                query = query.or_filter(
+                    dsl::cluster_id
+                        .eq(&cluster.cluster_id)
+                        .and(dsl::data_source_id.eq(data_source_id)),
+                );
+            }
         }
         let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
             query
                 .select((
-                    cluster_id,
-                    signature,
-                    examples,
-                    size,
-                    category_id,
-                    priority_id,
-                    qualifier_id,
-                    status_id,
+                    dsl::cluster_id,
+                    dsl::signature,
+                    dsl::examples,
+                    dsl::size,
+                    dsl::category_id,
+                    dsl::priority_id,
+                    dsl::qualifier_id,
+                    dsl::status_id,
                 ))
                 .load::<Cluster>(&conn)
                 .map_err(Into::into)
@@ -676,23 +723,29 @@ impl DB {
                                     }
                                     None => cluster.size.clone(),
                                 };
-                                Some(ClustersTable {
-                                    id: None,
-                                    cluster_id: Some(c.cluster_id.clone()),
-                                    description: None,
-                                    category_id: cluster.category_id,
-                                    detector_id: c.detector_id,
-                                    examples: example,
-                                    priority_id: cluster.priority_id,
-                                    qualifier_id: cluster.qualifier_id,
-                                    status_id: cluster.status_id,
-                                    rules: Some(sig.clone()),
-                                    signature: sig,
-                                    size: cluster_size,
-                                    score: c.score,
-                                    data_source: c.data_source.clone(),
-                                    last_modification_time: Some(timestamp),
-                                })
+                                let data_source_id = DB::get_data_source_id(self, &c.data_source)
+                                    .unwrap_or_default();
+                                if data_source_id != 0 {
+                                    Some(ClustersTable {
+                                        id: None,
+                                        cluster_id: Some(c.cluster_id.clone()),
+                                        description: None,
+                                        category_id: cluster.category_id,
+                                        detector_id: c.detector_id,
+                                        examples: example,
+                                        priority_id: cluster.priority_id,
+                                        qualifier_id: cluster.qualifier_id,
+                                        status_id: cluster.status_id,
+                                        rules: Some(sig.clone()),
+                                        signature: sig,
+                                        size: cluster_size,
+                                        score: c.score,
+                                        data_source_id,
+                                        last_modification_time: Some(timestamp),
+                                    })
+                                } else {
+                                    None
+                                }
                             } else {
                                 let example = match &c.examples {
                                     Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
@@ -706,29 +759,37 @@ impl DB {
                                     Some(cluster_size) => cluster_size.to_string(),
                                     None => "1".to_string(),
                                 };
-                                Some(ClustersTable {
-                                    id: None,
-                                    cluster_id: Some(c.cluster_id.clone()),
-                                    description: None,
-                                    category_id: 1,
-                                    detector_id: c.detector_id,
-                                    examples: example,
-                                    priority_id: 1,
-                                    qualifier_id: 2,
-                                    status_id: 2,
-                                    rules: Some(sig.clone()),
-                                    signature: sig,
-                                    size: cluster_size,
-                                    score: c.score,
-                                    data_source: c.data_source.clone(),
-                                    last_modification_time: None,
-                                })
+                                let data_source_id = DB::get_data_source_id(self, &c.data_source)
+                                    .unwrap_or_else(|_| {
+                                        DB::add_data_source(self, &c.data_source, "tmp")
+                                    });
+                                if data_source_id != 0 {
+                                    Some(ClustersTable {
+                                        id: None,
+                                        cluster_id: Some(c.cluster_id.clone()),
+                                        description: None,
+                                        category_id: 1,
+                                        detector_id: c.detector_id,
+                                        examples: example,
+                                        priority_id: 1,
+                                        qualifier_id: 2,
+                                        status_id: 2,
+                                        rules: Some(sig.clone()),
+                                        signature: sig,
+                                        size: cluster_size,
+                                        score: c.score,
+                                        data_source_id,
+                                        last_modification_time: None,
+                                    })
+                                } else {
+                                    None
+                                }
                             }
                         })
                         .collect();
 
                     if !replace_clusters.is_empty() {
-                        diesel::replace_into(Clusters)
+                        diesel::replace_into(dsl::Clusters)
                             .values(&replace_clusters)
                             .execute(&*conn)
                             .map_err(Into::into)
@@ -748,7 +809,7 @@ impl DB {
         let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
             let insert_clusters: Vec<ClustersTable> = new_clusters
                 .iter()
-                .map(|c| {
+                .filter_map(|c| {
                     let example = match &c.examples {
                         Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
                         None => None,
@@ -765,24 +826,30 @@ impl DB {
                         Some(cluster_size) => cluster_size.to_string(),
                         None => "1".to_string(),
                     };
-                    // We always insert 1 for category_id and priority_id,
-                    // "unknown" for qualifier_id, and "pending review" for status_id.
-                    ClustersTable {
-                        id: None,
-                        cluster_id: Some(c.cluster_id.to_string()),
-                        description: None,
-                        category_id: 1,
-                        detector_id: c.detector_id,
-                        examples: example,
-                        priority_id: 1,
-                        qualifier_id: 2,
-                        status_id: 2,
-                        rules: Some(sig.clone()),
-                        signature: sig,
-                        size: cluster_size,
-                        score: c.score,
-                        data_source: c.data_source.to_string(),
-                        last_modification_time: None,
+                    let data_source_id = DB::get_data_source_id(self, &c.data_source)
+                        .unwrap_or_else(|_| DB::add_data_source(self, &c.data_source, "tmp"));
+                    if data_source_id != 0 {
+                        // We always insert 1 for category_id and priority_id,
+                        // "unknown" for qualifier_id, and "pending review" for status_id.
+                        Some(ClustersTable {
+                            id: None,
+                            cluster_id: Some(c.cluster_id.to_string()),
+                            description: None,
+                            category_id: 1,
+                            detector_id: c.detector_id,
+                            examples: example,
+                            priority_id: 1,
+                            qualifier_id: 2,
+                            status_id: 2,
+                            rules: Some(sig.clone()),
+                            signature: sig,
+                            size: cluster_size,
+                            score: c.score,
+                            data_source_id,
+                            last_modification_time: None,
+                        })
+                    } else {
+                        None
                     }
                 })
                 .collect();
