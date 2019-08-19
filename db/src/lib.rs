@@ -273,9 +273,7 @@ impl DB {
                     .load::<(OutliersTable, DataSourceTable)>(&conn)
                     .map_err(Into::into)
             } else {
-                Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::RecordNotExist,
-                )))
+                Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
             }
         });
 
@@ -292,19 +290,15 @@ impl DB {
                 .filter_map(|new_outlier| {
                     let o_size = Some(new_outlier.event_ids.len().to_string());
                     let event_ids = rmp_serde::encode::to_vec(&new_outlier.event_ids).ok();
-                    if let Ok(data_source_id) =
-                        DB::get_data_source_id(self, &new_outlier.data_source)
-                    {
-                        Some(OutliersTable {
+                    DB::get_data_source_id(self, &new_outlier.data_source)
+                        .ok()
+                        .map(|data_source_id| OutliersTable {
                             id: None,
                             raw_event: new_outlier.outlier.to_vec(),
                             data_source_id,
                             event_ids,
                             size: o_size,
                         })
-                    } else {
-                        None
-                    }
                 })
                 .collect();
 
@@ -314,9 +308,7 @@ impl DB {
                     .execute(&*conn)
                     .map_err(Into::into)
             } else {
-                Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                )))
+                Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
             }
         });
         future::result(insert_result)
@@ -438,9 +430,7 @@ impl DB {
                             .execute(&*conn)
                             .map_err(Into::into)
                     } else {
-                        Err(Error::from(ErrorKind::DatabaseTransactionError(
-                            DatabaseError::Other,
-                        )))
+                        Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
                     }
                 })
         });
@@ -492,9 +482,7 @@ impl DB {
                 .sum();
 
             if row == 0 {
-                Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                )))
+                Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
             } else {
                 Ok(row)
             }
@@ -656,18 +644,17 @@ impl DB {
                             .execute(&conn)
                             .map_err(Into::into)
                     } else {
-                        Err(Error::from(ErrorKind::DatabaseTransactionError(
-                            DatabaseError::Other,
-                        )))
+                        Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
                     }
                 })
                 .and_then(|row| Ok((row as u8, is_benign, data_source.to_string())));
 
             future::result(execution_result)
         } else {
-            future::result(Err(Error::from(ErrorKind::DatabaseTransactionError(
+            future::result(Err(ErrorKind::DatabaseTransactionError(
                 DatabaseError::Other,
-            ))))
+            )
+            .into()))
         }
     }
 
@@ -894,9 +881,7 @@ impl DB {
                     .execute(&*conn)
                     .map_err(Into::into)
             } else {
-                Err(Error::from(ErrorKind::DatabaseTransactionError(
-                    DatabaseError::Other,
-                )))
+                Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
             }
         });
 
