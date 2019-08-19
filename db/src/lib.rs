@@ -118,30 +118,28 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let clusters = data
-                    .into_iter()
-                    .map(|d| {
-                        let examples = d.0.examples.and_then(|eg| {
-                            (rmp_serde::decode::from_slice(&eg)
-                                as Result<Vec<Example>, rmp_serde::decode::Error>)
-                                .ok()
-                        });
-                        let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
-                        (
-                            d.0.cluster_id,
-                            Some(d.0.detector_id),
-                            Some(d.2.qualifier),
-                            Some(d.1.status),
-                            Some(d.3.category),
-                            Some(d.0.signature),
-                            Some(d.4.topic_name),
-                            Some(cluster_size),
-                            d.0.score,
-                            examples,
-                            d.0.last_modification_time,
-                        )
-                    })
-                    .collect();
+                let clusters =
+                    data.into_iter()
+                        .map(|d| {
+                            let examples = d.0.examples.and_then(|eg| {
+                                rmp_serde::decode::from_slice::<Vec<Example>>(&eg).ok()
+                            });
+                            let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                            (
+                                d.0.cluster_id,
+                                Some(d.0.detector_id),
+                                Some(d.2.qualifier),
+                                Some(d.1.status),
+                                Some(d.3.category),
+                                Some(d.0.signature),
+                                Some(d.4.topic_name),
+                                Some(cluster_size),
+                                d.0.score,
+                                examples,
+                                d.0.last_modification_time,
+                            )
+                        })
+                        .collect();
                 Ok(clusters)
             });
 
@@ -231,9 +229,7 @@ impl DB {
                         let score = if select.8 { d.0.score } else { None };
                         let examples = if select.9 {
                             d.0.examples.and_then(|eg| {
-                                (rmp_serde::decode::from_slice(&eg)
-                                    as Result<Vec<Example>, rmp_serde::decode::Error>)
-                                    .ok()
+                                rmp_serde::decode::from_slice::<Vec<Example>>(&eg).ok()
                             })
                         } else {
                             None
@@ -370,17 +366,13 @@ impl DB {
                                     }
                                     None => new_size.to_string(),
                                 };
-                                let mut event_ids = match &outlier.event_ids {
-                                    Some(event_ids) => {
-                                        match rmp_serde::decode::from_slice(&event_ids)
-                                            as Result<Vec<u64>, rmp_serde::decode::Error>
-                                        {
-                                            Ok(event_ids) => event_ids,
-                                            Err(_) => Vec::<u64>::new(),
-                                        }
-                                    }
-                                    None => Vec::<u64>::new(),
-                                };
+                                let mut event_ids = outlier.event_ids.as_ref().map_or(
+                                    Vec::<u64>::new(),
+                                    |event_ids| {
+                                        rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids)
+                                            .unwrap_or_default()
+                                    },
+                                );
                                 event_ids.extend(&o.event_ids);
                                 // only store most recent 100 event_ids per outlier
                                 let event_ids = if event_ids.len() > 100 {
@@ -925,9 +917,7 @@ impl DB {
                         Err(_) => current_examples,
                     }
                 } else if let Some(current_eg) = current_examples.clone() {
-                    match rmp_serde::decode::from_slice(&current_eg)
-                        as Result<Vec<Example>, rmp_serde::decode::Error>
-                    {
+                    match rmp_serde::decode::from_slice::<Vec<Example>>(&current_eg) {
                         Ok(mut current_eg) => {
                             current_eg.extend(new_eg);
                             if current_eg.len() > max_examples_num {

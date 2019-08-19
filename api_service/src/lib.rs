@@ -100,9 +100,7 @@ impl ApiService {
                             return Box::new(result);
                         }
                     } else if let (Some(select), 2) = (hash_query.get("select"), hash_query.len()) {
-                        if let Ok(select) = serde_json::from_str(&select)
-                            as Result<Select, serde_json::error::Error>
-                        {
+                        if let Ok(select) = serde_json::from_str::<Select>(&select) {
                             let select = Select::response_type_builder(&select);
                             let result = db::DB::execute_select_cluster_query(
                                 &self.db,
@@ -124,8 +122,7 @@ impl ApiService {
                         hash_query.len(),
                     ) {
                         if let (Ok(select), Ok(limit)) = (
-                            serde_json::from_str(&select)
-                                as Result<Select, serde_json::error::Error>,
+                            serde_json::from_str::<Select>(&select),
                             limit.parse::<u64>(),
                         ) {
                             let select = Select::response_type_builder(&select);
@@ -411,7 +408,7 @@ impl ApiService {
                         .concat2()
                         .map_err(Into::into)
                         .and_then(move |buf| {
-                            match serde_json::from_slice(&buf) as Result<Vec<db::models::QualifierUpdate>, serde_json::error::Error> {
+                            match serde_json::from_slice::<Vec<db::models::QualifierUpdate>>(&buf) {
                                 Ok(data) => {
                                     let mut result = db::DB::update_qualifiers(&self.db, &data);
                                     match result.poll() {
@@ -820,13 +817,9 @@ impl ApiService {
         }
         let mut outliers: Vec<Outliers> = Vec::new();
         for d in data {
-            let event_ids =
-                d.0.event_ids
-                    .map_or(Vec::<u64>::new(), |event_ids| {
-                        (rmp_serde::decode::from_slice(&event_ids)
-                            as Result<Vec<u64>, rmp_serde::decode::Error>)
-                            .unwrap_or_default()
-                    });
+            let event_ids = d.0.event_ids.map_or(Vec::<u64>::new(), |event_ids| {
+                rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids).unwrap_or_default()
+            });
             let size =
                 d.0.size
                     .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
