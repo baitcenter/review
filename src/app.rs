@@ -85,16 +85,9 @@ pub fn init() -> Result<(), Error> {
                     InitializeErrorReason::ClientUrl,
                 )));
             }
-            // TODO: After REview http client mode gets updated,
-            //       modify the error handing here to use context()
-            let cluster_view = client::http::ClusterView::new(&url);
-            match cluster_view {
-                Ok(mut cluster_view) => cluster_view.run(),
-                Err(e) => {
-                    eprintln!("Failed to create a cluster_view: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            let mut cluster_view = client::http::ClusterView::new(&url)
+                .context(ErrorKind::Initialize(InitializeErrorReason::ClientMode))?;
+            cluster_view.run();
         } else if let Some(cluster) = review_matches.value_of("cluster") {
             let model = review_matches.value_of("model").unwrap();
             let raw = review_matches.value_of("raw").unwrap();
