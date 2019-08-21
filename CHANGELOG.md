@@ -6,7 +6,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 ### Added
-- Added a new table called `RawEvents` in database schema.
+- Added new tables called `RawEvents` and `DataSource` in database schema.
+
+### Removed
+- Removed REview file mode. REview is no longer able to read REmake output files.
 
 ## [0.5.0] - 2019-07-24
 ### Added
