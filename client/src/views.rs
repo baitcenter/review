@@ -85,44 +85,34 @@ impl ClusterSelectView {
         view.set_on_submit(|siv, &i| {
             let mut cluster_prop_window1 = siv.find_id::<TextView>("cluster_properties").unwrap();
             let properties = siv
-                .call_on_id(
-                    "cluster_select",
-                    |view: &mut ClusterSelectView| {
-                        Cluster::get_cluster_properties(&view.clusters[i])
-                    },
-                )
+                .call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                    Cluster::get_cluster_properties(&view.clusters[i])
+                })
                 .unwrap();
             cluster_prop_window1.set_content(properties);
 
             let mut cluster_prop_window2 = siv.find_id::<Dialog>("cluster_properties2").unwrap();
             let qualifier_select = siv
-                .call_on_id(
-                    "cluster_select",
-                    |view: &mut ClusterSelectView| {
-                        let mut qualifier_select = SelectView::new();
-                        for (i, qualifier) in view.clusters.qualifier.iter() {
-                            qualifier_select.add_item(qualifier.to_string(), *i);
-                        }
-                        qualifier_select
-                    },
-                )
+                .call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                    let mut qualifier_select = SelectView::new();
+                    for (i, qualifier) in view.clusters.qualifier.iter() {
+                        qualifier_select.add_item(qualifier.to_string(), *i);
+                    }
+                    qualifier_select
+                })
                 .unwrap();
 
             cluster_prop_window2.set_content(qualifier_select.on_submit(
                 move |siv, qualifier_val| {
-                    siv.call_on_id(
-                        "cluster_select",
-                        |view: &mut ClusterSelectView| {
-                            if view.clusters[i].qualifier != view.clusters.qualifier[qualifier_val]
-                            {
-                                view.clusters[i].qualifier =
-                                    view.clusters.qualifier[qualifier_val].clone();
-                                view.clusters
-                                    .updated_clusters
-                                    .insert(view.clusters[i].cluster_id.clone(), i);
-                            }
-                        },
-                    );
+                    siv.call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                        if view.clusters[i].qualifier != view.clusters.qualifier[qualifier_val] {
+                            view.clusters[i].qualifier =
+                                view.clusters.qualifier[qualifier_val].clone();
+                            view.clusters
+                                .updated_clusters
+                                .insert(view.clusters[i].cluster_id.clone(), i);
+                        }
+                    });
                 },
             ))
         });
