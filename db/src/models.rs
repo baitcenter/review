@@ -118,7 +118,7 @@ pub struct PriorityTable {
     pub priority: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct QualifierUpdate {
     pub cluster_id: String,
     pub data_source: String,
