@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind, InitializeErrorReason};
 use std::ops::{Index, IndexMut};
 
 #[derive(Deserialize, Debug)]
-pub struct ClusterForHttpClientMode {
+pub struct Cluster {
     pub(crate) cluster_id: String,
     pub(crate) detector_id: u32,
     pub(crate) qualifier: String,
@@ -20,7 +20,7 @@ pub struct ClusterForHttpClientMode {
     pub(crate) last_modification_time: String,
 }
 
-impl ClusterForHttpClientMode {
+impl Cluster {
     pub(crate) fn get_cluster_properties(&self) -> String {
         // REview displays at most 3 examples per cluster
         // if the length of an example is longer than 500,
@@ -70,14 +70,14 @@ impl ClusterForHttpClientMode {
     }
 }
 
-pub(crate) struct ClusterSetForHttpClientMode {
-    pub(crate) clusters: Vec<ClusterForHttpClientMode>,
+pub(crate) struct ClusterSet {
+    pub(crate) clusters: Vec<Cluster>,
     pub(crate) qualifier: HashMap<i32, String>,
     pub(crate) updated_clusters: HashMap<String, usize>,
     pub(crate) url: String,
 }
 
-impl ClusterSetForHttpClientMode {
+impl ClusterSet {
     pub(crate) fn from_reviewd(url: &str) -> Result<Self, Error> {
         let url = url.trim_end_matches('/');
         let cluster_url = format!(
@@ -87,7 +87,7 @@ impl ClusterSetForHttpClientMode {
         let mut cluster_resp = reqwest::get(cluster_url.as_str())
             .context(ErrorKind::Initialize(InitializeErrorReason::Reqwest))?;
         let clusters = cluster_resp
-            .json::<Vec<ClusterForHttpClientMode>>()
+            .json::<Vec<Cluster>>()
             .context(ErrorKind::Initialize(
                 InitializeErrorReason::UnexpectedResponse,
             ))?;
@@ -107,7 +107,7 @@ impl ClusterSetForHttpClientMode {
             .map(|q| (q.qualifier_id.unwrap(), q.qualifier.clone()))
             .collect();
 
-        Ok(ClusterSetForHttpClientMode {
+        Ok(ClusterSet {
             clusters,
             qualifier,
             updated_clusters: HashMap::<String, usize>::default(),
@@ -116,15 +116,15 @@ impl ClusterSetForHttpClientMode {
     }
 }
 
-impl Index<usize> for ClusterSetForHttpClientMode {
-    type Output = ClusterForHttpClientMode;
+impl Index<usize> for ClusterSet {
+    type Output = Cluster;
 
     fn index(&self, i: usize) -> &Self::Output {
         &self.clusters[i]
     }
 }
 
-impl IndexMut<usize> for ClusterSetForHttpClientMode {
+impl IndexMut<usize> for ClusterSet {
     fn index_mut(&mut self, i: usize) -> &mut Self::Output {
         &mut self.clusters[i]
     }

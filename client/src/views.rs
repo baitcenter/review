@@ -5,15 +5,15 @@ use cursive::views::{BoxView, Dialog, DummyView, LinearLayout, Panel, SelectView
 use cursive::wrap_impl;
 
 use crate::error::Error;
-use crate::models::{ClusterForHttpClientMode, ClusterSetForHttpClientMode};
+use crate::models::{Cluster, ClusterSet};
 
-pub(crate) struct MainViewForHttpClientMode {
+pub(crate) struct MainView {
     view: LinearLayout,
 }
 
-impl MainViewForHttpClientMode {
+impl MainView {
     pub(crate) fn from_reviewd(url: &str) -> Result<Self, Error> {
-        let cluster_select = ClusterSelectViewForHttpClientMode::from_reviewd(url)?;
+        let cluster_select = ClusterSelectView::from_reviewd(url)?;
         let quit_view = TextView::new("Press q to exit.".to_string());
         let save_view = TextView::new("Press s to save changes.".to_string());
         let top_layout = LinearLayout::new(Orientation::Vertical)
@@ -49,22 +49,22 @@ impl MainViewForHttpClientMode {
         let mut view = LinearLayout::horizontal();
         view.add_child(cluster_prop_box1);
         view.add_child(cluster_prop_box2);
-        Ok(MainViewForHttpClientMode { view })
+        Ok(MainView { view })
     }
 }
 
-impl ViewWrapper for MainViewForHttpClientMode {
+impl ViewWrapper for MainView {
     wrap_impl!(self.view: LinearLayout);
 }
 
-pub(crate) struct ClusterSelectViewForHttpClientMode {
+pub(crate) struct ClusterSelectView {
     view: SelectView<usize>,
-    pub(crate) clusters: ClusterSetForHttpClientMode,
+    pub(crate) clusters: ClusterSet,
 }
 
-impl ClusterSelectViewForHttpClientMode {
+impl ClusterSelectView {
     pub(crate) fn from_reviewd(url: &str) -> Result<Self, Error> {
-        let clusters = ClusterSetForHttpClientMode::from_reviewd(url)?;
+        let clusters = ClusterSet::from_reviewd(url)?;
 
         let index_width = ((clusters.clusters.len() + 1) as f64).log10() as usize + 1;
         let mut view = SelectView::<usize>::new().with_all(
@@ -87,8 +87,8 @@ impl ClusterSelectViewForHttpClientMode {
             let properties = siv
                 .call_on_id(
                     "cluster_select",
-                    |view: &mut ClusterSelectViewForHttpClientMode| {
-                        ClusterForHttpClientMode::get_cluster_properties(&view.clusters[i])
+                    |view: &mut ClusterSelectView| {
+                        Cluster::get_cluster_properties(&view.clusters[i])
                     },
                 )
                 .unwrap();
@@ -98,7 +98,7 @@ impl ClusterSelectViewForHttpClientMode {
             let qualifier_select = siv
                 .call_on_id(
                     "cluster_select",
-                    |view: &mut ClusterSelectViewForHttpClientMode| {
+                    |view: &mut ClusterSelectView| {
                         let mut qualifier_select = SelectView::new();
                         for (i, qualifier) in view.clusters.qualifier.iter() {
                             qualifier_select.add_item(qualifier.to_string(), *i);
@@ -112,7 +112,7 @@ impl ClusterSelectViewForHttpClientMode {
                 move |siv, qualifier_val| {
                     siv.call_on_id(
                         "cluster_select",
-                        |view: &mut ClusterSelectViewForHttpClientMode| {
+                        |view: &mut ClusterSelectView| {
                             if view.clusters[i].qualifier != view.clusters.qualifier[qualifier_val]
                             {
                                 view.clusters[i].qualifier =
@@ -127,10 +127,10 @@ impl ClusterSelectViewForHttpClientMode {
             ))
         });
 
-        Ok(ClusterSelectViewForHttpClientMode { view, clusters })
+        Ok(ClusterSelectView { view, clusters })
     }
 }
 
-impl ViewWrapper for ClusterSelectViewForHttpClientMode {
+impl ViewWrapper for ClusterSelectView {
     wrap_impl!(self.view: SelectView<usize>);
 }

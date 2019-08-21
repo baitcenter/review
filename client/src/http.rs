@@ -3,7 +3,7 @@ use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
 
 use crate::error::Error;
-use crate::views::{ClusterSelectViewForHttpClientMode, MainViewForHttpClientMode};
+use crate::views::{ClusterSelectView, MainView};
 
 pub struct ClusterView {
     cursive: Cursive,
@@ -11,7 +11,7 @@ pub struct ClusterView {
 
 impl ClusterView {
     pub fn new(url: &str) -> Result<ClusterView, Error> {
-        let main_view = MainViewForHttpClientMode::from_reviewd(url)?;
+        let main_view = MainView::from_reviewd(url)?;
         let mut cluster_view = ClusterView {
             cursive: Cursive::default(),
         };
@@ -34,7 +34,7 @@ fn send_update_request(s: &mut Cursive) {
     let (qualifier_update, url): (Vec<db::models::QualifierUpdate>, String) = s
         .call_on_id(
             "cluster_select",
-            |v: &mut ClusterSelectViewForHttpClientMode| {
+            |v: &mut ClusterSelectView| {
                 let qualifier_update = v
                     .clusters
                     .updated_clusters
