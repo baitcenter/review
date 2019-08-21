@@ -125,7 +125,7 @@ pub struct QualifierUpdate {
     pub qualifier: String,
 }
 
-#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Qualifier"]
 #[primary_key(qualifier_id)]
 pub struct QualifierTable {
