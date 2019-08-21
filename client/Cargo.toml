@@ -12,7 +12,6 @@ publish = false
 chrono = "0.4"
 db = { path = "../db" }
 failure = "0.1"
-remake = { path = "../remake/remake" }
 reqwest = "0.9"
 rmp-serde = "0.13"
 serde = { version = "1",  features = ["derive"] }
