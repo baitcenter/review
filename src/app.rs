@@ -64,6 +64,9 @@ pub fn init() -> Result<(), Error> {
         let docker_host_ip = std::env::var("DOCKER_HOST_IP").context(ErrorKind::Initialize(
             InitializeErrorReason::MissingEtcdAddr,
         ))?;
+        let kafka_url = std::env::var("KAFKA_URL").context(ErrorKind::Initialize(
+            InitializeErrorReason::MissingKafkaUrl,
+        ))?;
 
         if fs::metadata(&database_url).is_err() {
             fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
@@ -81,6 +84,7 @@ pub fn init() -> Result<(), Error> {
                 &database_url,
                 &docker_host_addr,
                 &etcd_url,
+                &kafka_url,
             )
             .map_err(|e| panic!("Reviewd initialization fails: {}", e))
             .and_then(|srv| {

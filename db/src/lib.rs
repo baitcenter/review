@@ -43,13 +43,17 @@ pub type SelectCluster = (
 #[derive(Clone)]
 pub struct DB {
     pub pool: Pool,
+    pub kafka_url: String,
 }
 
 impl DB {
-    pub fn new(database_url: &str) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
+    pub fn new(
+        database_url: &str,
+        kafka_url: String,
+    ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
         let manager = ConnectionManager::<SqliteConnection>::new(database_url);
         let db = Pool::new(manager)
-            .map(|pool| Self { pool })
+            .map(|pool| Self { pool, kafka_url })
             .map_err(Into::into);
 
         Box::new(future::result(db))

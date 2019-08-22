@@ -62,6 +62,7 @@ pub enum InitializeErrorReason {
     MissingDatabaseURL,
     MissingDockerHostIp,
     MissingEtcdAddr,
+    MissingKafkaUrl,
     MissingReviewdAddr,
     REviewd,
     REviewdUrl,
@@ -84,6 +85,7 @@ impl Display for InitializeErrorReason {
             InitializeErrorReason::MissingEtcdAddr => write!(f, "ETCD_ADDR is not set"),
             InitializeErrorReason::MissingReviewdAddr => write!(f, "REVIEWD_ADDR is not set"),
             InitializeErrorReason::MissingDockerHostIp => write!(f, "DOCKER_HOST_IP is not set"),
+            InitializeErrorReason::MissingKafkaUrl => write!(f, "KAFKA_URL is not set"),                                    
             InitializeErrorReason::REviewd => write!(f, "Could not initialize REviewd"),
             InitializeErrorReason::REviewdUrl => write!(
                 f,

@@ -29,12 +29,13 @@ impl ApiService {
         database_url: &str,
         docker_host_addr: &str,
         etcd_url: &str,
+        kafka_url: &str,
     ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
         let docker_host_addr = docker_host_addr.to_string();
         let etcd_url = etcd_url.to_string();
         let reviewd_url = database_url.to_string();
 
-        let fut = db::DB::new(database_url)
+        let fut = db::DB::new(database_url, kafka_url.to_string())
             .and_then(move |db| {
                 future::ok(Self {
                     db,
