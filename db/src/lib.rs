@@ -23,7 +23,7 @@ pub type ClusterResponse = (
     Option<String>,                // data_source
     Option<usize>,                 // size
     Option<f64>,                   // score
-    Option<Vec<Example>>,          // examples
+    Option<Vec<u64>>,              // examples
     Option<chrono::NaiveDateTime>, // last_modification_time
 );
 pub type SelectCluster = (
@@ -118,28 +118,28 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let clusters =
-                    data.into_iter()
-                        .map(|d| {
-                            let examples = d.0.examples.and_then(|eg| {
-                                rmp_serde::decode::from_slice::<Vec<Example>>(&eg).ok()
-                            });
-                            let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
-                            (
-                                d.0.cluster_id,
-                                Some(d.0.detector_id),
-                                Some(d.2.qualifier),
-                                Some(d.1.status),
-                                Some(d.3.category),
-                                Some(d.0.signature),
-                                Some(d.4.topic_name),
-                                Some(cluster_size),
-                                d.0.score,
-                                examples,
-                                d.0.last_modification_time,
-                            )
-                        })
-                        .collect();
+                let clusters = data
+                    .into_iter()
+                    .map(|d| {
+                        let examples =
+                            d.0.examples
+                                .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok());
+                        let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
+                        (
+                            d.0.cluster_id,
+                            Some(d.0.detector_id),
+                            Some(d.2.qualifier),
+                            Some(d.1.status),
+                            Some(d.3.category),
+                            Some(d.0.signature),
+                            Some(d.4.topic_name),
+                            Some(cluster_size),
+                            d.0.score,
+                            examples,
+                            d.0.last_modification_time,
+                        )
+                    })
+                    .collect();
                 Ok(clusters)
             });
 
@@ -229,7 +229,7 @@ impl DB {
                         let score = if select.8 { d.0.score } else { None };
                         let examples = if select.9 {
                             d.0.examples.and_then(|eg| {
-                                rmp_serde::decode::from_slice::<Vec<Example>>(&eg).ok()
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()
                             })
                         } else {
                             None
@@ -890,44 +890,33 @@ impl DB {
 
     fn merge_cluster_examples(
         current_examples: Option<Vec<u8>>,
-        new_examples: Option<Vec<Example>>,
+        new_examples: Option<Vec<u64>>,
     ) -> Option<Vec<u8>> {
-        let max_examples_num: usize = 25;
-
-        match new_examples {
-            Some(new_eg) => {
-                if new_eg.len() >= max_examples_num {
-                    match rmp_serde::encode::to_vec(&new_eg) {
-                        Ok(new_eg) => Some(new_eg),
-                        Err(_) => current_examples,
-                    }
-                } else if let Some(current_eg) = current_examples.clone() {
-                    match rmp_serde::decode::from_slice::<Vec<Example>>(&current_eg) {
-                        Ok(mut current_eg) => {
-                            current_eg.extend(new_eg);
-                            if current_eg.len() > max_examples_num {
-                                current_eg.sort();
-                                let (_, current_eg) =
-                                    current_eg.split_at(current_eg.len() - max_examples_num);
-                                match rmp_serde::encode::to_vec(&current_eg) {
-                                    Ok(eg) => Some(eg),
-                                    Err(_) => current_examples,
-                                }
-                            } else {
-                                match rmp_serde::encode::to_vec(&current_eg) {
-                                    Ok(eg) => Some(eg),
-                                    Err(_) => current_examples,
-                                }
-                            }
-                        }
-                        Err(_) => current_examples,
-                    }
-                } else {
-                    None
+        let max_example_num: usize = 25;
+        new_examples.map_or(current_examples.clone(), |new_examples| {
+            if new_examples.len() >= max_example_num {
+                match rmp_serde::encode::to_vec(&new_examples) {
+                    Ok(new_examples) => Some(new_examples),
+                    Err(_) => current_examples,
                 }
+            } else {
+                current_examples.map(|current_eg| {
+                    match rmp_serde::decode::from_slice::<Vec<u64>>(&current_eg) {
+                        Ok(mut eg) => {
+                            eg.extend(new_examples);
+                            let example = if eg.len() > max_example_num {
+                                let (_, eg) = eg.split_at(eg.len() - max_example_num);
+                                rmp_serde::encode::to_vec(&eg)
+                            } else {
+                                rmp_serde::encode::to_vec(&eg)
+                            };
+                            example.unwrap_or(current_eg)
+                        }
+                        Err(_) => current_eg,
+                    }
+                })
             }
-            None => current_examples,
-        }
+        })
     }
 
     pub fn update_category(

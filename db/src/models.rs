@@ -57,7 +57,7 @@ pub struct ClusterUpdate {
     pub data_source: String,
     pub data_source_type: String,
     pub size: Option<usize>,
-    pub examples: Option<Vec<Example>>,
+    pub examples: Option<Vec<u64>>,
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
