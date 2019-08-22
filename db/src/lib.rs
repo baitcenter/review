@@ -905,6 +905,7 @@ impl DB {
                         Ok(mut eg) => {
                             eg.extend(new_examples);
                             let example = if eg.len() > max_example_num {
+                                eg.sort();
                                 let (_, eg) = eg.split_at(eg.len() - max_example_num);
                                 rmp_serde::encode::to_vec(&eg)
                             } else {
