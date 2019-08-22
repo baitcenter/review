@@ -70,7 +70,7 @@ table! {
     RawEvent (event_id) {
         event_id -> Text,
         raw_event -> Binary,
-        data_source -> Text,
+        data_source_id -> Integer,
     }
 }
 
@@ -87,6 +87,7 @@ joinable!(Clusters -> Qualifier (qualifier_id));
 joinable!(Clusters -> Status (status_id));
 joinable!(Clusters -> DataSource (data_source_id));
 joinable!(Outliers -> DataSource (data_source_id));
+joinable!(RawEvent -> DataSource (data_source_id));
 
 allow_tables_to_appear_in_same_query!(
     Action, Category, Clusters, DataSource, Outliers, Priority, Qualifier, RawEvent, Status,

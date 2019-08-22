@@ -47,7 +47,7 @@ CREATE TABLE DataSource (
 CREATE TABLE Outliers (
   id INTEGER PRIMARY KEY,
   raw_event BLOB NOT NULL,
-  data_source_id TEXT NOT NULL,
+  data_source_id INTEGER NOT NULL,
   event_ids BLOB,
   size TEXT,
   UNIQUE (raw_event, data_source_id) ON CONFLICT REPLACE,
@@ -76,9 +76,10 @@ INSERT INTO Priority VALUES(3,'high');
 CREATE TABLE RawEvent (
   event_id TEXT NOT NULL,
   raw_event BLOB NOT NULL,
-  data_source TEXT NOT NULL,
-  PRIMARY KEY (event_id, data_source),
-  UNIQUE (event_id, data_source) ON CONFLICT REPLACE
+  data_source_id INTEGER NOT NULL,
+  PRIMARY KEY (event_id, data_source_id),
+  UNIQUE (event_id, data_source_id) ON CONFLICT REPLACE
+  FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE
 );
 
 -- Status is the current system status of the cluster. --

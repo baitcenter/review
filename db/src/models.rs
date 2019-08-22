@@ -138,7 +138,7 @@ pub struct QualifierTable {
 pub struct RawEventTable {
     pub event_id: String,
     pub raw_event: Vec<u8>,
-    pub data_source: String,
+    pub data_source_id: i32,
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
