@@ -59,6 +59,10 @@ pub enum InitializeErrorReason {
     ClientUrl,
     DatabaseFileNotFound,
     DatabaseInitialization,
+    MissingDatabaseURL,
+    MissingDockerHostIp,
+    MissingEtcdAddr,
+    MissingReviewdAddr,
     REviewd,
     REviewdUrl,
 }
@@ -74,12 +78,12 @@ impl Display for InitializeErrorReason {
                 f,
                 "Invalid url format. Please specify a url in the form of http://<hostname>:<port number>"
             ),
-            InitializeErrorReason::DatabaseFileNotFound => {
-                write!(f, "Could not find the database file")
-            }
-            InitializeErrorReason::DatabaseInitialization => {
-                write!(f, "Could not initialize the database")
-            }
+            InitializeErrorReason::DatabaseFileNotFound => write!(f, "Could not find the database file"),
+            InitializeErrorReason::DatabaseInitialization => write!(f, "Could not initialize the database"),
+            InitializeErrorReason::MissingDatabaseURL => write!(f, "DATABASE_URL is not set"),
+            InitializeErrorReason::MissingEtcdAddr => write!(f, "ETCD_ADDR is not set"),
+            InitializeErrorReason::MissingReviewdAddr => write!(f, "REVIEWD_ADDR is not set"),
+            InitializeErrorReason::MissingDockerHostIp => write!(f, "DOCKER_HOST_IP is not set"),
             InitializeErrorReason::REviewd => write!(f, "Could not initialize REviewd"),
             InitializeErrorReason::REviewdUrl => write!(
                 f,

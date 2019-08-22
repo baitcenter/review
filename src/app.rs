@@ -52,10 +52,18 @@ pub fn init() -> Result<(), Error> {
         }
     } else if matches.subcommand_matches("reviewd").is_some() {
         dotenv::dotenv().ok();
-        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is not set.");
-        let reviewd_addr = std::env::var("REVIEWD_ADDR").expect("REVIEWD_ADDR is not set");
-        let etcd_addr = std::env::var("ETCD_ADDR").expect("ETCD_ADDR is not set");
-        let docker_host_ip = std::env::var("DOCKER_HOST_IP").expect("DOCKER_HOST_IP is not set");
+        let database_url = std::env::var("DATABASE_URL").context(ErrorKind::Initialize(
+            InitializeErrorReason::MissingDatabaseURL,
+        ))?;
+        let reviewd_addr = std::env::var("REVIEWD_ADDR").context(ErrorKind::Initialize(
+            InitializeErrorReason::MissingReviewdAddr,
+        ))?;
+        let etcd_addr = std::env::var("ETCD_ADDR").context(ErrorKind::Initialize(
+            InitializeErrorReason::MissingEtcdAddr,
+        ))?;
+        let docker_host_ip = std::env::var("DOCKER_HOST_IP").context(ErrorKind::Initialize(
+            InitializeErrorReason::MissingEtcdAddr,
+        ))?;
 
         if fs::metadata(&database_url).is_err() {
             fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
@@ -65,14 +73,14 @@ pub fn init() -> Result<(), Error> {
                 InitializeErrorReason::DatabaseInitialization,
             ))?;
         }
-        let docker_host_addr = format!("{}:8080", docker_host_ip);
 
         let new_service = move || {
+            let docker_host_addr = format!("{}:8080", docker_host_ip);
             let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
             let api_service = api_service::ApiService::new(
                 &database_url,
-                docker_host_addr.as_str(),
-                etcd_url.as_str(),
+                &docker_host_addr,
+                &etcd_url,
             )
             .map_err(|e| panic!("Reviewd initialization fails: {}", e))
             .and_then(|srv| {
