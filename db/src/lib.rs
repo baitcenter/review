@@ -99,18 +99,17 @@ impl DB {
         &self,
         data_source: &str,
         max_event_count: usize,
-    ) -> impl Future<Item = (usize, String), Error = Error> {
+    ) -> impl Future<Item = usize, Error = Error> {
         if let (Ok(event_ids), Ok(consumer)) = (
             DB::get_examples(self, data_source),
             EventorKafka::new(&self.kafka_url, data_source, "REviewd"),
         ) {
+            let data_source_id = DB::get_data_source_id(self, data_source).unwrap_or_default();
             let raw_events: Vec<RawEventTable> =
                 EventorKafka::fetch_messages(&consumer, max_event_count)
                     .into_iter()
                     .filter(|data| event_ids.iter().any(|e| data.id() == *e))
                     .filter_map(|data| {
-                        let data_source_id =
-                            DB::get_data_source_id(self, data_source).unwrap_or_default();
                         if data_source_id != 0 {
                             Some(RawEventTable {
                                 event_id: data.id().to_string(),
@@ -130,45 +129,44 @@ impl DB {
                     .get()
                     .map_err(Into::into)
                     .and_then(|conn| {
-                        diesel::replace_into(dsl::RawEvent)
-                            .values(raw_events)
-                            .execute(&*conn)
-                            .map_err(Into::into)
+                        Ok((
+                            diesel::replace_into(dsl::RawEvent)
+                                .values(raw_events)
+                                .execute(&*conn)
+                                .map_err(Into::into),
+                            conn,
+                        ))
                     })
-                    .and_then(|row| Ok((row, data_source.to_string())));
+                    .and_then(|(row, conn)| {
+                        if let (Ok(examples), Ok(event_ids)) = (
+                            DB::get_examples(self, data_source),
+                            DB::get_raw_events(self, data_source),
+                        ) {
+                            let examples: HashSet<_> = HashSet::from_iter(examples);
+                            let event_ids: HashSet<_> =
+                                event_ids.into_iter().map(|(e, _)| e).collect();
+                            let diff: Vec<_> = event_ids.difference(&examples).collect();
+                            if !diff.is_empty() {
+                                for d in diff {
+                                    let _ = diesel::delete(
+                                        dsl::RawEvent.filter(
+                                            dsl::data_source_id
+                                                .eq(data_source_id)
+                                                .and(dsl::event_id.eq(d.to_string())),
+                                        ),
+                                    )
+                                    .execute(&*conn);
+                                }
+                            }
+                        }
+                        row
+                    });
 
                 return future::result(execution_result);
             }
         }
 
-        future::result(Ok((0, data_source.to_string())))
-    }
-
-    pub fn delete_raw_events(&self, data_source: &str) {
-        use schema::RawEvent::dsl;
-
-        if let (Ok(examples), Ok(event_ids), Ok(data_source_id), Ok(conn)) = (
-            DB::get_examples(self, data_source),
-            DB::get_raw_events(self, data_source),
-            DB::get_data_source_id(self, data_source),
-            self.pool.get(),
-        ) {
-            let examples: HashSet<_> = HashSet::from_iter(examples);
-            let event_ids: HashSet<_> = event_ids.into_iter().map(|(e, _)| e).collect();
-            let diff: Vec<_> = event_ids.difference(&examples).collect();
-            if !diff.is_empty() {
-                for d in diff {
-                    let _ = diesel::delete(
-                        dsl::RawEvent.filter(
-                            dsl::data_source_id
-                                .eq(data_source_id)
-                                .and(dsl::event_id.eq(d.to_string())),
-                        ),
-                    )
-                    .execute(&*conn);
-                }
-            }
-        }
+        future::result(Ok(0))
     }
 
     fn get_examples(&self, data_source: &str) -> Result<Vec<u64>, Error> {
