@@ -7,7 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 ### Added
 - Added new tables called `RawEvents` and `DataSource` in database schema.
-- Added kafka consumer to fetch messages directly from Kafka for raw events.
+- Added kafka consumer to fetch messages directly from Kafka for raw events. 
+  The environment variable, KAFKA_URL, must be set to run REviewd.
 
 ### Removed
 - Removed REview file mode. REview is no longer able to read REmake output files.
