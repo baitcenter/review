@@ -163,6 +163,37 @@ impl ApiService {
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
+                (&Method::PUT, "/api/raw_events") => {
+                    let hash_query: HashMap<_, _> =
+                        url::form_urlencoded::parse(query.as_ref()).collect();
+                    if let (Some(data_source), Some(max_event_count), 2) = (
+                        hash_query.get("data_source"),
+                        hash_query.get("max_event_count"),
+                        hash_query.len(),
+                    ) {
+                        if let Ok(max_event_count) = max_event_count.parse::<usize>() {
+                            let resp =
+                                db::DB::add_raw_events(&self.db, &data_source, max_event_count)
+                                    .and_then(move |(add_result, data_source)| {
+                                        if add_result != 0 {
+                                            db::DB::delete_raw_events(&self.db, &data_source);
+                                            future::ok(
+                                        Response::builder()
+                                            .status(StatusCode::CREATED)
+                                            .body(Body::from("RawEvent table have been updated"))
+                                            .expect("builder with known status code must not fail"),
+                                    )
+                                        } else {
+                                            future::ok(ApiService::build_http_500_response())
+                                        }
+                                    })
+                                    .map_err(Into::into);
+
+                            return Box::new(resp);
+                        }
+                    }
+                    Box::new(future::ok(ApiService::build_http_400_response()))
+                }
                 (&Method::PUT, "/api/etcd/suspicious_tokens") => {
                     let query = url::form_urlencoded::parse(query.as_ref())
                         .into_owned()
