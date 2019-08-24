@@ -4,10 +4,10 @@ use futures::future::Future;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::rt::Stream;
 use hyper::{header, Body, Method, Request, Response, StatusCode};
+use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use url::percent_encoding::percent_decode;
 
 mod error;
 use error::Error;
