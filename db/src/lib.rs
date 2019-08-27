@@ -27,7 +27,7 @@ pub type ClusterResponse = (
     Option<String>,                // data_source
     Option<usize>,                 // size
     Option<f64>,                   // score
-    Option<Vec<u64>>,              // examples
+    Option<Vec<Example>>,          // examples
     Option<chrono::NaiveDateTime>, // last_modification_time
 );
 pub type SelectCluster = (
@@ -169,6 +169,16 @@ impl DB {
         future::result(Ok(0))
     }
 
+    fn get_data_sources(&self) -> Result<Vec<String>, Error> {
+        use schema::DataSource::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::DataSource
+                .select(dsl::topic_name)
+                .load::<String>(&conn)
+                .map_err(Into::into)
+        })
+    }
+
     fn get_examples(&self, data_source: &str) -> Result<Vec<u64>, Error> {
         use schema::Clusters::dsl;
         if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
@@ -250,12 +260,37 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
+                let data_sources: HashSet<String> =
+                    HashSet::from_iter(DB::get_data_sources(self).unwrap_or_default());
+                let events: HashMap<String, HashMap<u64, Vec<u8>>> = data_sources
+                    .into_iter()
+                    .map(|d| (d.clone(), DB::get_raw_events(self, &d).unwrap_or_default()))
+                    .collect();
                 let clusters = data
                     .into_iter()
                     .map(|d| {
-                        let examples =
-                            d.0.examples
-                                .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok());
+                        let data_source_clone = d.4.topic_name.clone();
+                        let examples = &d.0.examples.and_then(|e| {
+                            let event_ids = rmp_serde::decode::from_slice::<Vec<u64>>(&e);
+                            if let (Ok(event_ids), Some(raw_events)) =
+                                (event_ids, events.get(&data_source_clone))
+                            {
+                                Some(
+                                    event_ids
+                                        .iter()
+                                        .map(|e| Example {
+                                            id: *e,
+                                            raw_event: (raw_events
+                                                .get(e)
+                                                .map_or("-".to_string(), |e| bytes_to_string(&e)))
+                                            .to_string(),
+                                        })
+                                        .collect(),
+                                )
+                            } else {
+                                None
+                            }
+                        });
                         let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
                         (
                             d.0.cluster_id,
@@ -267,7 +302,7 @@ impl DB {
                             Some(d.4.topic_name),
                             Some(cluster_size),
                             d.0.score,
-                            examples,
+                            examples.clone(),
                             d.0.last_modification_time,
                         )
                     })
@@ -335,6 +370,12 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
+                let data_sources: HashSet<String> =
+                    HashSet::from_iter(DB::get_data_sources(self).unwrap_or_default());
+                let events: HashMap<String, HashMap<u64, Vec<u8>>> = data_sources
+                    .into_iter()
+                    .map(|d| (d.clone(), DB::get_raw_events(self, &d).unwrap_or_default()))
+                    .collect();
                 let clusters: Vec<ClusterResponse> = data
                     .into_iter()
                     .map(|d| {
@@ -349,7 +390,7 @@ impl DB {
                         let category = if select.4 { Some(d.3.category) } else { None };
                         let signature = if select.5 { Some(d.0.signature) } else { None };
                         let data_source = if select.6 {
-                            Some(d.4.topic_name)
+                            Some(d.4.topic_name.clone())
                         } else {
                             None
                         };
@@ -360,8 +401,25 @@ impl DB {
                         };
                         let score = if select.8 { d.0.score } else { None };
                         let examples = if select.9 {
-                            d.0.examples.and_then(|eg| {
-                                rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()
+                            let data_source_clone = d.4.topic_name.clone();
+                            d.0.examples.and_then(|e| {
+                                let event_ids = rmp_serde::decode::from_slice::<Vec<u64>>(&e);
+                                if let (Ok(event_ids), Some(raw_events)) = (event_ids, events.get(&data_source_clone))
+                                {
+                                    Some(
+                                        event_ids
+                                            .iter()
+                                            .map(|e| Example {
+                                                id: *e,
+                                                raw_event: (raw_events
+                                                    .get(e)
+                                                    .map_or("-".to_string(), |e| bytes_to_string(&e))).to_string(),
+                                            })
+                                            .collect()
+                                    )
+                                } else {
+                                    None
+                                }
                             })
                         } else {
                             None
@@ -1069,4 +1127,8 @@ impl DB {
         });
         future::result(update_result)
     }
+}
+
+fn bytes_to_string(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| char::from(*b)).collect()
 }
