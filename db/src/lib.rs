@@ -100,25 +100,28 @@ impl DB {
         data_source: &str,
         max_event_count: usize,
     ) -> impl Future<Item = usize, Error = Error> {
-        if let (Ok(event_ids), Ok(consumer)) = (
+        if let (
+            Ok(event_ids_from_clusters),
+            Ok(event_ids_from_outliers),
+            Ok(consumer),
+            Ok(data_source_id),
+        ) = (
             DB::get_examples(self, data_source),
+            DB::get_event_ids_from_outlier(self, data_source),
             EventorKafka::new(&self.kafka_url, data_source, "REviewd"),
+            DB::get_data_source_id(self, data_source),
         ) {
-            let data_source_id = DB::get_data_source_id(self, data_source).unwrap_or_default();
             let raw_events: Vec<RawEventTable> =
                 EventorKafka::fetch_messages(&consumer, max_event_count)
                     .into_iter()
-                    .filter(|data| event_ids.iter().any(|e| data.id() == *e))
-                    .filter_map(|data| {
-                        if data_source_id != 0 {
-                            Some(RawEventTable {
-                                event_id: data.id().to_string(),
-                                raw_event: data.data().to_vec(),
-                                data_source_id,
-                            })
-                        } else {
-                            None
-                        }
+                    .filter(|data| {
+                        event_ids_from_clusters.iter().any(|e| data.id() == *e)
+                            || event_ids_from_outliers.iter().any(|e| data.id() == *e)
+                    })
+                    .map(|data| RawEventTable {
+                        event_id: data.id().to_string(),
+                        raw_event: data.data().to_vec(),
+                        data_source_id,
                     })
                     .collect();
 
@@ -138,14 +141,23 @@ impl DB {
                         ))
                     })
                     .and_then(|(row, conn)| {
-                        if let (Ok(examples), Ok(event_ids)) = (
+                        if let (
+                            Ok(mut event_ids_from_clusters),
+                            Ok(event_ids_from_outliers),
+                            Ok(event_ids_from_raw_events),
+                        ) = (
                             DB::get_examples(self, data_source),
+                            DB::get_event_ids_from_outlier(self, data_source),
                             DB::get_raw_events(self, data_source),
                         ) {
-                            let examples: HashSet<_> = HashSet::from_iter(examples);
-                            let event_ids: HashSet<_> =
-                                event_ids.into_iter().map(|(e, _)| e).collect();
-                            let diff: Vec<_> = event_ids.difference(&examples).collect();
+                            event_ids_from_clusters.extend(&event_ids_from_outliers);
+                            let event_ids: HashSet<_> = HashSet::from_iter(event_ids_from_clusters);
+                            let event_ids_from_raw_events: HashSet<_> = event_ids_from_raw_events
+                                .into_iter()
+                                .map(|(e, _)| e)
+                                .collect();
+                            let diff: Vec<_> =
+                                event_ids_from_raw_events.difference(&event_ids).collect();
                             if !diff.is_empty() {
                                 for d in diff {
                                     let _ = diesel::delete(
@@ -194,6 +206,32 @@ impl DB {
                 })
                 .map(|examples| {
                     examples
+                        .into_iter()
+                        .filter_map(|e| e)
+                        .filter_map(|e| rmp_serde::decode::from_slice::<Vec<u64>>(&e).ok())
+                        .flatten()
+                        .collect()
+                })
+        } else {
+            Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
+        }
+    }
+
+    fn get_event_ids_from_outlier(&self, data_source: &str) -> Result<Vec<u64>, Error> {
+        use schema::Outliers::dsl;
+        if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
+            self.pool
+                .get()
+                .map_err(Into::into)
+                .and_then(|conn| {
+                    dsl::Outliers
+                        .filter(dsl::data_source_id.eq(data_source_id))
+                        .select(dsl::event_ids)
+                        .load::<Option<Vec<u8>>>(&conn)
+                        .map_err(Into::into)
+                })
+                .map(|event_ids| {
+                    event_ids
                         .into_iter()
                         .filter_map(|e| e)
                         .filter_map(|e| rmp_serde::decode::from_slice::<Vec<u64>>(&e).ok())
@@ -556,10 +594,10 @@ impl DB {
                                     },
                                 );
                                 event_ids.extend(&o.event_ids);
-                                // only store most recent 100 event_ids per outlier
-                                let event_ids = if event_ids.len() > 100 {
+                                // only store most recent 25 event_ids per outlier
+                                let event_ids = if event_ids.len() > 25 {
                                     event_ids.sort();
-                                    let (_, event_ids) = event_ids.split_at(event_ids.len() - 100);
+                                    let (_, event_ids) = event_ids.split_at(event_ids.len() - 25);
                                     event_ids
                                 } else {
                                     &event_ids
@@ -579,12 +617,12 @@ impl DB {
                                     None
                                 }
                             } else {
-                                // only store most recent 100 event_ids per outlier
+                                // only store most recent 25 event_ids per outlier
                                 let mut event_ids_cloned = o.event_ids.clone();
-                                let event_ids = if event_ids_cloned.len() > 100 {
+                                let event_ids = if event_ids_cloned.len() > 25 {
                                     event_ids_cloned.sort();
                                     let (_, event_ids) =
-                                        event_ids_cloned.split_at(o.event_ids.len() - 100);
+                                        event_ids_cloned.split_at(o.event_ids.len() - 25);
                                     event_ids
                                 } else {
                                     &o.event_ids
