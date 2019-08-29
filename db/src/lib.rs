@@ -545,7 +545,7 @@ impl DB {
     pub fn update_outliers(
         &self,
         outlier_update: &[OutlierUpdate],
-    ) -> impl Future<Item = usize, Error = Error> {
+    ) -> future::FutureResult<usize, Error> {
         use schema::Outliers::dsl;
         let mut query = dsl::Outliers.into_boxed();
         for outlier in outlier_update.iter() {
