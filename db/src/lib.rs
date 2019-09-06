@@ -8,8 +8,7 @@ use futures::prelude::*;
 use models::*;
 use remake::event::Identifiable;
 use remake::stream::EventorKafka;
-use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
+use std::collections::HashMap;
 
 pub mod error;
 pub use self::error::{DatabaseError, Error, ErrorKind};
@@ -27,7 +26,7 @@ pub type ClusterResponse = (
     Option<String>,                // data_source
     Option<usize>,                 // size
     Option<f64>,                   // score
-    Option<Vec<Example>>,          // examples
+    Option<Example>,               // examples
     Option<chrono::NaiveDateTime>, // last_modification_time
 );
 pub type SelectCluster = (
@@ -106,74 +105,99 @@ impl DB {
             Ok(consumer),
             Ok(data_source_id),
         ) = (
-            DB::get_examples(self, data_source),
+            DB::get_event_ids_from_cluster(self, data_source),
             DB::get_event_ids_from_outlier(self, data_source),
             EventorKafka::new(&self.kafka_url, data_source, "REviewd"),
             DB::get_data_source_id(self, data_source),
         ) {
-            let raw_events: Vec<RawEventTable> =
+            use schema::*;
+            #[derive(Insertable)]
+            #[table_name = "RawEvent"]
+            struct InsertRawEvent {
+                raw_event: Vec<u8>,
+                data_source_id: i32,
+            }
+            #[derive(Queryable)]
+            struct UpdateRawEventId {
+                id: Option<i32>,
+                raw_event: Vec<u8>,
+                is_cluster: bool,
+            }
+            let mut update_lists = Vec::<UpdateRawEventId>::new();
+            let raw_events: Vec<InsertRawEvent> =
                 EventorKafka::fetch_messages(&consumer, max_event_count)
                     .into_iter()
-                    .filter(|data| {
-                        event_ids_from_clusters.iter().any(|e| data.id() == *e)
-                            || event_ids_from_outliers.iter().any(|e| data.id() == *e)
-                    })
-                    .map(|data| RawEventTable {
-                        event_id: data.id().to_string(),
-                        raw_event: data.data().to_vec(),
-                        data_source_id,
+                    .filter_map(|data| {
+                        if let Some(c) = event_ids_from_clusters.iter().find(|d| data.id() == d.1) {
+                            update_lists.push(UpdateRawEventId {
+                                id: c.0,
+                                raw_event: data.data().to_vec(),
+                                is_cluster: true,
+                            });
+                            Some(InsertRawEvent {
+                                raw_event: data.data().to_vec(),
+                                data_source_id,
+                            })
+                        } else if let Some(o) =
+                            event_ids_from_outliers.iter().find(|d| data.id() == d.1)
+                        {
+                            update_lists.push(UpdateRawEventId {
+                                id: o.0,
+                                raw_event: data.data().to_vec(),
+                                is_cluster: false,
+                            });
+                            Some(InsertRawEvent {
+                                raw_event: data.data().to_vec(),
+                                data_source_id,
+                            })
+                        } else {
+                            None
+                        }
                     })
                     .collect();
 
             if !raw_events.is_empty() {
-                use schema::RawEvent::dsl;
                 let execution_result = self
                     .pool
                     .get()
                     .map_err(Into::into)
                     .and_then(|conn| {
                         Ok((
-                            diesel::replace_into(dsl::RawEvent)
-                                .values(raw_events)
+                            diesel::insert_into(RawEvent::dsl::RawEvent)
+                                .values(&raw_events)
                                 .execute(&*conn)
                                 .map_err(Into::into),
                             conn,
                         ))
                     })
                     .and_then(|(row, conn)| {
-                        if let (
-                            Ok(mut event_ids_from_clusters),
-                            Ok(event_ids_from_outliers),
-                            Ok(event_ids_from_raw_events),
-                        ) = (
-                            DB::get_examples(self, data_source),
-                            DB::get_event_ids_from_outlier(self, data_source),
-                            DB::get_raw_events(self, data_source),
-                        ) {
-                            event_ids_from_clusters.extend(&event_ids_from_outliers);
-                            let event_ids: HashSet<_> = HashSet::from_iter(event_ids_from_clusters);
-                            let event_ids_from_raw_events: HashSet<_> = event_ids_from_raw_events
+                        if let Ok(raw_events) =
+                            DB::get_raw_events_by_data_source_id(self, data_source_id)
+                        {
+                            let raw_events = raw_events
                                 .into_iter()
-                                .map(|(e, _)| e)
-                                .collect();
-                            let diff: Vec<_> =
-                                event_ids_from_raw_events.difference(&event_ids).collect();
-                            if !diff.is_empty() {
-                                for d in diff {
-                                    let _ = diesel::delete(
-                                        dsl::RawEvent.filter(
-                                            dsl::data_source_id
-                                                .eq(data_source_id)
-                                                .and(dsl::event_id.eq(d.to_string())),
-                                        ),
-                                    )
-                                    .execute(&*conn);
+                                .map(|e| (e.1, e.0))
+                                .collect::<HashMap<Vec<u8>, i32>>();
+                            for u in update_lists {
+                                if let Some(raw_event_id) = raw_events.get(&u.raw_event) {
+                                    if u.is_cluster {
+                                        use schema::Clusters::dsl;
+                                        let _ =
+                                            diesel::update(dsl::Clusters.filter(dsl::id.eq(u.id)))
+                                                .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                                .execute(&*conn);
+                                    } else {
+                                        use schema::Outliers::dsl;
+                                        let _ =
+                                            diesel::update(dsl::Outliers.filter(dsl::id.eq(u.id)))
+                                                .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                                .execute(&*conn);
+                                    }
                                 }
                             }
                         }
                         row
                     });
-
                 return future::result(execution_result);
             }
         }
@@ -181,17 +205,10 @@ impl DB {
         future::result(Ok(0))
     }
 
-    fn get_data_sources(&self) -> Result<Vec<String>, Error> {
-        use schema::DataSource::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
-            dsl::DataSource
-                .select(dsl::topic_name)
-                .load::<String>(&conn)
-                .map_err(Into::into)
-        })
-    }
-
-    fn get_examples(&self, data_source: &str) -> Result<Vec<u64>, Error> {
+    fn get_event_ids_from_cluster(
+        &self,
+        data_source: &str,
+    ) -> Result<Vec<(Option<i32>, u64)>, Error> {
         use schema::Clusters::dsl;
         if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
             self.pool
@@ -199,17 +216,28 @@ impl DB {
                 .map_err(Into::into)
                 .and_then(|conn| {
                     dsl::Clusters
-                        .filter(dsl::data_source_id.eq(data_source_id))
-                        .select(dsl::examples)
-                        .load::<Option<Vec<u8>>>(&conn)
+                        .filter(
+                            dsl::data_source_id
+                                .eq(data_source_id)
+                                .and(dsl::raw_event_id.is_null()),
+                        )
+                        .select((dsl::id, dsl::examples))
+                        .load::<(Option<i32>, Option<Vec<u8>>)>(&conn)
                         .map_err(Into::into)
                 })
-                .map(|examples| {
-                    examples
-                        .into_iter()
-                        .filter_map(|e| e)
-                        .filter_map(|e| rmp_serde::decode::from_slice::<Vec<u64>>(&e).ok())
-                        .flatten()
+                .map(|data| {
+                    data.into_iter()
+                        .filter_map(|d| {
+                            let id = d.0;
+                            d.1.and_then(|examples| {
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&examples).ok()
+                            })
+                            .filter(|examples| !examples.is_empty())
+                            .map(|mut examples| {
+                                examples.sort();
+                                (id, examples[examples.len() - 1])
+                            })
+                        })
                         .collect()
                 })
         } else {
@@ -217,7 +245,10 @@ impl DB {
         }
     }
 
-    fn get_event_ids_from_outlier(&self, data_source: &str) -> Result<Vec<u64>, Error> {
+    fn get_event_ids_from_outlier(
+        &self,
+        data_source: &str,
+    ) -> Result<Vec<(Option<i32>, u64)>, Error> {
         use schema::Outliers::dsl;
         if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
             self.pool
@@ -225,17 +256,28 @@ impl DB {
                 .map_err(Into::into)
                 .and_then(|conn| {
                     dsl::Outliers
-                        .filter(dsl::data_source_id.eq(data_source_id))
-                        .select(dsl::event_ids)
-                        .load::<Option<Vec<u8>>>(&conn)
+                        .filter(
+                            dsl::data_source_id
+                                .eq(data_source_id)
+                                .and(dsl::raw_event_id.is_null()),
+                        )
+                        .select((dsl::id, dsl::event_ids))
+                        .load::<(Option<i32>, Option<Vec<u8>>)>(&conn)
                         .map_err(Into::into)
                 })
-                .map(|event_ids| {
-                    event_ids
-                        .into_iter()
-                        .filter_map(|e| e)
-                        .filter_map(|e| rmp_serde::decode::from_slice::<Vec<u64>>(&e).ok())
-                        .flatten()
+                .map(|data| {
+                    data.into_iter()
+                        .filter_map(|d| {
+                            let id = d.0;
+                            d.1.and_then(|examples| {
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&examples).ok()
+                            })
+                            .filter(|examples| !examples.is_empty())
+                            .map(|mut examples| {
+                                examples.sort();
+                                (id, examples[examples.len() - 1])
+                            })
+                        })
                         .collect()
                 })
         } else {
@@ -243,28 +285,29 @@ impl DB {
         }
     }
 
-    fn get_raw_events(&self, data_source: &str) -> Result<HashMap<u64, Vec<u8>>, Error> {
+    fn get_raw_events_by_data_source_id(
+        &self,
+        data_source_id: i32,
+    ) -> Result<Vec<(i32, Vec<u8>)>, Error> {
         use schema::RawEvent::dsl;
-        if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
-            self.pool
-                .get()
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::RawEvent
+                .filter(dsl::data_source_id.eq(data_source_id))
+                .select((dsl::raw_event_id, dsl::raw_event))
+                .load::<(i32, Vec<u8>)>(&conn)
                 .map_err(Into::into)
-                .and_then(|conn| {
-                    dsl::RawEvent
-                        .filter(dsl::data_source_id.eq(data_source_id))
-                        .select((dsl::event_id, dsl::raw_event))
-                        .load::<(String, Vec<u8>)>(&conn)
-                        .map_err(Into::into)
-                })
-                .map(|raw_events| {
-                    raw_events
-                        .into_iter()
-                        .map(|e| (e.0.parse::<u64>().unwrap_or(0), e.1))
-                        .collect()
-                })
-        } else {
-            Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
-        }
+        })
+    }
+
+    fn get_raw_event_by_raw_event_id(&self, raw_event_id: i32) -> Result<Vec<u8>, Error> {
+        use schema::RawEvent::dsl;
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            dsl::RawEvent
+                .filter(dsl::raw_event_id.eq(raw_event_id))
+                .select(dsl::raw_event)
+                .first::<Vec<u8>>(&conn)
+                .map_err(Into::into)
+        })
     }
 
     pub fn get_category_table(&self) -> impl Future<Item = Vec<CategoryTable>, Error = Error> {
@@ -298,37 +341,29 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let data_sources: HashSet<String> =
-                    HashSet::from_iter(DB::get_data_sources(self).unwrap_or_default());
-                let events: HashMap<String, HashMap<u64, Vec<u8>>> = data_sources
-                    .into_iter()
-                    .map(|d| (d.clone(), DB::get_raw_events(self, &d).unwrap_or_default()))
-                    .collect();
                 let clusters = data
                     .into_iter()
                     .map(|d| {
-                        let data_source_clone = d.4.topic_name.clone();
-                        let examples = &d.0.examples.and_then(|e| {
-                            let event_ids = rmp_serde::decode::from_slice::<Vec<u64>>(&e);
-                            if let (Ok(event_ids), Some(raw_events)) =
-                                (event_ids, events.get(&data_source_clone))
-                            {
-                                Some(
-                                    event_ids
-                                        .iter()
-                                        .map(|e| Example {
-                                            id: *e,
-                                            raw_event: (raw_events
-                                                .get(e)
-                                                .map_or("-".to_string(), |e| bytes_to_string(&e)))
-                                            .to_string(),
-                                        })
-                                        .collect(),
-                                )
+                        let examples = if let Some(event_ids) =
+                            d.0.examples
+                                .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok())
+                        {
+                            let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
+                                DB::get_raw_event_by_raw_event_id(self, raw_event_id)
+                                    .ok()
+                                    .map_or("-".to_string(), |raw_events| {
+                                        bytes_to_string(&raw_events)
+                                    })
                             } else {
-                                None
-                            }
-                        });
+                                "-".to_string()
+                            };
+                            Some(Example {
+                                raw_event,
+                                event_ids,
+                            })
+                        } else {
+                            None
+                        };
                         let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
                         (
                             d.0.cluster_id,
@@ -340,7 +375,7 @@ impl DB {
                             Some(d.4.topic_name),
                             Some(cluster_size),
                             d.0.score,
-                            examples.clone(),
+                            examples,
                             d.0.last_modification_time,
                         )
                     })
@@ -408,12 +443,6 @@ impl DB {
                     .map_err(Into::into)
             })
             .and_then(|data| {
-                let data_sources: HashSet<String> =
-                    HashSet::from_iter(DB::get_data_sources(self).unwrap_or_default());
-                let events: HashMap<String, HashMap<u64, Vec<u8>>> = data_sources
-                    .into_iter()
-                    .map(|d| (d.clone(), DB::get_raw_events(self, &d).unwrap_or_default()))
-                    .collect();
                 let clusters: Vec<ClusterResponse> = data
                     .into_iter()
                     .map(|d| {
@@ -439,26 +468,18 @@ impl DB {
                         };
                         let score = if select.8 { d.0.score } else { None };
                         let examples = if select.9 {
-                            let data_source_clone = d.4.topic_name.clone();
-                            d.0.examples.and_then(|e| {
-                                let event_ids = rmp_serde::decode::from_slice::<Vec<u64>>(&e);
-                                if let (Ok(event_ids), Some(raw_events)) = (event_ids, events.get(&data_source_clone))
-                                {
-                                    Some(
-                                        event_ids
-                                            .iter()
-                                            .map(|e| Example {
-                                                id: *e,
-                                                raw_event: (raw_events
-                                                    .get(e)
-                                                    .map_or("-".to_string(), |e| bytes_to_string(&e))).to_string(),
-                                            })
-                                            .collect()
-                                    )
+                            if let Some(event_ids) = d.0.examples.and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()) {
+                                let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
+                                    DB::get_raw_event_by_raw_event_id(self, raw_event_id)
+                                        .ok()
+                                        .map_or("-".to_string(), |raw_events| bytes_to_string(&raw_events))
                                 } else {
-                                    None
-                                }
-                            })
+                                    "-".to_string()
+                                };
+                                Some(Example {raw_event, event_ids})
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         };
@@ -525,6 +546,7 @@ impl DB {
                             raw_event: new_outlier.outlier.to_vec(),
                             data_source_id,
                             event_ids,
+                            raw_event_id: None,
                             size: o_size,
                         })
                 })
@@ -611,6 +633,7 @@ impl DB {
                                         raw_event: o.outlier.clone(),
                                         data_source_id,
                                         event_ids,
+                                        raw_event_id: outlier.raw_event_id,
                                         size: Some(o_size),
                                     })
                                 } else {
@@ -643,6 +666,7 @@ impl DB {
                                         raw_event: o.outlier.clone(),
                                         data_source_id,
                                         event_ids,
+                                        raw_event_id: None,
                                         size: Some(size.to_string()),
                                     })
                                 } else {
@@ -897,6 +921,7 @@ impl DB {
             cluster_id: Option<String>,
             signature: String,
             examples: Option<Vec<u8>>,
+            raw_event_id: Option<i32>,
             size: String,
             category_id: i32,
             priority_id: i32,
@@ -919,6 +944,7 @@ impl DB {
                     dsl::cluster_id,
                     dsl::signature,
                     dsl::examples,
+                    dsl::raw_event_id,
                     dsl::size,
                     dsl::category_id,
                     dsl::priority_id,
@@ -976,6 +1002,7 @@ impl DB {
                                         category_id: cluster.category_id,
                                         detector_id: c.detector_id,
                                         examples: example,
+                                        raw_event_id: cluster.raw_event_id,
                                         priority_id: cluster.priority_id,
                                         qualifier_id: cluster.qualifier_id,
                                         status_id: cluster.status_id,
@@ -1018,6 +1045,7 @@ impl DB {
                                         category_id: 1,
                                         detector_id: c.detector_id,
                                         examples: example,
+                                        raw_event_id: None,
                                         priority_id: 1,
                                         qualifier_id: 2,
                                         status_id: 2,
@@ -1087,6 +1115,7 @@ impl DB {
                             category_id: 1,
                             detector_id: c.detector_id,
                             examples: example,
+                            raw_event_id: None,
                             priority_id: 1,
                             qualifier_id: 2,
                             status_id: 2,

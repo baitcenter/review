@@ -22,6 +22,7 @@ table! {
         category_id -> Integer,
         detector_id -> Integer,
         examples -> Nullable<Binary>,
+        raw_event_id -> Nullable<Integer>,
         priority_id -> Integer,
         qualifier_id -> Integer,
         status_id -> Integer,
@@ -48,6 +49,7 @@ table! {
         raw_event -> Binary,
         data_source_id -> Integer,
         event_ids -> Nullable<Binary>,
+        raw_event_id -> Nullable<Integer>,
         size -> Nullable<Text>,
     }
 }
@@ -67,8 +69,8 @@ table! {
 }
 
 table! {
-    RawEvent (event_id) {
-        event_id -> Text,
+    RawEvent (raw_event_id) {
+        raw_event_id -> Integer,
         raw_event -> Binary,
         data_source_id -> Integer,
     }
@@ -84,6 +86,7 @@ table! {
 joinable!(Clusters -> Category (category_id));
 joinable!(Clusters -> Priority (priority_id));
 joinable!(Clusters -> Qualifier (qualifier_id));
+joinable!(Clusters -> RawEvent (raw_event_id));
 joinable!(Clusters -> Status (status_id));
 joinable!(Clusters -> DataSource (data_source_id));
 joinable!(Outliers -> DataSource (data_source_id));

@@ -20,6 +20,7 @@ CREATE TABLE Clusters (
   category_id INTEGER NOT NULL,
   detector_id INTEGER NOT NULL,
   examples BLOB,
+  raw_event_id INTEGER,
   priority_id INTEGER NOT NULL,
   qualifier_id INTEGER NOT NULL,
   status_id INTEGER NOT NULL,
@@ -34,6 +35,7 @@ CREATE TABLE Clusters (
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE,
   FOREIGN KEY(priority_id) REFERENCES Priority(priority_id) ON UPDATE CASCADE,
   FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id) ON UPDATE CASCADE,
+  FOREIGN KEY(raw_event_id) REFERENCES RawEvent(raw_event_id) ON UPDATE CASCADE,
   FOREIGN KEY(status_id) REFERENCES Status(status_id) ON UPDATE CASCADE
 );
 
@@ -49,9 +51,11 @@ CREATE TABLE Outliers (
   raw_event BLOB NOT NULL,
   data_source_id INTEGER NOT NULL,
   event_ids BLOB,
+  raw_event_id INTEGER,
   size TEXT,
   UNIQUE (raw_event, data_source_id) ON CONFLICT REPLACE,
-  FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE
+  FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE,
+  FOREIGN KEY(raw_event_id) REFERENCES RawEvent(raw_event_id) ON UPDATE CASCADE
 );
 
 -- Qualifier is the qualification of a cluster (i.e. good or bad). --
@@ -74,11 +78,9 @@ INSERT INTO Priority VALUES(2,'mid');
 INSERT INTO Priority VALUES(3,'high');
 
 CREATE TABLE RawEvent (
-  event_id TEXT NOT NULL,
+  raw_event_id INTEGER NOT NULL PRIMARY KEY,
   raw_event BLOB NOT NULL,
   data_source_id INTEGER NOT NULL,
-  PRIMARY KEY (event_id, data_source_id),
-  UNIQUE (event_id, data_source_id) ON CONFLICT REPLACE
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id) ON UPDATE CASCADE
 );
 

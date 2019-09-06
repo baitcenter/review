@@ -37,6 +37,7 @@ pub struct ClustersTable {
     pub category_id: i32,
     pub detector_id: i32,
     pub examples: Option<Vec<u8>>,
+    pub raw_event_id: Option<i32>,
     pub priority_id: i32,
     pub qualifier_id: i32,
     pub status_id: i32,
@@ -69,28 +70,10 @@ pub struct DataSourceTable {
     pub data_type: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Example {
-    pub id: u64,
     pub raw_event: String,
-}
-
-impl Ord for Example {
-    fn cmp(&self, other: &Example) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-impl PartialOrd for Example {
-    fn partial_cmp(&self, other: &Example) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Example {
-    fn eq(&self, other: &Example) -> bool {
-        self.id == other.id
-    }
+    pub event_ids: Vec<u64>,
 }
 
 #[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
@@ -101,10 +84,11 @@ pub struct OutliersTable {
     pub raw_event: Vec<u8>,
     pub data_source_id: i32,
     pub event_ids: Option<Vec<u8>>,
+    pub raw_event_id: Option<i32>,
     pub size: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OutlierUpdate {
     pub outlier: Vec<u8>,
     pub data_source: String,
@@ -136,7 +120,7 @@ pub struct QualifierTable {
 #[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "RawEvent"]
 pub struct RawEventTable {
-    pub event_id: String,
+    pub raw_event_id: i32,
     pub raw_event: Vec<u8>,
     pub data_source_id: i32,
 }

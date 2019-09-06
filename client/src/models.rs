@@ -16,45 +16,12 @@ pub struct Cluster {
     pub(crate) data_source: String,
     pub(crate) size: usize,
     pub(crate) score: String,
-    pub(crate) examples: Vec<db::models::Example>,
+    pub(crate) examples: db::models::Example,
     pub(crate) last_modification_time: String,
 }
 
 impl Cluster {
     pub(crate) fn get_cluster_properties(&self) -> String {
-        // REview displays at most 3 examples per cluster
-        // if the length of an example is longer than 500,
-        // REview only uses first 500
-        let examples = if self.examples.len() > 3 {
-            let (examples, _) = self.examples.split_at(3);
-            examples
-                .iter()
-                .map(|e| {
-                    if e.raw_event.len() > 500 {
-                        db::models::Example {
-                            id: e.id,
-                            raw_event: e.raw_event[..500].to_string(),
-                        }
-                    } else {
-                        e.clone()
-                    }
-                })
-                .collect::<Vec<_>>()
-        } else {
-            self.examples
-                .iter()
-                .map(|e| {
-                    if e.raw_event.len() > 500 {
-                        db::models::Example {
-                            id: e.id,
-                            raw_event: e.raw_event[..500].to_string(),
-                        }
-                    } else {
-                        e.clone()
-                    }
-                })
-                .collect::<Vec<_>>()
-        };
         format!("cluster_id: {}\ndetector_id: {}\nqualifier: {}\nstatus: {}\nsignature: {}\ndata_source: {}\nscore: {}\nsize: {}\nexample: {:#?}\nlast_modification_time: {}", 
             self.cluster_id,
             self.detector_id,
@@ -64,7 +31,7 @@ impl Cluster {
             self.data_source,
             self.score,
             self.size,
-            examples,
+            self.examples,
             self.last_modification_time,
         )
     }

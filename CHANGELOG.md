@@ -10,6 +10,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added kafka consumer to fetch messages directly from Kafka for raw events. 
   The environment variable, KAFKA_URL, must be set to run REviewd.
 
+### Changed
+- Each cluster `examples` is a pair of a single `raw_event` and a list of `event_ids` like below:
+```
+"examples": {
+            "raw_event": "something",
+            "event_ids": [
+                464118,
+                465078
+            ]
+          }
+```
+- If a cluster is created only from training files, `raw_event` in `examples` will be `-`.
+
 ### Removed
 - Removed REview file mode. REview is no longer able to read REmake output files.
 
