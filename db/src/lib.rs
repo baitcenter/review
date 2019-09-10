@@ -2,7 +2,7 @@
 extern crate diesel;
 
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use futures::future;
 use futures::prelude::*;
 use models::*;
@@ -16,6 +16,7 @@ pub mod models;
 mod schema;
 
 type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+type ConnType = PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>;
 pub type ClusterResponse = (
     Option<String>,                // cluster_id
     Option<i32>,                   // detector_id
@@ -62,13 +63,22 @@ impl DB {
         Box::new(future::result(db))
     }
 
+    fn get_connection(&self) -> Result<ConnType, Error> {
+        self.pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::sql_query("PRAGMA busy_timeout = 60000;")
+                .execute(&conn)
+                .map(|_| conn)
+                .map_err(Into::into)
+        })
+    }
+
     pub fn add_category(&self, new_category: &str) -> impl Future<Item = usize, Error = Error> {
         use schema::Category::dsl::*;
         let c = CategoryTable {
             category_id: None,
             category: new_category.to_string(),
         };
-        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let insert_result = self.get_connection().and_then(|conn| {
             diesel::insert_into(Category)
                 .values(&c)
                 .execute(&conn)
@@ -81,7 +91,7 @@ impl DB {
     fn add_data_source(&self, data_source: &str, data_type: &str) -> i32 {
         use schema::DataSource::dsl;
 
-        let _: Result<usize, Error> = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let _: Result<usize, Error> = self.get_connection().and_then(|conn| {
             diesel::insert_into(dsl::DataSource)
                 .values((
                     dsl::topic_name.eq(data_source),
@@ -158,9 +168,7 @@ impl DB {
 
             if !raw_events.is_empty() {
                 let execution_result = self
-                    .pool
-                    .get()
-                    .map_err(Into::into)
+                    .get_connection()
                     .and_then(|conn| {
                         Ok((
                             diesel::insert_into(RawEvent::dsl::RawEvent)
@@ -211,9 +219,7 @@ impl DB {
     ) -> Result<Vec<(Option<i32>, u64)>, Error> {
         use schema::Clusters::dsl;
         if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
-            self.pool
-                .get()
-                .map_err(Into::into)
+            self.get_connection()
                 .and_then(|conn| {
                     dsl::Clusters
                         .filter(
@@ -251,9 +257,7 @@ impl DB {
     ) -> Result<Vec<(Option<i32>, u64)>, Error> {
         use schema::Outliers::dsl;
         if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
-            self.pool
-                .get()
-                .map_err(Into::into)
+            self.get_connection()
                 .and_then(|conn| {
                     dsl::Outliers
                         .filter(
@@ -290,7 +294,7 @@ impl DB {
         data_source_id: i32,
     ) -> Result<Vec<(i32, Vec<u8>)>, Error> {
         use schema::RawEvent::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::RawEvent
                 .filter(dsl::data_source_id.eq(data_source_id))
                 .select((dsl::raw_event_id, dsl::raw_event))
@@ -301,7 +305,7 @@ impl DB {
 
     fn get_raw_event_by_raw_event_id(&self, raw_event_id: i32) -> Result<Vec<u8>, Error> {
         use schema::RawEvent::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::RawEvent
                 .filter(dsl::raw_event_id.eq(raw_event_id))
                 .select(dsl::raw_event)
@@ -311,7 +315,7 @@ impl DB {
     }
 
     pub fn get_category_table(&self) -> impl Future<Item = Vec<CategoryTable>, Error = Error> {
-        let category_table = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let category_table = self.get_connection().and_then(|conn| {
             schema::Category::dsl::Category
                 .load::<CategoryTable>(&conn)
                 .map_err(Into::into)
@@ -322,9 +326,7 @@ impl DB {
 
     pub fn get_cluster_table(&self) -> impl Future<Item = Vec<ClusterResponse>, Error = Error> {
         let cluster_table = self
-            .pool
-            .get()
-            .map_err(Into::into)
+            .get_connection()
             .and_then(|conn| {
                 schema::Clusters::dsl::Clusters
                     .inner_join(schema::Status::dsl::Status)
@@ -387,7 +389,7 @@ impl DB {
     }
 
     pub fn get_qualifier_table(&self) -> impl Future<Item = Vec<QualifierTable>, Error = Error> {
-        let qualifier_table = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let qualifier_table = self.get_connection().and_then(|conn| {
             schema::Qualifier::dsl::Qualifier
                 .load::<QualifierTable>(&conn)
                 .map_err(Into::into)
@@ -397,7 +399,7 @@ impl DB {
     }
 
     pub fn get_status_table(&self) -> impl Future<Item = Vec<StatusTable>, Error = Error> {
-        let status_table = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let status_table = self.get_connection().and_then(|conn| {
             schema::Status::dsl::Status
                 .load::<StatusTable>(&conn)
                 .map_err(Into::into)
@@ -409,7 +411,7 @@ impl DB {
     pub fn get_outliers_table(
         &self,
     ) -> impl Future<Item = Vec<(OutliersTable, DataSourceTable)>, Error = Error> {
-        let outliers_table = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let outliers_table = self.get_connection().and_then(|conn| {
             schema::Outliers::dsl::Outliers
                 .inner_join(schema::DataSource::dsl::DataSource)
                 .load::<(OutliersTable, DataSourceTable)>(&conn)
@@ -425,10 +427,7 @@ impl DB {
         limit: Option<i64>,
         select: SelectCluster,
     ) -> impl Future<Item = (Vec<ClusterResponse>, bool), Error = Error> {
-        let cluster = self
-            .pool
-            .get()
-            .map_err(Into::into)
+        let cluster = self.get_connection()
             .and_then(|conn| {
                 let mut query = "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id INNER JOIN DataSource ON Clusters.data_source_id = DataSource.data_source_id".to_string();
                 if let Some(where_clause) = where_clause {
@@ -514,7 +513,7 @@ impl DB {
         data_source: &str,
     ) -> impl Future<Item = Vec<(OutliersTable, DataSourceTable)>, Error = Error> {
         use schema::Outliers::dsl;
-        let result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let result = self.get_connection().and_then(|conn| {
             if let Ok(data_source_id) = DB::get_data_source_id(self, data_source) {
                 dsl::Outliers
                     .inner_join(schema::DataSource::dsl::DataSource)
@@ -533,7 +532,7 @@ impl DB {
         &self,
         new_outliers: &[OutlierUpdate],
     ) -> impl Future<Item = usize, Error = Error> {
-        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let insert_result = self.get_connection().and_then(|conn| {
             let insert_outliers: Vec<OutliersTable> = new_outliers
                 .iter()
                 .filter_map(|new_outlier| {
@@ -579,7 +578,7 @@ impl DB {
                 );
             }
         }
-        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let execution_result = self.get_connection().and_then(|conn| {
             query
                 .load::<OutliersTable>(&conn)
                 .map_err(Into::into)
@@ -695,7 +694,7 @@ impl DB {
         qualifier_update: &[QualifierUpdate],
     ) -> impl Future<Item = usize, Error = Error> {
         use schema::Clusters::dsl;
-        let result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let result = self.get_connection().and_then(|conn| {
             let timestamp =
                 chrono::NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0);
             let status_id = match DB::get_status_id(self, "reviewed") {
@@ -745,7 +744,7 @@ impl DB {
 
     fn get_category_id(&self, category: &str) -> Result<Option<i32>, Error> {
         use schema::Category::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::Category
                 .select(dsl::category_id)
                 .filter(dsl::category.eq(category))
@@ -756,7 +755,7 @@ impl DB {
 
     fn get_data_source_id(&self, data_source: &str) -> Result<i32, Error> {
         use schema::DataSource::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::DataSource
                 .select(dsl::data_source_id)
                 .filter(dsl::topic_name.eq(data_source))
@@ -767,7 +766,7 @@ impl DB {
 
     fn get_qualifier_id(&self, qualifier: &str) -> Result<Option<i32>, Error> {
         use schema::Qualifier::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::Qualifier
                 .select(dsl::qualifier_id)
                 .filter(dsl::qualifier.eq(qualifier))
@@ -778,7 +777,7 @@ impl DB {
 
     fn get_status_id(&self, status: &str) -> Result<Option<i32>, Error> {
         use schema::Status::dsl;
-        self.pool.get().map_err(Into::into).and_then(|conn| {
+        self.get_connection().and_then(|conn| {
             dsl::Status
                 .select(dsl::status_id)
                 .filter(dsl::status.eq(status))
@@ -818,9 +817,7 @@ impl DB {
                 _ => 1,
             };
             let execution_result = self
-                .pool
-                .get()
-                .map_err(Into::into)
+                .get_connection()
                 .and_then(|conn| {
                     if let (Some(cluster_id), Some(Some(category_id)), Some(Some(qualifier_id))) =
                         (&new_cluster_id, &category_id, &qualifier_id)
@@ -938,7 +935,7 @@ impl DB {
                 );
             }
         }
-        let execution_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let execution_result = self.get_connection().and_then(|conn| {
             query
                 .select((
                     dsl::cluster_id,
@@ -1081,7 +1078,7 @@ impl DB {
         &self,
         new_clusters: &[ClusterUpdate],
     ) -> impl Future<Item = usize, Error = Error> {
-        let insert_result = self.pool.get().map_err(Into::into).and_then(|conn| {
+        let insert_result = self.get_connection().and_then(|conn| {
             let insert_clusters: Vec<ClustersTable> = new_clusters
                 .iter()
                 .filter_map(|c| {
@@ -1185,7 +1182,7 @@ impl DB {
         use schema::Category::dsl::*;
         let update_result = DB::get_category_id(&self, current_category).and_then(|_| {
             let target = Category.filter(category.eq(current_category));
-            self.pool.get().map_err(Into::into).and_then(|conn| {
+            self.get_connection().and_then(|conn| {
                 diesel::update(target)
                     .set((category.eq(new_category),))
                     .execute(&conn)
