@@ -655,42 +655,15 @@ impl ApiService {
     }
 
     fn build_http_400_response() -> Response<Body> {
-        let body = json!({
-            "message": "Invalid request",
-        })
-        .to_string();
-        Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, body.len().to_string().as_str())
-            .body(body.into())
-            .expect("builder with known status code must not fail")
+        Self::build_http_response(StatusCode::BAD_REQUEST, "Invalid request")
     }
 
     fn build_http_404_response() -> Response<Body> {
-        let body = json!({
-            "message": "Not found",
-        })
-        .to_string();
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, body.len().to_string().as_str())
-            .body(body.into())
-            .expect("builder with known status code must not fail")
+        Self::build_http_response(StatusCode::NOT_FOUND, "Not found")
     }
 
     fn build_http_500_response() -> Response<Body> {
-        let body = json!({
-            "message": "Internal server error",
-        })
-        .to_string();
-        Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, body.len().to_string().as_str())
-            .body(body.into())
-            .expect("builder with known status code must not fail")
+        Self::build_http_response(StatusCode::INTERNAL_SERVER_ERROR, "Iternal server error")
     }
 
     fn build_cluster_response(
