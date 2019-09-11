@@ -1,14 +1,25 @@
 stages:
+  - check-format
   - build
   - package
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
+merge-requests:
+  stage: check-format
+  only:
+    - merge_requests
+  image: rust:latest
+  script:
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+
 rust-latest:
   stage: build
   only:
-  - merge_requests
+    refs:
+    - master
   image: rust:latest
   except:
   - tags
@@ -19,8 +30,6 @@ rust-latest:
     - apt-get update -yqq
     - apt-get install -yqq --no-install-recommends clang libhyperscan-dev
   script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
     - cargo build --verbose
     - cargo test --verbose
 
