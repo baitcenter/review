@@ -5,12 +5,15 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
+
 - Added new tables called `RawEvents` and `DataSource` in database schema.
 - Added kafka consumer to fetch messages directly from Kafka for raw events. 
   The environment variable, KAFKA_URL, must be set to run REviewd.
 
 ### Changed
+
 - Each cluster `examples` is a pair of a single `raw_event` and a list of `event_ids` like below:
 ```
 "examples": {
@@ -24,9 +27,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - If a cluster is created only from training files, `raw_event` in `examples` will be `-`.
 
 ### Removed
+
 - Removed REview file mode. REview is no longer able to read REmake output files.
 
+### Fixed
+
+- Corrected the error message for `DOCKER_HOST_IP` not set.
+
 ## [0.5.0] - 2019-07-24
+
 ### Added
 
 - A new field called `score` is added to `Clusters` table to store score value. Note that database files created by an older version of REview are not compatible with this version.

@@ -62,7 +62,7 @@ pub fn init() -> Result<(), Error> {
             InitializeErrorReason::MissingEtcdAddr,
         ))?;
         let docker_host_ip = std::env::var("DOCKER_HOST_IP").context(ErrorKind::Initialize(
-            InitializeErrorReason::MissingEtcdAddr,
+            InitializeErrorReason::MissingDockerHostIp,
         ))?;
         let kafka_url = std::env::var("KAFKA_URL").context(ErrorKind::Initialize(
             InitializeErrorReason::MissingKafkaUrl,
