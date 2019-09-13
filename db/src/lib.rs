@@ -599,7 +599,7 @@ impl DB {
                             (o.event_ids.as_ref(), o.raw_event_id)
                         {
                             if let Ok(event_ids) =
-                                rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids)
+                                rmp_serde::decode::from_slice::<Vec<u64>>(event_ids)
                             {
                                 return Some((event_ids, raw_event_id));
                             }
