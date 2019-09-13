@@ -287,6 +287,35 @@ paths:
           description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
+    delete:
+      tags: [outlier]
+      summary: "Delete a list of outliers"
+      description: "This endpoint is to delete one or more outliers."
+      parameters:
+        - name: "data_source"
+          in: "query"
+          description: "data_source"
+          type: "string"
+          required: true
+        - in: "body"
+          name: "Outliers"
+          description: "Outliers to be updated or inserted to database"
+          required: true
+          schema:
+            type: "array"
+            items:
+              type: "string"
+      responses:
+        200:
+          description: "Outliers have been successfully deleted"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        503:
+          description: "Service temporarily unavailable"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
   /api/outlier/{data_source}:
     get:
       tags: [outlier]
