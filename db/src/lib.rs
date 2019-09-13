@@ -563,6 +563,103 @@ impl DB {
         future::result(insert_result)
     }
 
+    pub fn delete_outliers(
+        &self,
+        outliers: &[String],
+        data_source: &str,
+    ) -> future::FutureResult<(), Error> {
+        use schema::Clusters::dsl as c_dsl;
+        use schema::Outliers::dsl as o_dsl;
+        if let (Ok(data_source_id), Ok(conn)) = (
+            DB::get_data_source_id(self, data_source),
+            self.get_connection(),
+        ) {
+            let outliers_from_database = o_dsl::Outliers
+                .filter(o_dsl::data_source_id.eq(data_source_id))
+                .load::<OutliersTable>(&conn)
+                .unwrap_or_default();
+
+            let deleted_outliers = outliers
+                .iter()
+                .filter_map(|outlier| {
+                    let _ = diesel::delete(
+                        o_dsl::Outliers.filter(
+                            o_dsl::data_source_id
+                                .eq(data_source_id)
+                                .and(o_dsl::raw_event.eq(outlier.as_bytes())),
+                        ),
+                    )
+                    .execute(&*conn);
+
+                    if let Some(o) = outliers_from_database
+                        .iter()
+                        .find(|o| o.raw_event == outlier.as_bytes())
+                    {
+                        if let (Some(event_ids), Some(raw_event_id)) =
+                            (o.event_ids.clone(), o.raw_event_id)
+                        {
+                            if let Ok(event_ids) =
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids)
+                            {
+                                return Some((event_ids, raw_event_id));
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>();
+
+            let clusters_from_database = c_dsl::Clusters
+                .select((c_dsl::id, c_dsl::examples))
+                .filter(
+                    c_dsl::data_source_id
+                        .eq(data_source_id)
+                        .and(c_dsl::raw_event_id.is_null()),
+                )
+                .load::<(Option<i32>, Option<Vec<u8>>)>(&conn)
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|(id, event_ids)| {
+                    if let (Some(id), Some(event_ids)) = (id, event_ids) {
+                        if let Ok(event_ids) = rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids)
+                        {
+                            return Some((id, event_ids));
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>();
+
+            let update_clusters = deleted_outliers
+                .into_iter()
+                .filter_map(|(event_ids, raw_event_id)| {
+                    event_ids
+                        .iter()
+                        .find_map(|e| {
+                            clusters_from_database.iter().find_map(
+                                |(id, event_ids_from_database)| {
+                                    if event_ids_from_database.contains(e) {
+                                        Some(id)
+                                    } else {
+                                        None
+                                    }
+                                },
+                            )
+                        })
+                        .map(|id| (id, raw_event_id))
+                })
+                .collect::<HashMap<_, _>>();
+
+            for (id, raw_event_id) in update_clusters {
+                let _ = diesel::update(c_dsl::Clusters.filter(c_dsl::id.eq(id)))
+                    .set(c_dsl::raw_event_id.eq(raw_event_id))
+                    .execute(&*conn);
+            }
+        }
+
+        future::result(Ok(()))
+    }
+
     pub fn update_outliers(
         &self,
         outlier_update: &[OutlierUpdate],

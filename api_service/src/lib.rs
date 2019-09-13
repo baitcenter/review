@@ -163,6 +163,34 @@ impl ApiService {
                     }
                     Box::new(future::ok(ApiService::build_http_400_response()))
                 }
+                (&Method::DELETE, "/api/outlier") => {
+                    let query = url::form_urlencoded::parse(query.as_ref())
+                        .into_owned()
+                        .collect::<Vec<_>>();
+                    if query.len() == 1 && query[0].0 == "data_source" {
+                        let resp = req
+                            .into_body()
+                            .concat2()
+                            .map_err(Into::into)
+                            .and_then(move |buf| {
+                                serde_json::from_slice(&buf)
+                                    .map(move |data: Vec<String>| {
+                                        db::DB::delete_outliers(&self.db, &data, &query[0].1)
+                                    })
+                                    .map_err(Into::into)
+                            })
+                            .and_then(|_| {
+                                future::ok(
+                                    Response::builder()
+                                        .status(StatusCode::OK)
+                                        .body(Body::from("Outliers have been deleted"))
+                                        .expect("builder with known status code must not fail"),
+                                )
+                            });
+                        return Box::new(resp);
+                    }
+                    Box::new(future::ok(ApiService::build_http_400_response()))
+                }
                 (&Method::PUT, "/api/raw_events") => {
                     let hash_query: HashMap<_, _> =
                         url::form_urlencoded::parse(query.as_ref()).collect();
