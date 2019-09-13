@@ -174,7 +174,7 @@ impl ApiService {
                             .map_err(Into::into)
                             .and_then(move |buf| {
                                 serde_json::from_slice(&buf)
-                                    .map(move |data: Vec<String>| {
+                                    .map(|data: Vec<String>| {
                                         db::DB::delete_outliers(&self.db, &data, &query[0].1)
                                     })
                                     .map_err(Into::into)

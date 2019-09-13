@@ -589,14 +589,14 @@ impl DB {
                                 .and(o_dsl::raw_event.eq(outlier.as_bytes())),
                         ),
                     )
-                    .execute(&*conn);
+                    .execute(&conn);
 
                     if let Some(o) = outliers_from_database
                         .iter()
                         .find(|o| o.raw_event == outlier.as_bytes())
                     {
                         if let (Some(event_ids), Some(raw_event_id)) =
-                            (o.event_ids.clone(), o.raw_event_id)
+                            (o.event_ids.as_ref(), o.raw_event_id)
                         {
                             if let Ok(event_ids) =
                                 rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids)
@@ -653,7 +653,7 @@ impl DB {
             for (id, raw_event_id) in update_clusters {
                 let _ = diesel::update(c_dsl::Clusters.filter(c_dsl::id.eq(id)))
                     .set(c_dsl::raw_event_id.eq(raw_event_id))
-                    .execute(&*conn);
+                    .execute(&conn);
             }
         }
 
