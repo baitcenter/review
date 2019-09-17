@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate diesel;
 
+use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use futures::future;
@@ -15,8 +16,8 @@ pub use self::error::{DatabaseError, Error, ErrorKind};
 pub mod models;
 mod schema;
 
-type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
-type ConnType = PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>;
+type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+type ConnType = PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 pub type ClusterResponse = (
     Option<String>,                // cluster_id
     Option<i32>,                   // detector_id
@@ -55,7 +56,7 @@ impl DB {
         database_url: &str,
         kafka_url: String,
     ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
-        let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+        let manager = ConnectionManager::<PgConnection>::new(database_url);
         let db = Pool::new(manager)
             .map(|pool| Self { pool, kafka_url })
             .map_err(Into::into);
@@ -773,8 +774,16 @@ impl DB {
                         .collect();
 
                     if !replace_outliers.is_empty() {
-                        diesel::replace_into(dsl::Outliers)
+                        diesel::insert_into(dsl::Outliers)
                             .values(&replace_outliers)
+                            .on_conflict((dsl::raw_event, dsl::data_source_id))
+                            .do_update()
+                            .set((
+                                dsl::id.eq(excluded(dsl::id)),
+                                dsl::event_ids.eq(excluded(dsl::event_ids)),
+                                dsl::raw_event_id.eq(excluded(dsl::raw_event_id)),
+                                dsl::size.eq(excluded(dsl::size)),
+                            ))
                             .execute(&*conn)
                             .map_err(Into::into)
                     } else {
@@ -1150,8 +1159,24 @@ impl DB {
                         .collect();
 
                     if !replace_clusters.is_empty() {
-                        diesel::replace_into(dsl::Clusters)
+                        diesel::insert_into(dsl::Clusters)
                             .values(&replace_clusters)
+                            .on_conflict((dsl::cluster_id, dsl::data_source_id))
+                            .do_update()
+                            .set((
+                                dsl::id.eq(excluded(dsl::id)),
+                                dsl::category_id.eq(excluded(dsl::category_id)),
+                                dsl::detector_id.eq(excluded(dsl::detector_id)),
+                                dsl::event_ids.eq(excluded(dsl::event_ids)),
+                                dsl::raw_event_id.eq(excluded(dsl::raw_event_id)),
+                                dsl::qualifier_id.eq(excluded(dsl::qualifier_id)),
+                                dsl::status_id.eq(excluded(dsl::status_id)),
+                                dsl::signature.eq(excluded(dsl::signature)),
+                                dsl::size.eq(excluded(dsl::size)),
+                                dsl::score.eq(excluded(dsl::score)),
+                                dsl::last_modification_time
+                                    .eq(excluded(dsl::last_modification_time)),
+                            ))
                             .execute(&*conn)
                             .map_err(Into::into)
                     } else {

@@ -9,7 +9,7 @@ CREATE TABLE Clusters (
   cluster_id TEXT,
   category_id INTEGER NOT NULL,
   detector_id INTEGER NOT NULL,
-  event_ids BLOB,
+  event_ids BYTEA,
   raw_event_id INTEGER,
   qualifier_id INTEGER NOT NULL,
   status_id INTEGER NOT NULL,
@@ -18,7 +18,6 @@ CREATE TABLE Clusters (
   score REAL,
   data_source_id INTEGER NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (cluster_id, data_source_id) ON CONFLICT REPLACE,
   FOREIGN KEY(category_id) REFERENCES Category(category_id)
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id)
   FOREIGN KEY(qualifier_id) REFERENCES Qualifier(qualifier_id)
@@ -34,12 +33,11 @@ CREATE TABLE DataSource (
 
 CREATE TABLE Outliers (
   id INTEGER PRIMARY KEY,
-  raw_event BLOB NOT NULL,
+  raw_event BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL,
-  event_ids BLOB,
+  event_ids BYTEA,
   raw_event_id INTEGER,
   size TEXT,
-  UNIQUE (raw_event, data_source_id) ON CONFLICT REPLACE,
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id)
   FOREIGN KEY(raw_event_id) REFERENCES RawEvent(raw_event_id)
 );
@@ -54,7 +52,7 @@ INSERT INTO Qualifier VALUES(3,'suspicious');
 
 CREATE TABLE RawEvent (
   raw_event_id INTEGER NOT NULL PRIMARY KEY,
-  raw_event BLOB NOT NULL,
+  raw_event BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL,
   FOREIGN KEY(data_source_id) REFERENCES DataSource(data_source_id)
 );
