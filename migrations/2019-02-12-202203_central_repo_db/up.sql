@@ -30,7 +30,6 @@ CREATE TABLE DataSource (
   data_source_id INTEGER NOT NULL PRIMARY KEY, 
   topic_name TEXT NOT NULL,
   data_type TEXT NOT NULL,
-  UNIQUE (topic_name, data_type) ON CONFLICT REPLACE
 );
 
 CREATE TABLE Outliers (
