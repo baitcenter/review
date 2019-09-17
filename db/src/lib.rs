@@ -227,7 +227,7 @@ impl DB {
                                 .eq(data_source_id)
                                 .and(dsl::raw_event_id.is_null()),
                         )
-                        .select((dsl::id, dsl::examples))
+                        .select((dsl::id, dsl::event_ids))
                         .load::<(Option<i32>, Option<Vec<u8>>)>(&conn)
                         .map_err(Into::into)
                 })
@@ -235,13 +235,13 @@ impl DB {
                     data.into_iter()
                         .filter_map(|d| {
                             let id = d.0;
-                            d.1.and_then(|examples| {
-                                rmp_serde::decode::from_slice::<Vec<u64>>(&examples).ok()
+                            d.1.and_then(|event_ids| {
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids).ok()
                             })
-                            .filter(|examples| !examples.is_empty())
-                            .map(|mut examples| {
-                                examples.sort();
-                                (id, examples[examples.len() - 1])
+                            .filter(|event_ids| !event_ids.is_empty())
+                            .map(|mut event_ids| {
+                                event_ids.sort();
+                                (id, event_ids[event_ids.len() - 1])
                             })
                         })
                         .collect()
@@ -346,8 +346,8 @@ impl DB {
                 let clusters = data
                     .into_iter()
                     .map(|d| {
-                        let examples = if let Some(event_ids) =
-                            d.0.examples
+                        let event_ids = if let Some(event_ids) =
+                            d.0.event_ids
                                 .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok())
                         {
                             let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
@@ -377,7 +377,7 @@ impl DB {
                             Some(d.4.topic_name),
                             Some(cluster_size),
                             d.0.score,
-                            examples,
+                            event_ids,
                             d.0.last_modification_time,
                         )
                     })
@@ -466,8 +466,8 @@ impl DB {
                             None
                         };
                         let score = if select.8 { d.0.score } else { None };
-                        let examples = if select.9 {
-                            if let Some(event_ids) = d.0.examples.and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()) {
+                        let event_ids = if select.9 {
+                            if let Some(event_ids) = d.0.event_ids.and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()) {
                                 let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
                                     DB::get_raw_event_by_raw_event_id(self, raw_event_id)
                                         .ok()
@@ -497,7 +497,7 @@ impl DB {
                             data_source,
                             cluster_size,
                             score,
-                            examples,
+                            event_ids,
                             time,
                         )
                     })
@@ -610,7 +610,7 @@ impl DB {
                 .collect::<Vec<_>>();
 
             let clusters_from_database = c_dsl::Clusters
-                .select((c_dsl::id, c_dsl::examples))
+                .select((c_dsl::id, c_dsl::event_ids))
                 .filter(
                     c_dsl::data_source_id
                         .eq(data_source_id)
@@ -1014,11 +1014,10 @@ impl DB {
         pub struct Cluster {
             cluster_id: Option<String>,
             signature: String,
-            examples: Option<Vec<u8>>,
+            event_ids: Option<Vec<u8>>,
             raw_event_id: Option<i32>,
             size: String,
             category_id: i32,
-            priority_id: i32,
             qualifier_id: i32,
             status_id: i32,
         }
@@ -1037,11 +1036,10 @@ impl DB {
                 .select((
                     dsl::cluster_id,
                     dsl::signature,
-                    dsl::examples,
+                    dsl::event_ids,
                     dsl::raw_event_id,
                     dsl::size,
                     dsl::category_id,
-                    dsl::priority_id,
                     dsl::qualifier_id,
                     dsl::status_id,
                 ))
@@ -1055,7 +1053,7 @@ impl DB {
                                 .iter()
                                 .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
                             {
-                                c.examples.as_ref()?;
+                                c.event_ids.as_ref()?;
                                 let now = chrono::Utc::now();
                                 let timestamp =
                                     chrono::NaiveDateTime::from_timestamp(now.timestamp(), 0);
@@ -1064,9 +1062,9 @@ impl DB {
                                     Some(sig) => sig.clone(),
                                     None => cluster.signature.clone(),
                                 };
-                                let example = DB::merge_cluster_examples(
-                                    cluster.examples.clone(),
-                                    c.examples.clone(),
+                                let event_ids = DB::merge_cluster_examples(
+                                    cluster.event_ids.clone(),
+                                    c.event_ids.clone(),
                                 );
                                 let cluster_size = match c.size {
                                     Some(new_size) => {
@@ -1092,15 +1090,12 @@ impl DB {
                                     Some(ClustersTable {
                                         id: None,
                                         cluster_id: Some(c.cluster_id.clone()),
-                                        description: None,
                                         category_id: cluster.category_id,
                                         detector_id: c.detector_id,
-                                        examples: example,
+                                        event_ids,
                                         raw_event_id: cluster.raw_event_id,
-                                        priority_id: cluster.priority_id,
                                         qualifier_id: cluster.qualifier_id,
                                         status_id: cluster.status_id,
-                                        rules: Some(sig.clone()),
                                         signature: sig,
                                         size: cluster_size,
                                         score: c.score,
@@ -1111,7 +1106,7 @@ impl DB {
                                     None
                                 }
                             } else {
-                                let example = match &c.examples {
+                                let event_ids = match &c.event_ids {
                                     Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
                                     None => None,
                                 };
@@ -1135,15 +1130,12 @@ impl DB {
                                     Some(ClustersTable {
                                         id: None,
                                         cluster_id: Some(c.cluster_id.clone()),
-                                        description: None,
                                         category_id: 1,
                                         detector_id: c.detector_id,
-                                        examples: example,
+                                        event_ids,
                                         raw_event_id: None,
-                                        priority_id: 1,
                                         qualifier_id: 2,
                                         status_id: 2,
-                                        rules: Some(sig.clone()),
                                         signature: sig,
                                         size: cluster_size,
                                         score: c.score,
@@ -1179,7 +1171,7 @@ impl DB {
             let insert_clusters: Vec<ClustersTable> = new_clusters
                 .iter()
                 .filter_map(|c| {
-                    let example = match &c.examples {
+                    let event_ids = match &c.event_ids {
                         Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
                         None => None,
                     };
@@ -1200,20 +1192,17 @@ impl DB {
                             DB::add_data_source(self, &c.data_source, &c.data_source_type)
                         });
                     if data_source_id != 0 {
-                        // We always insert 1 for category_id and priority_id,
+                        // We always insert 1 for category_id
                         // "unknown" for qualifier_id, and "pending review" for status_id.
                         Some(ClustersTable {
                             id: None,
                             cluster_id: Some(c.cluster_id.to_string()),
-                            description: None,
                             category_id: 1,
                             detector_id: c.detector_id,
-                            examples: example,
+                            event_ids,
                             raw_event_id: None,
-                            priority_id: 1,
                             qualifier_id: 2,
                             status_id: 2,
-                            rules: Some(sig.clone()),
                             signature: sig,
                             size: cluster_size,
                             score: c.score,

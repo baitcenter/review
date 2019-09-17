@@ -1,12 +1,6 @@
 use super::schema::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Serialize)]
-pub struct ActionTable {
-    pub action_id: Option<i32>,
-    pub action: String,
-}
-
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "Category"]
 #[primary_key(category_id)]
@@ -33,15 +27,12 @@ pub struct CategoryTable {
 pub struct ClustersTable {
     pub id: Option<i32>,
     pub cluster_id: Option<String>,
-    pub description: Option<String>,
     pub category_id: i32,
     pub detector_id: i32,
-    pub examples: Option<Vec<u8>>,
+    pub event_ids: Option<Vec<u8>>,
     pub raw_event_id: Option<i32>,
-    pub priority_id: i32,
     pub qualifier_id: i32,
     pub status_id: i32,
-    pub rules: Option<String>,
     pub signature: String,
     pub size: String,
     pub score: Option<f64>,
@@ -58,7 +49,7 @@ pub struct ClusterUpdate {
     pub data_source: String,
     pub data_source_type: String,
     pub size: Option<usize>,
-    pub examples: Option<Vec<u64>>,
+    pub event_ids: Option<Vec<u64>>,
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
@@ -94,12 +85,6 @@ pub struct OutlierUpdate {
     pub data_source: String,
     pub data_source_type: String,
     pub event_ids: Vec<u64>,
-}
-
-#[derive(Queryable, Serialize)]
-pub struct PriorityTable {
-    pub priority_id: Option<i32>,
-    pub priority: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
