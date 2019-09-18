@@ -3,7 +3,7 @@ FROM ubuntu:18.04 as builder
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.36.0
+    RUST_VERSION=1.37.0
 
 RUN set -eux; \
     apt-get update; \
@@ -12,8 +12,8 @@ RUN set -eux; \
     clang \
     g++ \
     libhyperscan-dev \
+    libpq-dev \
     librdkafka-dev \
-    libsqlite3-dev \
     libssl-dev \
     make \
     pkgconf \
@@ -21,7 +21,7 @@ RUN set -eux; \
     zlib1g-dev \
     ; \
     rustArch='x86_64-unknown-linux-gnu'; \
-    url="https://static.rust-lang.org/rustup/archive/1.18.3/${rustArch}/rustup-init"; \
+    url="https://static.rust-lang.org/rustup/archive/1.19.0/${rustArch}/rustup-init"; \
     wget "$url"; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --default-toolchain $RUST_VERSION; \
@@ -45,8 +45,6 @@ COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./diesel.toml ./diesel.toml
 
-RUN cargo install diesel_cli -f --no-default-features --features "sqlite"
-RUN diesel setup
 RUN cargo build --release
 
 FROM ubuntu:18.04
@@ -55,7 +53,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
     libhyperscan4 \
-    libsqlite3-0 \
+    libpq5 \
     libssl1.1 \
     ; \
     rm -rf /var/lib/apt/lists/*;
@@ -64,7 +62,6 @@ ENV LD_LIBRARY_PATH=/usr/pkg/lib
 
 COPY --from=builder /work/target/release/review .
 COPY --from=builder /work/.env .
-COPY --from=builder /work/central_repo.db .
 EXPOSE 8080
 
 ENTRYPOINT ["./review"]
