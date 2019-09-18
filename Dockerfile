@@ -40,7 +40,6 @@ COPY ./db ./db
 COPY ./migrations ./migrations
 COPY ./remake/ ./remake/
 COPY ./src/ ./src/
-COPY ./.env ./.env
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./diesel.toml ./diesel.toml
@@ -61,7 +60,6 @@ RUN set -eux; \
 ENV LD_LIBRARY_PATH=/usr/pkg/lib
 
 COPY --from=builder /work/target/release/review .
-COPY --from=builder /work/.env .
 EXPOSE 8080
 
 ENTRYPOINT ["./review"]
