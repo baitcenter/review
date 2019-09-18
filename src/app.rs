@@ -67,14 +67,8 @@ pub fn init() -> Result<(), Error> {
             InitializeErrorReason::MissingKafkaUrl,
         ))?;
 
-        //if fs::metadata(&database_url).is_err() {
-        //    fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
-        //        InitializeErrorReason::DatabaseFileNotFound,
-        //    ))?;
-        //    fs::copy("/central_repo.db", &database_url).context(ErrorKind::Initialize(
-        //        InitializeErrorReason::DatabaseInitialization,
-        //    ))?;
-        //}
+        // TODO: Test if the database server is running, and initialize it if
+        // the database is empty.
 
         let new_service = move || {
             let docker_host_addr = format!("{}:8080", docker_host_ip);
