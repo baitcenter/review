@@ -14,6 +14,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The underlying database has changed from SQLite to PostgreSQL.
 - Each cluster `examples` is a pair of a single `raw_event` and a list of `event_ids` like below:
 ```
 "examples": {
