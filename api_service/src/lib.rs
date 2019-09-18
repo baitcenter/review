@@ -849,9 +849,8 @@ impl ApiService {
         }
         let mut outliers: Vec<Outliers> = Vec::new();
         for d in data {
-            let event_ids = d.0.event_ids.map_or(Vec::<u64>::new(), |event_ids| {
-                rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids).unwrap_or_default()
-            });
+            let event_ids =
+                rmp_serde::decode::from_slice::<Vec<u64>>(&d.0.event_ids).unwrap_or_default();
             let size =
                 d.0.size
                     .map_or(0, |size| size.parse::<usize>().unwrap_or(0));

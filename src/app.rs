@@ -3,7 +3,6 @@ use failure::ResultExt;
 use futures::prelude::*;
 use hyper::service::service_fn;
 use hyper::Server;
-use std::fs;
 
 use crate::error::{Error, ErrorKind, InitializeErrorReason};
 
@@ -68,14 +67,14 @@ pub fn init() -> Result<(), Error> {
             InitializeErrorReason::MissingKafkaUrl,
         ))?;
 
-        if fs::metadata(&database_url).is_err() {
-            fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
-                InitializeErrorReason::DatabaseFileNotFound,
-            ))?;
-            fs::copy("/central_repo.db", &database_url).context(ErrorKind::Initialize(
-                InitializeErrorReason::DatabaseInitialization,
-            ))?;
-        }
+        //if fs::metadata(&database_url).is_err() {
+        //    fs::metadata("/central_repo.db").context(ErrorKind::Initialize(
+        //        InitializeErrorReason::DatabaseFileNotFound,
+        //    ))?;
+        //    fs::copy("/central_repo.db", &database_url).context(ErrorKind::Initialize(
+        //        InitializeErrorReason::DatabaseInitialization,
+        //    ))?;
+        //}
 
         let new_service = move || {
             let docker_host_addr = format!("{}:8080", docker_host_ip);

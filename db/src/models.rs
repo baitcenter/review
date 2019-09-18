@@ -2,11 +2,11 @@ use super::schema::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
-#[table_name = "Category"]
+#[table_name = "category"]
 #[primary_key(category_id)]
 pub struct CategoryTable {
-    pub category_id: Option<i32>,
-    pub category: String,
+    pub category_id: i32,
+    pub name: String,
 }
 
 #[derive(
@@ -19,13 +19,13 @@ pub struct CategoryTable {
     QueryableByName,
     Serialize,
 )]
-#[table_name = "Clusters"]
+#[table_name = "clusters"]
 #[belongs_to(CategoryTable, foreign_key = "category_id")]
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 #[belongs_to(StatusTable, foreign_key = "status_id")]
 #[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
 pub struct ClustersTable {
-    pub id: Option<i32>,
+    pub id: i32,
     pub cluster_id: Option<String>,
     pub category_id: i32,
     pub detector_id: i32,
@@ -53,7 +53,7 @@ pub struct ClusterUpdate {
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
-#[table_name = "DataSource"]
+#[table_name = "data_source"]
 #[primary_key(data_source_id)]
 pub struct DataSourceTable {
     pub data_source_id: i32,
@@ -68,13 +68,13 @@ pub struct Example {
 }
 
 #[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
-#[table_name = "Outliers"]
+#[table_name = "outliers"]
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 pub struct OutliersTable {
-    pub id: Option<i32>,
+    pub id: i32,
     pub raw_event: Vec<u8>,
     pub data_source_id: i32,
-    pub event_ids: Option<Vec<u8>>,
+    pub event_ids: Vec<u8>,
     pub raw_event_id: Option<i32>,
     pub size: Option<String>,
 }
@@ -95,25 +95,25 @@ pub struct QualifierUpdate {
 }
 
 #[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
-#[table_name = "Qualifier"]
+#[table_name = "qualifier"]
 #[primary_key(qualifier_id)]
 pub struct QualifierTable {
-    pub qualifier_id: Option<i32>,
-    pub qualifier: String,
+    pub qualifier_id: i32,
+    pub description: String,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
-#[table_name = "RawEvent"]
+#[table_name = "raw_event"]
 pub struct RawEventTable {
     pub raw_event_id: i32,
-    pub raw_event: Vec<u8>,
+    pub data: Vec<u8>,
     pub data_source_id: i32,
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
-#[table_name = "Status"]
+#[table_name = "status"]
 #[primary_key(status_id)]
 pub struct StatusTable {
-    pub status_id: Option<i32>,
-    pub status: String,
+    pub status_id: i32,
+    pub description: String,
 }

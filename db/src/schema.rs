@@ -1,79 +1,84 @@
-#![allow(non_snake_case)]
-
 table! {
-    Category (category_id) {
-        category_id -> Nullable<Integer>,
-        category -> Text,
+    category (category_id) {
+        category_id -> Int4,
+        name -> Text,
     }
 }
 
 table! {
-    Clusters (id) {
-        id -> Nullable<Integer>,
+    clusters (id) {
+        id -> Int4,
         cluster_id -> Nullable<Text>,
-        category_id -> Integer,
-        detector_id -> Integer,
-        event_ids -> Nullable<Binary>,
-        raw_event_id -> Nullable<Integer>,
-        qualifier_id -> Integer,
-        status_id -> Integer,
+        category_id -> Int4,
+        detector_id -> Int4,
+        event_ids -> Nullable<Bytea>,
+        raw_event_id -> Nullable<Int4>,
+        qualifier_id -> Int4,
+        status_id -> Int4,
         signature -> Text,
         size -> Text,
-        score -> Nullable<Double>,
-        data_source_id -> Integer,
+        score -> Nullable<Float8>,
+        data_source_id -> Int4,
         last_modification_time -> Nullable<Timestamp>,
     }
 }
 
 table! {
-    DataSource (data_source_id) {
-        data_source_id -> Integer,
+    data_source (data_source_id) {
+        data_source_id -> Int4,
         topic_name -> Text,
         data_type -> Text,
     }
 }
 
 table! {
-    Outliers (id) {
-        id -> Nullable<Integer>,
-        raw_event -> Binary,
-        data_source_id -> Integer,
-        event_ids -> Nullable<Binary>,
-        raw_event_id -> Nullable<Integer>,
+    outliers (id) {
+        id -> Int4,
+        raw_event -> Bytea,
+        data_source_id -> Int4,
+        event_ids -> Bytea,
+        raw_event_id -> Nullable<Int4>,
         size -> Nullable<Text>,
     }
 }
 
 table! {
-    Qualifier (qualifier_id) {
-        qualifier_id -> Nullable<Integer>,
-        qualifier -> Text,
+    qualifier (qualifier_id) {
+        qualifier_id -> Int4,
+        description -> Text,
     }
 }
 
 table! {
-    RawEvent (raw_event_id) {
-        raw_event_id -> Integer,
-        raw_event -> Binary,
-        data_source_id -> Integer,
+    raw_event (raw_event_id) {
+        raw_event_id -> Int4,
+        data -> Bytea,
+        data_source_id -> Int4,
     }
 }
 
 table! {
-    Status (status_id) {
-        status_id -> Nullable<Integer>,
-        status -> Text,
+    status (status_id) {
+        status_id -> Int4,
+        description -> Text,
     }
 }
 
-joinable!(Clusters -> Category (category_id));
-joinable!(Clusters -> Qualifier (qualifier_id));
-joinable!(Clusters -> RawEvent (raw_event_id));
-joinable!(Clusters -> Status (status_id));
-joinable!(Clusters -> DataSource (data_source_id));
-joinable!(Outliers -> DataSource (data_source_id));
-joinable!(RawEvent -> DataSource (data_source_id));
+joinable!(clusters -> category (category_id));
+joinable!(clusters -> data_source (data_source_id));
+joinable!(clusters -> qualifier (qualifier_id));
+joinable!(clusters -> raw_event (raw_event_id));
+joinable!(clusters -> status (status_id));
+joinable!(outliers -> data_source (data_source_id));
+joinable!(outliers -> raw_event (raw_event_id));
+joinable!(raw_event -> data_source (data_source_id));
 
 allow_tables_to_appear_in_same_query!(
-    Category, Clusters, DataSource, Outliers, Qualifier, RawEvent, Status,
+    category,
+    clusters,
+    data_source,
+    outliers,
+    qualifier,
+    raw_event,
+    status,
 );
