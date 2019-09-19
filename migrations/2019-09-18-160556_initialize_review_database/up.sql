@@ -45,7 +45,8 @@ CREATE TABLE clusters (
   size TEXT NOT NULL DEFAULT '1',
   score FLOAT8,
   data_source_id INTEGER NOT NULL REFERENCES data_source(data_source_id),
-  last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (cluster_id, data_source_id)
 );
 
 CREATE TABLE outliers (
@@ -54,5 +55,6 @@ CREATE TABLE outliers (
   data_source_id INTEGER NOT NULL REFERENCES data_source(data_source_id),
   event_ids BYTEA NOT NULL,
   raw_event_id INTEGER REFERENCES raw_event(raw_event_id),
-  size TEXT
+  size TEXT,
+  UNIQUE (raw_event, data_source_id)
 );
