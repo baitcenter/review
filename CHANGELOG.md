@@ -34,6 +34,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Corrected the error message for `DOCKER_HOST_IP` not set.
+- Delete outliers from outliers table when REmake finds new clusters from them.
 
 ## [0.5.0] - 2019-07-24
 
