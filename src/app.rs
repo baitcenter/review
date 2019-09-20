@@ -67,9 +67,9 @@ pub fn init() -> Result<(), Error> {
             InitializeErrorReason::MissingKafkaUrl,
         ))?;
 
+        let docker_host_addr = format!("{}:8080", docker_host_ip);
+        let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
         let new_service = move || {
-            let docker_host_addr = format!("{}:8080", docker_host_ip);
-            let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
             let api_service = api_service::ApiService::new(
                 &database_url,
                 &docker_host_addr,
