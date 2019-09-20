@@ -60,7 +60,7 @@ impl DB {
     pub fn new(
         database_url: &str,
         kafka_url: String,
-    ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
+    ) -> impl Future<Item = Self, Error = Error> {
         let manager = ConnectionManager::<PgConnection>::new(database_url);
         let db = match Pool::new(manager) {
             Ok(pool) => {
@@ -74,7 +74,7 @@ impl DB {
             Err(e) => Err(e.into()),
         };
 
-        Box::new(future::result(db))
+        future::result(db)
     }
 
     fn get_connection(&self) -> Result<ConnType, Error> {

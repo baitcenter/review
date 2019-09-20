@@ -30,12 +30,12 @@ impl ApiService {
         docker_host_addr: &str,
         etcd_url: &str,
         kafka_url: &str,
-    ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
+    ) -> impl Future<Item = Self, Error = Error> {
         let docker_host_addr = docker_host_addr.to_string();
         let etcd_url = etcd_url.to_string();
         let reviewd_url = database_url.to_string();
 
-        let fut = db::DB::new(database_url, kafka_url.to_string())
+        db::DB::new(database_url, kafka_url.to_string())
             .and_then(move |db| {
                 future::ok(Self {
                     db,
@@ -44,15 +44,13 @@ impl ApiService {
                     reviewd_url,
                 })
             })
-            .map_err(Into::into);
-
-        Box::new(fut)
+            .map_err(Into::into)
     }
 
     pub fn request_handler(
         self,
         req: Request<Body>,
-    ) -> Box<dyn Future<Item = Response<Body>, Error = Error> + Send + 'static> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = Error> + Send> {
         match req.uri().query() {
             Some(query) => match (req.method(), req.uri().path()) {
                 (&Method::GET, "/api/cluster/search") => {
@@ -610,9 +608,9 @@ impl ApiService {
 
     pub fn api_error_handler(
         res_body: Result<Response<Body>, Error>,
-    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send + 'static> {
+    ) -> impl Future<Item = Response<Body>, Error = hyper::Error> {
         match res_body {
-            Ok(res) => Box::new(future::ok(res)),
+            Ok(res) => future::ok(res),
             Err(err) => {
                 let message = err.to_string();
                 let status_code = StatusCode::INTERNAL_SERVER_ERROR;
@@ -628,7 +626,7 @@ impl ApiService {
                     .body(body.into())
                     .expect("builder with known status code must not fail");
 
-                Box::new(future::ok(res.map(Into::into)))
+                future::ok(res.map(Into::into))
             }
         }
     }

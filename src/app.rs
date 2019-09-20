@@ -83,7 +83,7 @@ pub fn init() -> Result<(), Error> {
                         .then(api_service::ApiService::api_error_handler)
                 })
             });
-            Box::new(api_service)
+            api_service
         };
         let reviewd_addr = reviewd_addr
             .parse::<std::net::SocketAddr>()
