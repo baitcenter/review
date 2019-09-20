@@ -5,13 +5,13 @@ CREATE TABLE category (
 INSERT INTO category VALUES(1,'Non-Specified Alert');
 
 CREATE TABLE data_source (
-  data_source_id INTEGER PRIMARY KEY, 
+  data_source_id SERIAL PRIMARY KEY,
   topic_name TEXT NOT NULL,
   data_type TEXT NOT NULL
 );
 
 CREATE TABLE raw_event (
-  raw_event_id INTEGER PRIMARY KEY,
+  raw_event_id SERIAL PRIMARY KEY,
   data BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(data_source_id)
 );
