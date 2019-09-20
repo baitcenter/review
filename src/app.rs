@@ -67,9 +67,6 @@ pub fn init() -> Result<(), Error> {
             InitializeErrorReason::MissingKafkaUrl,
         ))?;
 
-        // TODO: Test if the database server is running, and initialize it if
-        // the database is empty.
-
         let new_service = move || {
             let docker_host_addr = format!("{}:8080", docker_host_ip);
             let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);

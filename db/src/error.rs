@@ -1,5 +1,6 @@
 use diesel::result::Error as QueryResultError;
 use diesel::ConnectionError;
+use diesel_migrations::RunMigrationsError;
 use failure::{Backtrace, Context, Fail};
 use r2d2::Error as R2D2Error;
 use std::fmt;
@@ -12,6 +13,8 @@ pub enum ErrorKind {
         _0
     )]
     DatabaseTransactionError(DatabaseError),
+    #[fail(display = "A migration error")]
+    Migration,
     #[fail(display = "An error occurred while processing a database query")]
     Query,
     #[fail(display = "An error occurred while connecting database")]
@@ -40,6 +43,14 @@ impl From<R2D2Error> for Error {
     fn from(error: R2D2Error) -> Error {
         Error {
             inner: error.context(ErrorKind::R2D2),
+        }
+    }
+}
+
+impl From<RunMigrationsError> for Error {
+    fn from(error: RunMigrationsError) -> Error {
+        Error {
+            inner: error.context(ErrorKind::Migration),
         }
     }
 }

@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_migrations;
 
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::upsert::excluded;
@@ -16,6 +18,8 @@ pub mod error;
 pub use self::error::{DatabaseError, Error, ErrorKind};
 pub mod models;
 mod schema;
+
+embed_migrations!();
 
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type ConnType = PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
@@ -58,9 +62,17 @@ impl DB {
         kafka_url: String,
     ) -> Box<dyn Future<Item = Self, Error = Error> + Send + 'static> {
         let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let db = Pool::new(manager)
-            .map(|pool| Self { pool, kafka_url })
-            .map_err(Into::into);
+        let db = match Pool::new(manager) {
+            Ok(pool) => {
+                match pool.get() {
+                    Ok(conn) => embedded_migrations::run(&conn)
+                        .map(|()| Self { pool, kafka_url })
+                        .map_err(Into::into),
+                    Err(e) => Err(e.into()),
+                }
+            }
+            Err(e) => Err(e.into()),
+        };
 
         Box::new(future::result(db))
     }
