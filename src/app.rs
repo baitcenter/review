@@ -1,5 +1,6 @@
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use failure::ResultExt;
+use futures::future;
 use futures::prelude::*;
 use hyper::service::service_fn;
 use hyper::Server;
@@ -69,30 +70,26 @@ pub fn init() -> Result<(), Error> {
 
         let docker_host_addr = format!("{}:8080", docker_host_ip);
         let etcd_url = format!("http://{}/v3beta/kv/put", etcd_addr);
-        let new_service = move || {
-            let api_service = api_service::ApiService::new(
-                &database_url,
-                &docker_host_addr,
-                &etcd_url,
-                &kafka_url,
-            )
-            .map_err(|e| panic!("Reviewd initialization fails: {}", e))
-            .and_then(|srv| {
-                service_fn(move |req| {
-                    api_service::ApiService::request_handler(srv.clone(), req)
-                        .then(api_service::ApiService::api_error_handler)
-                })
-            });
-            api_service
-        };
         let reviewd_addr = reviewd_addr
             .parse::<std::net::SocketAddr>()
             .context(ErrorKind::Initialize(InitializeErrorReason::REviewdUrl))?;
-        let server = Server::bind(&reviewd_addr)
-            .serve(new_service)
-            .map_err(|e| panic!("Failed to build server: {}", e));
 
-        hyper::rt::run(server);
+        hyper::rt::run(future::lazy(move || {
+            api_service::ApiService::new(&database_url, &docker_host_addr, &etcd_url, &kafka_url)
+                .map_err(|e| panic!("Reviewd initialization fails: {}", e))
+                .and_then(move |state| {
+                    let service = move || {
+                        let state = state.clone();
+                        service_fn(move |req| {
+                            api_service::ApiService::request_handler(state.clone(), req)
+                                .then(api_service::ApiService::api_error_handler)
+                        })
+                    };
+                    Server::bind(&reviewd_addr)
+                        .serve(service)
+                        .map_err(|e| panic!("Failed to build server: {}", e))
+                })
+        }));
     }
 
     Ok(())
