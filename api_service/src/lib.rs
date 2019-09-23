@@ -918,7 +918,7 @@ impl Filter {
             Some(data_source) => {
                 let data_source = data_source
                     .iter()
-                    .map(|d| format!("Clusters.data_source_id = (SELECT data_source_id FROM DataSource WHERE topic_name = '{}')", d))
+                    .map(|d| format!("Clusters.data_source_id = (SELECT data_source_id FROM data_source WHERE topic_name = '{}')", d))
                     .collect::<Vec<String>>();
                 Filter::build_where_clause(&query, &data_source)
             }

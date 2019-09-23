@@ -427,7 +427,7 @@ impl DB {
     ) -> impl Future<Item = (Vec<ClusterResponse>, bool), Error = Error> {
         let cluster = self.get_connection()
             .and_then(|conn| {
-                let mut query = "SELECT * FROM Clusters INNER JOIN Category ON Clusters.category_id = Category.category_id INNER JOIN Qualifier ON Clusters.qualifier_id = Qualifier.qualifier_id INNER JOIN Status ON Clusters.status_id = Status.status_id INNER JOIN DataSource ON Clusters.data_source_id = DataSource.data_source_id".to_string();
+                let mut query = "SELECT * FROM clusters INNER JOIN category ON clusters.category_id = category.category_id INNER JOIN qualifier ON clusters.qualifier_id = qualifier.qualifier_id INNER JOIN status ON clusters.status_id = status.status_id INNER JOIN data_source ON clusters.data_source_id = data_source.data_source_id".to_string();
                 if let Some(where_clause) = where_clause {
                     query.push_str(&format!(" WHERE {}", where_clause));
                 }
