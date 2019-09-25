@@ -7,7 +7,8 @@ INSERT INTO category VALUES(1,'Non-Specified Alert');
 CREATE TABLE data_source (
   data_source_id SERIAL PRIMARY KEY,
   topic_name TEXT NOT NULL,
-  data_type TEXT NOT NULL
+  data_type TEXT NOT NULL,
+  UNIQUE (topic_name)
 );
 
 CREATE TABLE raw_event (

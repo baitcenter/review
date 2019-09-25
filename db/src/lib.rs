@@ -57,20 +57,15 @@ pub struct DB {
 }
 
 impl DB {
-    pub fn new(
-        database_url: &str,
-        kafka_url: String,
-    ) -> impl Future<Item = Self, Error = Error> {
+    pub fn new(database_url: &str, kafka_url: String) -> impl Future<Item = Self, Error = Error> {
         let manager = ConnectionManager::<PgConnection>::new(database_url);
         let db = match Pool::new(manager) {
-            Ok(pool) => {
-                match pool.get() {
-                    Ok(conn) => embedded_migrations::run(&conn)
-                        .map(|()| Self { pool, kafka_url })
-                        .map_err(Into::into),
-                    Err(e) => Err(e.into()),
-                }
-            }
+            Ok(pool) => match pool.get() {
+                Ok(conn) => embedded_migrations::run(&conn)
+                    .map(|()| Self { pool, kafka_url })
+                    .map_err(Into::into),
+                Err(e) => Err(e.into()),
+            },
             Err(e) => Err(e.into()),
         };
 
@@ -102,6 +97,8 @@ impl DB {
                     dsl::topic_name.eq(data_source),
                     dsl::data_type.eq(data_type),
                 ))
+                .on_conflict(dsl::topic_name)
+                .do_nothing()
                 .execute(&conn)
                 .map_err(Into::into)
         });
