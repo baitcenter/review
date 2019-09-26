@@ -40,7 +40,7 @@ pub struct ClustersTable {
     pub last_modification_time: Option<chrono::NaiveDateTime>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClusterUpdate {
     pub cluster_id: String,
     pub detector_id: i32,
