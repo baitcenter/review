@@ -516,7 +516,7 @@ impl DB {
                     .load::<(OutliersTable, DataSourceTable)>(&conn)
                     .map_err(Into::into)
             } else {
-                Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
+                Ok(Vec::<(OutliersTable, DataSourceTable)>::new())
             }
         });
 
