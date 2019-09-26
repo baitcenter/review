@@ -1,9 +1,9 @@
-FROM ubuntu:18.04 as builder
+FROM ubuntu:19.04 as builder
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.37.0
+    RUST_VERSION=1.38.0
 
 RUN set -eux; \
     apt-get update; \
@@ -46,12 +46,12 @@ COPY ./diesel.toml ./diesel.toml
 
 RUN cargo build --release
 
-FROM ubuntu:18.04
+FROM ubuntu:19.04
 
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-    libhyperscan4 \
+    libhyperscan5 \
     libpq5 \
     libssl1.1 \
     ; \
