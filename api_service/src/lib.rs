@@ -7,7 +7,7 @@ use hyper::{header, Body, Method, Request, Response, StatusCode};
 use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 mod error;
 use error::Error;
@@ -234,31 +234,43 @@ impl ApiService {
                                         base64::encode(&query[0].1),
                                         base64::encode(&buf)
                                     );
-                                    let client = reqwest::Client::new();
-                                    match client.post(&self.etcd_url).body(data).send() {
-                                        Ok(_) => {
+                                    let (tx, rx) = tokio::sync::oneshot::channel();
+                                    let req = reqwest::r#async::Client::new()
+                                        .post(&self.etcd_url)
+                                        .body(data)
+                                        .send()
+                                        .and_then(|response| response.error_for_status())
+                                        .then(move |response| tx.send(response))
+                                        .map(|_| ())
+                                        .map_err(|_| ());
+                                    if let Ok(mut runtime) = tokio::runtime::Runtime::new() {
+                                        runtime.spawn(req);
+                                        let response = rx.wait();
+                                        if let Ok(Ok(_)) = response {
                                             let msg = format!("{} has been updated.", &query[0].1);
-                                            future::ok(
+                                            return future::ok(
                                             Response::builder()
                                                 .status(StatusCode::OK)
                                                 .body(Body::from(msg))
                                                 .expect(
                                                     "builder with known status code must not fail",
                                                 ),
-                                        )
-                                        }
-                                        Err(e) => {
+                                        );
+                                        } else if let Ok(Err(e)) = response {
                                             let err_msg = format!(
                                                 "An error occurs while updating etcd value: {}",
                                                 e
                                             );
-                                            eprintln!("{}", err_msg);
-                                            future::ok(ApiService::build_http_response(
+                                            return future::ok(ApiService::build_http_response(
                                                 StatusCode::INTERNAL_SERVER_ERROR,
                                                 &err_msg,
-                                            ))
+                                            ));
                                         }
                                     }
+                                    future::ok(ApiService::build_http_response(
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        "An error occurs while updating etcd value",
+                                    ))
                                 });
                         return Box::new(result);
                     }
@@ -470,15 +482,20 @@ impl ApiService {
                                     let mut result = db::DB::update_qualifiers(&self.db, &data);
                                     match result.poll() {
                                         Ok(_) => {
-                                            data.iter().for_each(|d| {
+                                            let update_list = data.iter().filter_map(|d| {
                                                 if d.qualifier == "benign" {
-                                                    let etcd_value = format!(
-                                                        r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
-                                                        &self.docker_host_addr, &d.data_source
-                                                    );
-                                                    let etcd_key = format!("benign_signatures_{}", &d.data_source);
-                                                    ApiService::update_etcd(&self.etcd_url, &etcd_key, &etcd_value);
+                                                    Some(d.data_source.clone())
+                                                } else {
+                                                    None
                                                 }
+                                            }).collect::<HashSet<_>>();
+                                            update_list.iter().for_each(|data_source| {
+                                                let etcd_value = format!(
+                                                    r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
+                                                    &self.docker_host_addr, data_source
+                                                );
+                                                let etcd_key = format!("benign_signatures_{}", data_source);
+                                                ApiService::update_etcd(&self.etcd_url, &etcd_key, &etcd_value);
                                             });
                                             future::ok(
                                                 Response::builder()
@@ -876,9 +893,18 @@ impl ApiService {
             base64::encode(key),
             base64::encode(value)
         );
-        let client = reqwest::Client::new();
-        if let Err(e) = client.post(url).body(data).send() {
-            eprintln!("An error occurs while updating etcd: {}", e);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let req = reqwest::r#async::Client::new()
+            .post(url)
+            .body(data)
+            .send()
+            .and_then(|response| response.error_for_status())
+            .then(move |response| tx.send(response))
+            .map(|_| ())
+            .map_err(|_| ());
+        if let Ok(mut runtime) = tokio::runtime::Runtime::new() {
+            runtime.spawn(req);
+            let _ = rx.wait();
         }
     }
 }
