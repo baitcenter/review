@@ -1,6 +1,6 @@
 swagger: "2.0"
 info:
-  version: "0.4.2"
+  version: "0.6.0"
   title: "REviewd API"
 tags:
 - name: "cluster"
@@ -564,6 +564,8 @@ definitions:
     required:
     - "cluster_id"
     - "detector_id"
+    - "data_source"
+    - "data_source_type"
     properties:
       cluster_id:
         type: "string"
@@ -582,6 +584,9 @@ definitions:
       data_source:
         type: "string"
         description: "Kafka topic name"
+      data_source_type:
+        type: "string"
+        description: "A data type of this Kafka topic"
       size:
         type: "integer"
         format: "uint64"
@@ -639,6 +644,7 @@ definitions:
     required:
     - "outlier"
     - "data_source"
+    - "data_source_type"
     - "event_ids"
     properties:
       outlier:
@@ -650,6 +656,9 @@ definitions:
       data_source:
         type: "string"
         description: "Kafka topic name"
+      data_source_type:
+        type: "string"
+        description: "a data type of this Kafka topic"
       event_ids:
         type: "array"
         items:
