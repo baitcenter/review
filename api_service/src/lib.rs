@@ -899,7 +899,7 @@ impl Filter {
         if let Some(category) = &self.category {
             query.extend(category.iter().map(|c| {
                 format!(
-                    "Clusters.category_id = (SELECT category_id FROM category WHERE category = '{}')",
+                    "Clusters.category_id = (SELECT category_id FROM category WHERE name = '{}')",
                     c
                 )
             }));
@@ -940,7 +940,7 @@ impl Filter {
                     .iter()
                     .map(|s| {
                         format!(
-                            "Clusters.status_id = (SELECT status_id FROM status WHERE status = '{}')",
+                            "Clusters.status_id = (SELECT status_id FROM status WHERE description = '{}')",
                             s
                         )
                     })
@@ -951,7 +951,7 @@ impl Filter {
         };
         match &self.qualifier {
             Some(qualifier) => {
-                let qualifier = qualifier.iter().map(|q| format!("Clusters.qualifier_id = (SELECT qualifier_id FROM qualifier WHERE qualifier = '{}')", q)).collect::<Vec<String>>();
+                let qualifier = qualifier.iter().map(|q| format!("Clusters.qualifier_id = (SELECT qualifier_id FROM qualifier WHERE description = '{}')", q)).collect::<Vec<String>>();
                 Filter::build_where_clause(&query, &qualifier)
             }
             None => query,
