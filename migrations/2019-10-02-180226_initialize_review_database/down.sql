@@ -1,7 +1,7 @@
 DROP TABLE token;
 DROP TABLE indicator;
-DROP TABLE outliers;
-DROP TABLE clusters;
+DROP TABLE outlier;
+DROP TABLE cluster;
 DROP TABLE status;
 DROP TABLE qualifier;
 DROP TABLE raw_event;

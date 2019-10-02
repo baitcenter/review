@@ -71,7 +71,7 @@ impl ClusterSet {
                 InitializeErrorReason::UnexpectedResponse,
             ))?
             .iter()
-            .map(|q| (q.qualifier_id, q.description.clone()))
+            .map(|q| (q.id, q.description.clone()))
             .collect();
 
         Ok(ClusterSet {

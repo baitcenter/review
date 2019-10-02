@@ -1,12 +1,12 @@
 table! {
-    category (category_id) {
-        category_id -> Int4,
+    category (id) {
+        id -> Int4,
         name -> Text,
     }
 }
 
 table! {
-    clusters (id) {
+    cluster (id) {
         id -> Int4,
         cluster_id -> Nullable<Text>,
         category_id -> Int4,
@@ -24,8 +24,8 @@ table! {
 }
 
 table! {
-    data_source (data_source_id) {
-        data_source_id -> Int4,
+    data_source (id) {
+        id -> Int4,
         topic_name -> Text,
         data_type -> Text,
     }
@@ -42,7 +42,7 @@ table! {
 }
 
 table! {
-    outliers (id) {
+    outlier (id) {
         id -> Int4,
         raw_event -> Bytea,
         data_source_id -> Int4,
@@ -53,23 +53,23 @@ table! {
 }
 
 table! {
-    qualifier (qualifier_id) {
-        qualifier_id -> Int4,
+    qualifier (id) {
+        id -> Int4,
         description -> Text,
     }
 }
 
 table! {
-    raw_event (raw_event_id) {
-        raw_event_id -> Int4,
+    raw_event (id) {
+        id -> Int4,
         data -> Bytea,
         data_source_id -> Int4,
     }
 }
 
 table! {
-    status (status_id) {
-        status_id -> Int4,
+    status (id) {
+        id -> Int4,
         description -> Text,
     }
 }
@@ -82,24 +82,24 @@ table! {
     }
 }
 
-joinable!(clusters -> category (category_id));
-joinable!(clusters -> data_source (data_source_id));
-joinable!(clusters -> qualifier (qualifier_id));
-joinable!(clusters -> raw_event (raw_event_id));
-joinable!(clusters -> status (status_id));
+joinable!(cluster -> category (category_id));
+joinable!(cluster -> data_source (data_source_id));
+joinable!(cluster -> qualifier (qualifier_id));
+joinable!(cluster -> raw_event (raw_event_id));
+joinable!(cluster -> status (status_id));
 joinable!(indicator -> category (category));
 joinable!(indicator -> data_source (source));
-joinable!(outliers -> data_source (data_source_id));
-joinable!(outliers -> raw_event (raw_event_id));
+joinable!(outlier -> data_source (data_source_id));
+joinable!(outlier -> raw_event (raw_event_id));
 joinable!(raw_event -> data_source (data_source_id));
 joinable!(token -> indicator (indicator));
 
 allow_tables_to_appear_in_same_query!(
     category,
-    clusters,
+    cluster,
     data_source,
     indicator,
-    outliers,
+    outlier,
     qualifier,
     raw_event,
     status,

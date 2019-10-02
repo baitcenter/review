@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "category"]
-#[primary_key(category_id)]
+#[primary_key(id)]
 pub struct CategoryTable {
-    pub category_id: i32,
+    pub id: i32,
     pub name: String,
 }
 
@@ -19,7 +19,7 @@ pub struct CategoryTable {
     QueryableByName,
     Serialize,
 )]
-#[table_name = "clusters"]
+#[table_name = "cluster"]
 #[belongs_to(CategoryTable, foreign_key = "category_id")]
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 #[belongs_to(StatusTable, foreign_key = "status_id")]
@@ -54,9 +54,9 @@ pub struct ClusterUpdate {
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "data_source"]
-#[primary_key(data_source_id)]
+#[primary_key(id)]
 pub struct DataSourceTable {
-    pub data_source_id: i32,
+    pub id: i32,
     pub topic_name: String,
     pub data_type: String,
 }
@@ -68,7 +68,7 @@ pub struct Example {
 }
 
 #[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
-#[table_name = "outliers"]
+#[table_name = "outlier"]
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 pub struct OutliersTable {
     pub id: i32,
@@ -96,24 +96,24 @@ pub struct QualifierUpdate {
 
 #[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "qualifier"]
-#[primary_key(qualifier_id)]
+#[primary_key(id)]
 pub struct QualifierTable {
-    pub qualifier_id: i32,
+    pub id: i32,
     pub description: String,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "raw_event"]
 pub struct RawEventTable {
-    pub raw_event_id: i32,
+    pub id: i32,
     pub data: Vec<u8>,
     pub data_source_id: i32,
 }
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "status"]
-#[primary_key(status_id)]
+#[primary_key(id)]
 pub struct StatusTable {
-    pub status_id: i32,
+    pub id: i32,
     pub description: String,
 }
