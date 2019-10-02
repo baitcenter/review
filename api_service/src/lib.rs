@@ -200,17 +200,17 @@ impl ApiService {
                         if let Ok(max_event_count) = max_event_count.parse::<usize>() {
                             let resp =
                                 db::DB::add_raw_events(&self.db, &data_source, max_event_count)
-                                    .and_then(|add_result| {
-                                        if add_result != 0 {
-                                            future::ok(
-                                        Response::builder()
-                                            .status(StatusCode::CREATED)
-                                            .body(Body::from("RawEvent table have been updated"))
-                                            .expect("builder with known status code must not fail"),
-                                    )
-                                        } else {
-                                            future::ok(ApiService::build_http_500_response())
-                                        }
+                                    .and_then(|_| {
+                                        future::ok(
+                                            Response::builder()
+                                                .status(StatusCode::CREATED)
+                                                .body(Body::from(
+                                                    "RawEvent table have been updated",
+                                                ))
+                                                .expect(
+                                                    "builder with known status code must not fail",
+                                                ),
+                                        )
                                     })
                                     .map_err(Into::into);
 

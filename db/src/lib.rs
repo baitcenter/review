@@ -110,7 +110,7 @@ impl DB {
         &self,
         data_source: &str,
         max_event_count: usize,
-    ) -> impl Future<Item = usize, Error = Error> {
+    ) -> impl Future<Item = (), Error = Error> {
         if let (
             Ok(event_ids_from_clusters),
             Ok(event_ids_from_outliers),
@@ -169,50 +169,39 @@ impl DB {
                     .collect();
 
             if !raw_events.is_empty() {
-                let execution_result = self
-                    .get_connection()
-                    .and_then(|conn| {
-                        Ok((
-                            diesel::insert_into(raw_event::dsl::raw_event)
-                                .values(&raw_events)
-                                .execute(&*conn)
-                                .map_err(Into::into),
-                            conn,
-                        ))
-                    })
-                    .and_then(|(row, conn)| {
-                        if let Ok(raw_events) =
-                            DB::get_raw_events_by_data_source_id(self, data_source_id)
-                        {
-                            let raw_events = raw_events
-                                .into_iter()
-                                .map(|e| (e.1, e.0))
-                                .collect::<HashMap<Vec<u8>, i32>>();
-                            for u in update_lists {
-                                if let Some(raw_event_id) = raw_events.get(&u.data) {
-                                    if u.is_cluster {
-                                        use schema::clusters::dsl;
-                                        let _ =
-                                            diesel::update(dsl::clusters.filter(dsl::id.eq(u.id)))
-                                                .set(dsl::raw_event_id.eq(Some(raw_event_id)))
-                                                .execute(&*conn);
-                                    } else {
-                                        use schema::outliers::dsl;
-                                        let _ =
-                                            diesel::update(dsl::outliers.filter(dsl::id.eq(u.id)))
-                                                .set(dsl::raw_event_id.eq(Some(raw_event_id)))
-                                                .execute(&*conn);
-                                    }
+                let _ = self.get_connection().and_then(|conn| {
+                    let _ = diesel::insert_into(raw_event::dsl::raw_event)
+                        .values(&raw_events)
+                        .execute(&*conn);
+                    if let Ok(raw_events) =
+                        DB::get_raw_events_by_data_source_id(self, data_source_id)
+                    {
+                        let raw_events = raw_events
+                            .into_iter()
+                            .map(|e| (e.1, e.0))
+                            .collect::<HashMap<Vec<u8>, i32>>();
+                        for u in update_lists {
+                            if let Some(raw_event_id) = raw_events.get(&u.data) {
+                                if u.is_cluster {
+                                    use schema::clusters::dsl;
+                                    let _ = diesel::update(dsl::clusters.filter(dsl::id.eq(u.id)))
+                                        .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                        .execute(&*conn);
+                                } else {
+                                    use schema::outliers::dsl;
+                                    let _ = diesel::update(dsl::outliers.filter(dsl::id.eq(u.id)))
+                                        .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                        .execute(&*conn);
                                 }
                             }
                         }
-                        row
-                    });
-                return future::result(execution_result);
+                    }
+                    Ok(())
+                });
             }
         }
 
-        future::result(Ok(0))
+        future::result(Ok(()))
     }
 
     fn get_event_ids_from_cluster(&self, data_source: &str) -> Result<Vec<(i32, u64)>, Error> {
