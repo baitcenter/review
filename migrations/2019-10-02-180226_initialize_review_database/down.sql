@@ -1,3 +1,5 @@
+DROP TABLE token;
+DROP TABLE indicator;
 DROP TABLE outliers;
 DROP TABLE clusters;
 DROP TABLE status;

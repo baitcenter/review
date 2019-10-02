@@ -32,6 +32,16 @@ table! {
 }
 
 table! {
+    indicator (id) {
+        id -> Int4,
+        description -> Nullable<Text>,
+        source -> Nullable<Int4>,
+        category -> Nullable<Int4>,
+        qualification -> Nullable<Float8>,
+    }
+}
+
+table! {
     outliers (id) {
         id -> Int4,
         raw_event -> Bytea,
@@ -64,21 +74,34 @@ table! {
     }
 }
 
+table! {
+    token (id) {
+        id -> Int4,
+        name -> Nullable<Bytea>,
+        indicator -> Nullable<Int4>,
+    }
+}
+
 joinable!(clusters -> category (category_id));
 joinable!(clusters -> data_source (data_source_id));
 joinable!(clusters -> qualifier (qualifier_id));
 joinable!(clusters -> raw_event (raw_event_id));
 joinable!(clusters -> status (status_id));
+joinable!(indicator -> category (category));
+joinable!(indicator -> data_source (source));
 joinable!(outliers -> data_source (data_source_id));
 joinable!(outliers -> raw_event (raw_event_id));
 joinable!(raw_event -> data_source (data_source_id));
+joinable!(token -> indicator (indicator));
 
 allow_tables_to_appear_in_same_query!(
     category,
     clusters,
     data_source,
+    indicator,
     outliers,
     qualifier,
     raw_event,
     status,
+    token,
 );

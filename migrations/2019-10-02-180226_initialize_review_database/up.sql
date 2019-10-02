@@ -59,3 +59,17 @@ CREATE TABLE outliers (
   size TEXT,
   UNIQUE (raw_event, data_source_id)
 );
+
+CREATE TABLE indicator (
+  id SERIAL PRIMARY KEY,
+  description TEXT,
+  source INTEGER REFERENCES data_source(data_source_id),
+  category INTEGER REFERENCES category(category_id),
+  qualification DOUBLE PRECISION
+);
+
+CREATE TABLE token (
+  id SERIAL PRIMARY KEY,
+  name BYTEA,
+  indicator INTEGER REFERENCES indicator(id)
+);
