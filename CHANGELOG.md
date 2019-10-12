@@ -4,6 +4,15 @@ This file documents all notable changes to this project. The format of this file
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2019-10-11
+
+### Added
+
+- REviewd outputs logs of processed HTTP Requests and Response like below:
+```
+[2019-10-12T01:36:58Z INFO  actix_web::middleware::logger] 10.0.170.135:54135 "PUT /api/cluster HTTP/1.1" 200 0 "-" "reqwest/0.9.21" 0.046250
+```
+
 ## [0.6.1] - 2019-10-08
 
 ### Fixed
@@ -133,6 +142,7 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
+[0.6.2]: https://gitlab.com/resolutions/review/compare/0.6.1...0.6.2
 [0.6.1]: https://gitlab.com/resolutions/review/compare/0.6.0...0.6.1
 [0.6.0]: https://gitlab.com/resolutions/review/compare/0.5.0...0.6.0
 [0.5.0]: https://gitlab.com/resolutions/review/compare/0.4.2...0.5.0
