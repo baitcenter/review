@@ -1,7 +1,7 @@
 use failure::ResultExt;
+use reviewd::{Example, QualifierTable};
 use serde::Deserialize;
 use std::collections::HashMap;
-use reviewd::{Example, QualifierTable};
 
 use crate::error::{Error, ErrorKind, InitializeErrorReason};
 use std::ops::{Index, IndexMut};
