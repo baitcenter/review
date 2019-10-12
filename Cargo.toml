@@ -1,6 +1,6 @@
 [package]
 name = "review"
-version = "0.6.1"
+version = "0.6.2"
 authors = [
     "Atsushi Yoshioka <yoshioka@petabi.com>",
     "Min Kim <msk@petabi.com>",
@@ -9,14 +9,11 @@ edition = "2018"
 publish = false
 
 [dependencies]
-api_service = { path = "./api_service" }
+reviewd = { path = "./reviewd" }
 clap = "2"
 client = { path = "./client" }
 dotenv = "0.14"
 env_logger = "0.7"
 failure = "0.1"
-futures = "0.1"
-hyper = "0.12"
 log = "0.4"
-percent-encoding = "2"
 url = "2"

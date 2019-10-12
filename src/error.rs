@@ -30,8 +30,8 @@ impl Display for Error {
 }
 
 impl Error {
-    pub fn new(inner: Context<ErrorKind>) -> Error {
-        Error { inner }
+    pub fn new(inner: Context<ErrorKind>) -> Self {
+        Self { inner }
     }
 
     pub fn kind(&self) -> &ErrorKind {
@@ -40,25 +40,24 @@ impl Error {
 }
 
 impl From<ErrorKind> for Error {
-    fn from(kind: ErrorKind) -> Error {
-        Error {
+    fn from(kind: ErrorKind) -> Self {
+        Self {
             inner: Context::new(kind),
         }
     }
 }
 
 impl From<Context<ErrorKind>> for Error {
-    fn from(inner: Context<ErrorKind>) -> Error {
-        Error { inner }
+    fn from(inner: Context<ErrorKind>) -> Self {
+        Self { inner }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InitializeErrorReason {
+    BuildServer,
     ClientMode,
     ClientUrl,
-    DatabaseFileNotFound,
-    DatabaseInitialization,
     MissingDatabaseURL,
     MissingDockerHostIp,
     MissingEtcdAddr,
@@ -66,31 +65,32 @@ pub enum InitializeErrorReason {
     MissingReviewdAddr,
     REviewd,
     REviewdUrl,
+    ServerRun,
 }
 
 impl Display for InitializeErrorReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            InitializeErrorReason::ClientMode => write!(
+            Self::BuildServer => write!(f, "Could not build server"),
+            Self::ClientMode => write!(
                 f,
                 "Could not create the cluster view for REview client mode"
             ),
-            InitializeErrorReason::ClientUrl => write!(
+            Self::ClientUrl => write!(
                 f,
                 "Invalid url format. Please specify a url in the form of http://<hostname>:<port number>"
             ),
-            InitializeErrorReason::DatabaseFileNotFound => write!(f, "Could not find the database file"),
-            InitializeErrorReason::DatabaseInitialization => write!(f, "Could not initialize the database"),
-            InitializeErrorReason::MissingDatabaseURL => write!(f, "DATABASE_URL is not set"),
-            InitializeErrorReason::MissingEtcdAddr => write!(f, "ETCD_ADDR is not set"),
-            InitializeErrorReason::MissingReviewdAddr => write!(f, "REVIEWD_ADDR is not set"),
-            InitializeErrorReason::MissingDockerHostIp => write!(f, "DOCKER_HOST_IP is not set"),
-            InitializeErrorReason::MissingKafkaUrl => write!(f, "KAFKA_URL is not set"),                                    
-            InitializeErrorReason::REviewd => write!(f, "Could not initialize REviewd"),
-            InitializeErrorReason::REviewdUrl => write!(
+            Self::MissingDatabaseURL => write!(f, "DATABASE_URL is not set"),
+            Self::MissingEtcdAddr => write!(f, "ETCD_ADDR is not set"),
+            Self::MissingReviewdAddr => write!(f, "REVIEWD_ADDR is not set"),
+            Self::MissingDockerHostIp => write!(f, "DOCKER_HOST_IP is not set"),
+            Self::MissingKafkaUrl => write!(f, "KAFKA_URL is not set"),                                    
+            Self::REviewd => write!(f, "Could not initialize REviewd"),
+            Self::REviewdUrl => write!(
                 f,
                 "IP address and/or port number for reviewd is bad/illegal format"
             ),
+            Self::ServerRun => write!(f, "Could not run server"),
         }
     }
 }
