@@ -13,11 +13,8 @@ base64 = "0.10"
 diesel = { version = "1.4", features = ["chrono", "r2d2", "postgres"] }
 diesel_migrations = "1.4"
 diesel_derives = "1.4"
-env_logger = "0.7"
 failure = "0.1"
 futures = "0.1"
-hex = "0.4"
-log = "0.4"
 remake = { path = "../remake" }
 reqwest = "0.9"
 rmp-serde = "0.14"
