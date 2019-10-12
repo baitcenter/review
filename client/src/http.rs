@@ -1,6 +1,7 @@
 use cursive::view::Position;
 use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
+use reviewd::QualifierUpdate;
 
 use crate::error::Error;
 use crate::views::{ClusterSelectView, MainView};
@@ -31,13 +32,13 @@ impl ClusterView {
 }
 
 fn send_update_request(s: &mut Cursive) {
-    let (qualifier_update, url): (Vec<db::models::QualifierUpdate>, String) = s
+    let (qualifier_update, url): (Vec<QualifierUpdate>, String) = s
         .call_on_id("cluster_select", |v: &mut ClusterSelectView| {
             let qualifier_update = v
                 .clusters
                 .updated_clusters
                 .iter()
-                .map(|(cluster_id, i)| db::models::QualifierUpdate {
+                .map(|(cluster_id, i)| QualifierUpdate {
                     cluster_id: cluster_id.clone(),
                     data_source: v.clusters[*i].data_source.clone(),
                     qualifier: v.clusters[*i].qualifier.clone(),

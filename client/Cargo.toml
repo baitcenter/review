@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 chrono = "0.4"
-db = { path = "../db" }
+reviewd = { path = "../reviewd" }
 failure = "0.1"
 reqwest = "0.9"
 rmp-serde = "0.14"

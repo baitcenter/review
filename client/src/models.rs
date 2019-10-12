@@ -1,6 +1,7 @@
 use failure::ResultExt;
 use serde::Deserialize;
 use std::collections::HashMap;
+use reviewd::{Example, QualifierTable};
 
 use crate::error::{Error, ErrorKind, InitializeErrorReason};
 use std::ops::{Index, IndexMut};
@@ -16,7 +17,7 @@ pub struct Cluster {
     pub(crate) data_source: String,
     pub(crate) size: usize,
     pub(crate) score: String,
-    pub(crate) examples: db::models::Example,
+    pub(crate) examples: Example,
     pub(crate) last_modification_time: String,
 }
 
@@ -66,7 +67,7 @@ impl ClusterSet {
         let mut qualifier_resp = reqwest::get(qualifier_url.as_str())
             .context(ErrorKind::Initialize(InitializeErrorReason::Reqwest))?;
         let qualifier = qualifier_resp
-            .json::<Vec<db::models::QualifierTable>>()
+            .json::<Vec<QualifierTable>>()
             .context(ErrorKind::Initialize(
                 InitializeErrorReason::UnexpectedResponse,
             ))?
