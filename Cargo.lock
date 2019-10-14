@@ -817,7 +817,7 @@ dependencies = [
 [[package]]
 name = "eventio"
 version = "0.1.0"
-source = "git+https://github.com/petabi/eventio.git?tag=0.1.0#082bbd7f2e75acedb4e1c98334a3eac50a1fd724"
+source = "git+https://github.com/petabi/eventio.git?tag=0.1.0#c66e5299758c1e384ccf750398ce5742e4742c4f"
 dependencies = [
  "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "kafka 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",

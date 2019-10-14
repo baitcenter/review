@@ -13,6 +13,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 [2019-10-12T01:36:58Z INFO  actix_web::middleware::logger] 10.0.170.135:54135 "PUT /api/cluster HTTP/1.1" 200 0 "-" "reqwest/0.9.21" 0.046250
 ```
 
+### Changed
+
+- Fetching raw events from Kafka runs faster by running I/O operations in
+  parallel with internal data udpates.
+
 ## [0.6.1] - 2019-10-08
 
 ### Fixed
