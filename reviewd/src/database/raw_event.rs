@@ -71,9 +71,11 @@ pub(crate) fn add_raw_events(
 
         let mut update_lists = Vec::<UpdateRawEventId>::new();
         let mut raw_events: Vec<InsertRawEvent> = Vec::new();
+        let mut event_count = 0;
         {
             let ack_tx = ack_tx;
             for ev in data_rx {
+                event_count += 1;
                 let id = ev.entry.time;
                 if let Some(c) = event_ids_from_clusters.iter().find(|d| id == d.1) {
                     if let Some(raw) = ev.entry.record.get("message") {
@@ -102,6 +104,9 @@ pub(crate) fn add_raw_events(
                 }
                 if ack_tx.send(ev.loc).is_err() {
                     return future::result(Ok(HttpResponse::InternalServerError().into()));
+                }
+                if event_count >= query.max_event_count {
+                    break;
                 }
             }
         }
