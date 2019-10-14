@@ -28,7 +28,7 @@ rust-latest:
       - target/
   before_script:
     - apt-get update -yqq
-    - apt-get install -yqq --no-install-recommends clang cmake libhyperscan-dev
+    - apt-get install -yqq --no-install-recommends clang libhyperscan-dev
   script:
     - cargo build --verbose
     - cargo test --all --verbose

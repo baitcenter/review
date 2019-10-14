@@ -8,12 +8,13 @@ edition = "2018"
 actix = "0.8"
 actix-web = "1.0.0"
 base64 = "0.10"
+crossbeam-channel = "0.3"
 diesel = { version = "1.4", features = ["chrono", "r2d2", "postgres"] }
 diesel_migrations = "1.4"
 diesel_derives = "1.4"
+eventio = { git = "https://github.com/petabi/eventio.git", tag = "0.1.0" }
 failure = "0.1"
 futures = "0.1"
-remake = { path = "../remake" }
 reqwest = "0.9"
 rmp-serde = "0.14"
 r2d2 = "0.8"

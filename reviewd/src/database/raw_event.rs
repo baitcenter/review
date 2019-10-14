@@ -3,11 +3,11 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
+use eventio::kafka;
 use futures::{future, prelude::*};
-use remake::event::Identifiable;
-use remake::stream::EventorKafka;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::thread;
 
 use super::schema::{cluster, outlier, raw_event};
 use crate::database::{get_data_source_id, DatabaseError, Error, ErrorKind, Pool};
@@ -46,49 +46,66 @@ pub(crate) fn add_raw_events(
     kafka_url: Data<String>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let query = query.into_inner();
-    if let (
-        Ok(event_ids_from_clusters),
-        Ok(event_ids_from_outliers),
-        Ok(consumer),
-        Ok(data_source_id),
-    ) = (
+    if let (Ok(event_ids_from_clusters), Ok(event_ids_from_outliers), Ok(data_source_id)) = (
         get_event_ids_from_cluster(&pool, &query.data_source),
         get_event_ids_from_outlier(&pool, &query.data_source),
-        EventorKafka::new(&kafka_url, &query.data_source, "REviewd"),
         get_data_source_id(&pool, &query.data_source),
     ) {
+        let (data_tx, data_rx) = crossbeam_channel::bounded(256);
+        let (ack_tx, ack_rx) = crossbeam_channel::bounded(256);
+        let mut event_input = match kafka::Input::new(
+            data_tx,
+            ack_rx,
+            vec![kafka_url.get_ref().into()],
+            "REviewd".into(),
+            "REview".into(),
+            query.data_source,
+        ) {
+            Ok(input) => input,
+            Err(_) => return future::result(Ok(HttpResponse::InternalServerError().into())),
+        };
+        let in_thread = thread::spawn(move || match event_input.run() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("{}", e)),
+        });
+
         let mut update_lists = Vec::<UpdateRawEventId>::new();
-        let raw_events: Vec<InsertRawEvent> =
-            EventorKafka::fetch_messages(&consumer, query.max_event_count)
-                .into_iter()
-                .filter_map(|data| {
-                    if let Some(c) = event_ids_from_clusters.iter().find(|d| data.id() == d.1) {
+        let mut raw_events: Vec<InsertRawEvent> = Vec::new();
+        {
+            let ack_tx = ack_tx;
+            for ev in data_rx {
+                let id = ev.entry.time;
+                if let Some(c) = event_ids_from_clusters.iter().find(|d| id == d.1) {
+                    if let Some(raw) = ev.entry.record.get("message") {
                         update_lists.push(UpdateRawEventId {
                             id: c.0,
-                            data: data.data().to_vec(),
+                            data: raw.to_vec(),
                             is_cluster: true,
                         });
-                        Some(InsertRawEvent {
-                            data: data.data().to_vec(),
+                        raw_events.push(InsertRawEvent {
+                            data: raw.to_vec(),
                             data_source_id,
-                        })
-                    } else if let Some(o) =
-                        event_ids_from_outliers.iter().find(|d| data.id() == d.1)
-                    {
+                        });
+                    }
+                } else if let Some(o) = event_ids_from_outliers.iter().find(|d| id == d.1) {
+                    if let Some(raw) = ev.entry.record.get("message") {
                         update_lists.push(UpdateRawEventId {
                             id: o.0,
-                            data: data.data().to_vec(),
+                            data: raw.to_vec(),
                             is_cluster: false,
                         });
-                        Some(InsertRawEvent {
-                            data: data.data().to_vec(),
+                        raw_events.push(InsertRawEvent {
+                            data: raw.to_vec(),
                             data_source_id,
-                        })
-                    } else {
-                        None
+                        });
                     }
-                })
-                .collect();
+                }
+                if ack_tx.send(ev.loc).is_err() {
+                    return future::result(Ok(HttpResponse::InternalServerError().into()));
+                }
+            }
+        }
+        let thread_result = in_thread.join();
 
         if !raw_events.is_empty() {
             let _: Result<(), Error> = pool.get().map_err(Into::into).and_then(|conn| {
@@ -118,6 +135,10 @@ pub(crate) fn add_raw_events(
                 }
                 Ok(())
             });
+        }
+
+        if thread_result.is_err() {
+            return future::result(Ok(HttpResponse::InternalServerError().into()));
         }
     }
 
