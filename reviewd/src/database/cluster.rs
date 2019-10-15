@@ -108,22 +108,6 @@ pub(crate) fn add_clusters(
             .into_inner()
             .iter()
             .filter_map(|c| {
-                let event_ids = match &c.event_ids {
-                    Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                    None => None,
-                };
-
-                // Signature is required field in central repo database
-                // but if new cluster information does not have signature field,
-                // we use '-' as a signature
-                let sig = match &c.signature {
-                    Some(sig) => sig.clone(),
-                    None => "-".to_string(),
-                };
-                let cluster_size = match c.size {
-                    Some(cluster_size) => cluster_size.to_string(),
-                    None => "1".to_string(),
-                };
                 let data_source_id =
                     get_data_source_id(&pool, &c.data_source).unwrap_or_else(|_| {
                         add_data_source(&pool, &c.data_source, &c.data_source_type)
@@ -131,6 +115,23 @@ pub(crate) fn add_clusters(
                 if data_source_id == 0 {
                     None
                 } else {
+                    let event_ids = match &c.event_ids {
+                        Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
+                        None => None,
+                    };
+
+                    // Signature is required field in central repo database
+                    // but if new cluster information does not have signature field,
+                    // we use '-' as a signature
+                    let sig = match &c.signature {
+                        Some(sig) => sig.clone(),
+                        None => "-".to_string(),
+                    };
+                    let cluster_size = match c.size {
+                        Some(cluster_size) => cluster_size.to_string(),
+                        None => "1".to_string(),
+                    };
+
                     // We always insert 1 for category_id
                     // "unknown" for qualifier_id, and "pending review" for status_id.
                     Some((
