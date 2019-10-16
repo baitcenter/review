@@ -10,29 +10,37 @@ use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use super::category::CategoryTable;
-use super::data_source::DataSourceTable;
-use super::qualifier::QualifierTable;
 use super::schema;
 use super::schema::cluster;
-use super::status::StatusTable;
 
 use crate::database::*;
 use crate::server::EtcdServer;
 
-type ClusterResponse = (
-    Option<String>,        // cluster_id
-    Option<i32>,           // detector_id
-    Option<String>,        // qualifier
-    Option<String>,        // status
-    Option<String>,        // category
-    Option<String>,        // signature
-    Option<String>,        // data_source
-    Option<usize>,         // size
-    Option<f64>,           // score
-    Option<Example>,       // examples
-    Option<NaiveDateTime>, // last_modification_time
-);
+#[derive(Debug, Serialize)]
+struct ClusterResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cluster_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detector_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qualifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signature: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    score: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    examples: Option<Example>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_modification_time: Option<NaiveDateTime>,
+}
 
 #[derive(
     Debug,
@@ -193,11 +201,10 @@ pub(crate) fn get_cluster_table(
                 )>(&conn)
                 .map_err(Into::into)
         })
-        .and_then(|data| {
-            let clusters = data
-                .into_iter()
+        .map(|data| {
+            data.into_iter()
                 .map(|d| {
-                    let event_ids = if let Some(event_ids) =
+                    let examples = if let Some(event_ids) =
                         d.0.event_ids
                             .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok())
                     {
@@ -215,31 +222,30 @@ pub(crate) fn get_cluster_table(
                     } else {
                         None
                     };
-                    let score = d.0.score.unwrap_or_default();
+                    let score = Some(d.0.score.unwrap_or(std::f64::NAN));
+                    let size = Some(d.0.size.parse::<usize>().unwrap_or_default());
 
-                    let cluster_size = d.0.size.parse::<usize>().unwrap_or(0);
-                    (
-                        d.0.cluster_id,
-                        Some(d.0.detector_id),
-                        Some(d.2.description),
-                        Some(d.1.description),
-                        Some(d.3.name),
-                        Some(d.0.signature),
-                        Some(d.4.topic_name),
-                        Some(cluster_size),
-                        Some(score),
-                        event_ids,
-                        d.0.last_modification_time,
-                    )
+                    ClusterResponse {
+                        cluster_id: d.0.cluster_id,
+                        detector_id: Some(d.0.detector_id),
+                        qualifier: Some(d.2.description),
+                        status: Some(d.1.description),
+                        category: Some(d.3.name),
+                        signature: Some(d.0.signature),
+                        data_source: Some(d.4.topic_name),
+                        size,
+                        score,
+                        examples,
+                        last_modification_time: d.0.last_modification_time,
+                    }
                 })
-                .collect();
-            Ok(clusters)
+                .collect()
         });
 
     let result = match query_result {
         Ok(clusters) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_cluster_response(&clusters, true))),
+            .json(&clusters)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
@@ -397,7 +403,7 @@ pub(crate) fn update_clusters(
     use cluster::dsl;
 
     #[derive(Debug, Queryable, Serialize)]
-    pub struct Cluster {
+    struct Cluster {
         cluster_id: Option<String>,
         signature: String,
         event_ids: Option<Vec<u8>>,
@@ -893,7 +899,7 @@ pub(crate) fn get_selected_clusters(
         });
     let limit = query.limit;
 
-    let query_result: Result<(Vec<ClusterResponse>, bool), Error> =
+    let query_result: Result<Vec<ClusterResponse>, Error> =
         pool.get()
             .map_err(Into::into)
             .and_then(|conn| {
@@ -915,197 +921,91 @@ pub(crate) fn get_selected_clusters(
                     )>(&conn)
                     .map_err(Into::into)
             })
-            .and_then(|data| {
-                let clusters: Vec<ClusterResponse> =
-                    data.into_iter()
-                        .map(|d| {
-                            let cluster_id = if select.0 { d.0.cluster_id } else { None };
-                            let detector_id = if select.1 {
-                                Some(d.0.detector_id)
-                            } else {
-                                None
-                            };
-                            let qualifier = if select.2 {
-                                Some(d.2.description)
-                            } else {
-                                None
-                            };
-                            let status = if select.3 {
-                                Some(d.1.description)
-                            } else {
-                                None
-                            };
-                            let category = if select.4 { Some(d.3.name) } else { None };
-                            let signature = if select.5 { Some(d.0.signature) } else { None };
-                            let data_source = if select.6 {
-                                Some(d.4.topic_name.clone())
-                            } else {
-                                None
-                            };
-                            let cluster_size = if select.7 {
-                                Some(d.0.size.parse::<usize>().unwrap_or(0))
-                            } else {
-                                None
-                            };
-                            let score = if select.8 { d.0.score } else { None };
-                            let event_ids = if select.9 {
-                                if let Some(event_ids) = d.0.event_ids.and_then(|eg| {
-                                    rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()
-                                }) {
-                                    let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
-                                        get_raw_event_by_raw_event_id(&pool, raw_event_id)
-                                            .ok()
-                                            .map_or("-".to_string(), |raw_events| {
-                                                bytes_to_string(&raw_events)
-                                            })
-                                    } else {
-                                        "-".to_string()
-                                    };
-                                    Some(Example {
-                                        raw_event,
-                                        event_ids,
-                                    })
+            .map(|data| {
+                data.into_iter()
+                    .map(|d| {
+                        let cluster_id = if select.0 { d.0.cluster_id } else { None };
+                        let detector_id = if select.1 {
+                            Some(d.0.detector_id)
+                        } else {
+                            None
+                        };
+                        let qualifier = if select.2 {
+                            Some(d.2.description)
+                        } else {
+                            None
+                        };
+                        let status = if select.3 {
+                            Some(d.1.description)
+                        } else {
+                            None
+                        };
+                        let category = if select.4 { Some(d.3.name) } else { None };
+                        let signature = if select.5 { Some(d.0.signature) } else { None };
+                        let data_source = if select.6 {
+                            Some(d.4.topic_name.clone())
+                        } else {
+                            None
+                        };
+                        let size = if select.7 {
+                            Some(d.0.size.parse::<usize>().unwrap_or(0))
+                        } else {
+                            None
+                        };
+                        let score = if select.8 { Some(d.0.score.unwrap_or(std::f64::NAN)) } else { None };
+                        let examples = if select.9 {
+                            if let Some(event_ids) = d.0.event_ids.and_then(|eg| {
+                                rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()
+                            }) {
+                                let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
+                                    get_raw_event_by_raw_event_id(&pool, raw_event_id)
+                                        .ok()
+                                        .map_or("-".to_string(), |raw_events| {
+                                            bytes_to_string(&raw_events)
+                                        })
                                 } else {
-                                    None
-                                }
+                                    "-".to_string()
+                                };
+                                Some(Example {
+                                    raw_event,
+                                    event_ids,
+                                })
                             } else {
                                 None
-                            };
-                            let time = if select.10 {
-                                d.0.last_modification_time
-                            } else {
-                                None
-                            };
-                            (
-                                cluster_id,
-                                detector_id,
-                                qualifier,
-                                status,
-                                category,
-                                signature,
-                                data_source,
-                                cluster_size,
-                                score,
-                                event_ids,
-                                time,
-                            )
-                        })
-                        .collect();
-                Ok((clusters, select.8))
+                            }
+                        } else {
+                            None
+                        };
+                        let last_modification_time = if select.10 {
+                            d.0.last_modification_time
+                        } else {
+                            None
+                        };
+                        ClusterResponse {
+                            cluster_id,
+                            detector_id,
+                            qualifier,
+                            status,
+                            category,
+                            signature,
+                            data_source,
+                            size,
+                            score,
+                            examples,
+                            last_modification_time,
+                        }
+                    })
+                    .collect()
             });
 
     let result = match query_result {
         Ok(clusters) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_cluster_response(&clusters.0, clusters.1))),
+            .json(&clusters)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
     };
 
     future::result(result)
-}
-
-fn build_cluster_response(data: &[ClusterResponse], return_score: bool) -> String {
-    let mut json = String::new();
-    json.push_str("[");
-    for (index, d) in data.iter().enumerate() {
-        json.push_str("{");
-        let mut j = String::new();
-        if let Some(cluster_id) = &d.0 {
-            j.push_str(&build_response_string(
-                j.is_empty(),
-                "cluster_id",
-                cluster_id,
-            ));
-        }
-        if let Some(detector_id) = d.1 {
-            j.push_str(&build_response_string(
-                j.is_empty(),
-                "detector_id",
-                detector_id,
-            ));
-        }
-        if let Some(qualifier) = &d.2 {
-            j.push_str(&build_response_string(j.is_empty(), "qualifier", qualifier));
-        }
-        if let Some(status) = &d.3 {
-            j.push_str(&build_response_string(j.is_empty(), "status", status));
-        }
-        if let Some(category) = &d.4 {
-            j.push_str(&build_response_string(j.is_empty(), "category", category));
-        }
-        if let Some(signature) = &d.5 {
-            j.push_str(&build_response_string(j.is_empty(), "signature", signature));
-        }
-        if let Some(data_source) = &d.6 {
-            j.push_str(&build_response_string(
-                j.is_empty(),
-                "data_source",
-                data_source,
-            ));
-        }
-        if let Some(size) = &d.7 {
-            j.push_str(&build_response_string(j.is_empty(), "size", size));
-        }
-        if return_score {
-            if let Some(score) = d.8 {
-                j.push_str(&build_response_string(j.is_empty(), "score", score));
-            } else {
-                j.push_str(&build_response_string(j.is_empty(), "score", "-"));
-            }
-        }
-        if let Some(examples) = &d.9 {
-            match serde_json::to_string(&examples) {
-                Ok(e) => {
-                    if j.is_empty() {
-                        j.push_str(&format!(r#""examples":{}"#, e));
-                    } else {
-                        j.push_str(&format!(r#","examples":{}"#, e));
-                    }
-                }
-                Err(_) => {
-                    if j.is_empty() {
-                        j.push_str(r#""examples":-"#);
-                    } else {
-                        j.push_str(r#","examples":-"#);
-                    }
-                }
-            }
-        }
-        if let Some(last_modification_time) = &d.10 {
-            if j.is_empty() {
-                j.push_str(&format!(
-                    r#""last_modification_time":"{}""#,
-                    last_modification_time
-                ));
-            } else {
-                j.push_str(&format!(
-                    r#","last_modification_time":"{}""#,
-                    last_modification_time
-                ));
-            }
-        }
-        if index == data.len() - 1 {
-            j.push_str("}")
-        } else {
-            j.push_str("},")
-        }
-
-        json.push_str(&j);
-    }
-    json.push_str("]");
-    json
-}
-
-fn build_response_string<T: std::fmt::Debug>(
-    is_first_property: bool,
-    property_name: &str,
-    property_value: T,
-) -> String {
-    if is_first_property {
-        format!(r#""{}":{:?}"#, property_name, property_value)
-    } else {
-        format!(r#","{}":{:?}"#, property_name, property_value)
-    }
 }
