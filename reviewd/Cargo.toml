@@ -15,11 +15,13 @@ diesel_derives = "1.4"
 eventio = { git = "https://github.com/petabi/eventio.git", tag = "0.1.0" }
 failure = "0.1"
 futures = "0.1"
+num-traits = "0.2"
 reqwest = "0.9"
 rmp-serde = "0.14"
 r2d2 = "0.8"
 serde_json = "1"
 serde = { version = "1",  features = ["derive"] }
+structured = { git = "https://github.com/petabi/structured.git", rev = "b37c661" }
 tokio = "0.1"
 
 [dependencies.chrono]

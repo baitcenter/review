@@ -1,3 +1,17 @@
+DROP TABLE top_n_datetime;
+DROP TABLE top_n_ipaddr;
+DROP TABLE top_n_text;
+DROP TABLE top_n_float;
+DROP TABLE top_n_enum;
+DROP TABLE top_n_int;
+DROP TABLE description_datetime;
+DROP TABLE description_ipaddr;
+DROP TABLE description_text;
+DROP TABLE description_float;
+DROP TABLE description_enum;
+DROP TABLE description_int;
+DROP TABLE column_description;
+DROP TABLE description_element_type;
 DROP TABLE token;
 DROP TABLE indicator;
 DROP TABLE outlier;

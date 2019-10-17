@@ -73,3 +73,126 @@ CREATE TABLE token (
   name BYTEA,
   indicator INTEGER REFERENCES indicator(id)
 );
+
+CREATE TABLE description_element_type (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL
+);
+INSERT INTO description_element_type VALUES(1,'Int');
+INSERT INTO description_element_type VALUES(2,'UInt');
+INSERT INTO description_element_type VALUES(3,'Float');
+INSERT INTO description_element_type VALUES(4,'Text');
+INSERT INTO description_element_type VALUES(5,'IpAddr');
+INSERT INTO description_element_type VALUES(6,'DateTime');
+
+CREATE TABLE column_description (
+  id SERIAL PRIMARY KEY,
+  cluster_id INTEGER NOT NULL REFERENCES cluster (id),
+  first_event_id TEXT NOT NULL,
+  last_event_id TEXT NOT NULL,
+  column_index INTEGER NOT NULL,
+  type_id INTEGER NOT NULL REFERENCES description_element_type (id),
+  count BIGINT NOT NULL,
+  unique_count BIGINT NOT NULL,
+  UNIQUE(cluster_id, first_event_id, last_event_id, column_index)
+);
+
+CREATE TABLE description_int (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  min BIGINT,
+  max BIGINT,
+  mean DOUBLE PRECISION,
+  s_deviation DOUBLE PRECISION,
+  mode BIGINT
+);
+
+CREATE TABLE description_enum (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  mode BIGINT
+);
+
+CREATE TABLE description_float (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  min DOUBLE PRECISION,
+  max DOUBLE PRECISION,
+  mean DOUBLE PRECISION,
+  s_deviation DOUBLE PRECISION,
+  mode_smallest DOUBLE PRECISION,
+  mode_largest DOUBLE PRECISION
+);
+
+CREATE TABLE description_text (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  mode TEXT
+);
+
+CREATE TABLE description_ipaddr (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  mode TEXT
+);
+
+CREATE TABLE description_datetime (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  mode TIMESTAMP
+);
+
+CREATE TABLE top_n_int (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value BIGINT,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);
+
+CREATE TABLE top_n_enum (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value BIGINT,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);
+
+CREATE TABLE top_n_float (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value_smallest DOUBLE PRECISION,
+  value_largest DOUBLE PRECISION,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);
+
+CREATE TABLE top_n_text (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value TEXT,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);
+
+CREATE TABLE top_n_ipaddr (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value TEXT,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);
+
+CREATE TABLE top_n_datetime (
+  id SERIAL PRIMARY KEY,
+  description_id INTEGER NOT NULL REFERENCES column_description (id),
+  ranking BIGINT,
+  value TIMESTAMP,
+  count BIGINT,
+  UNIQUE(description_id, ranking)
+);

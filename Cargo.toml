@@ -4,6 +4,7 @@ version = "0.6.2"
 authors = [
     "Atsushi Yoshioka <yoshioka@petabi.com>",
     "Min Kim <msk@petabi.com>",
+    "Sehkone Kim <sehkone@petabi.com>",
 ]
 edition = "2018"
 publish = false
