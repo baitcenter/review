@@ -161,19 +161,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(put().to_async(add_descriptions)),
     )
     .service(
-        resource("/api/description")
-            .guard(guard::Put())
-            .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<DescriptionUpdate>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
-            .route(put().to_async(add_descriptions)),
-    )
-    .service(
         resource("/api/etcd/suspicious_tokens")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
