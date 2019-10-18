@@ -33,11 +33,9 @@ RUN set -eux; \
 
 WORKDIR /work/
 
-COPY ./api_service ./api_service
+COPY ./reviewd ./reviewd
 COPY ./client ./client
-COPY ./db ./db
 COPY ./migrations ./migrations
-COPY ./remake/ ./remake/
 COPY ./src/ ./src/
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
