@@ -14,6 +14,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ```
 
 - Added saving column descriptions for multidimensional clustering into db.
+- Can designated the frontend app directory to be served through HTTP.
 
 ### Changed
 

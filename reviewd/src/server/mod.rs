@@ -1,5 +1,6 @@
 use actix::prelude::SystemRunner;
-use actix_web::{middleware, App, HttpServer};
+use actix_files::Files;
+use actix_web::{middleware, App, HttpServer, Result};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use failure::ResultExt;
@@ -44,12 +45,20 @@ impl Server {
             docker_host_addr,
         };
 
+        let frontend_path = match std::env::var("FRONTEND_DIR") {
+            Ok(path) => path,
+            Err(_) => {
+                eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
+                ".".to_string()
+            }
+        };
         HttpServer::new(move || {
             App::new()
                 .data(pool.clone())
                 .data(kafka_url.clone())
                 .data(etcd_server.clone())
                 .configure(route::init_app)
+                .service(Files::new("/", frontend_path.as_str()).index_file("index.html"))
                 .wrap(middleware::Logger::default())
         })
         .bind(reviewd_addr)
