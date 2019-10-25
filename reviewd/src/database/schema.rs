@@ -11,7 +11,7 @@ table! {
         cluster_id -> Nullable<Text>,
         category_id -> Int4,
         detector_id -> Int4,
-        event_ids -> Nullable<Bytea>,
+        event_ids -> Nullable<Array<Numeric>>,
         raw_event_id -> Nullable<Int4>,
         qualifier_id -> Int4,
         status_id -> Int4,
@@ -121,9 +121,9 @@ table! {
 table! {
     outlier (id) {
         id -> Int4,
-        raw_event -> Bytea,
+        raw_event -> Text,
         data_source_id -> Int4,
-        event_ids -> Bytea,
+        event_ids -> Array<Numeric>,
         raw_event_id -> Nullable<Int4>,
         size -> Nullable<Text>,
     }
@@ -139,7 +139,7 @@ table! {
 table! {
     raw_event (id) {
         id -> Int4,
-        data -> Bytea,
+        data -> Text,
         data_source_id -> Int4,
     }
 }

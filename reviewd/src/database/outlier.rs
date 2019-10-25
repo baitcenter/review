@@ -3,6 +3,7 @@ use actix_web::{
     web::{Data, Json, Path, Query},
     HttpResponse,
 };
+use bigdecimal::{BigDecimal, FromPrimitive};
 use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use futures::{future, prelude::*};
@@ -18,9 +19,9 @@ use crate::database::*;
 #[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 struct OutliersTable {
     id: i32,
-    raw_event: Vec<u8>,
+    raw_event: String,
     data_source_id: i32,
-    event_ids: Vec<u8>,
+    event_ids: Vec<BigDecimal>,
     raw_event_id: Option<i32>,
     size: Option<String>,
 }
@@ -38,7 +39,7 @@ struct OutlierResponse {
     outlier: String,
     data_source: String,
     size: usize,
-    event_ids: Vec<u64>,
+    event_ids: Vec<BigDecimal>,
 }
 
 pub(crate) fn add_outliers(
@@ -53,13 +54,17 @@ pub(crate) fn add_outliers(
             .iter()
             .filter_map(|new_outlier| {
                 let o_size = Some(new_outlier.event_ids.len().to_string());
-                let event_ids =
-                    rmp_serde::encode::to_vec(&new_outlier.event_ids).unwrap_or_default();
+                let event_ids = new_outlier
+                    .event_ids
+                    .iter()
+                    .filter_map(|e| FromPrimitive::from_u64(*e))
+                    .collect::<Vec<BigDecimal>>();
+
                 get_data_source_id(&pool, &new_outlier.data_source)
                     .ok()
                     .map(|data_source_id| {
                         (
-                            dsl::raw_event.eq(new_outlier.outlier.to_vec()),
+                            dsl::raw_event.eq(bytes_to_string(&new_outlier.outlier)),
                             dsl::data_source_id.eq(data_source_id),
                             dsl::event_ids.eq(event_ids),
                             dsl::raw_event_id.eq(Option::<i32>::None),
@@ -114,21 +119,17 @@ pub(crate) fn delete_outliers(
                     o_dsl::outlier.filter(
                         o_dsl::data_source_id
                             .eq(data_source_id)
-                            .and(o_dsl::raw_event.eq(outlier.as_bytes())),
+                            .and(o_dsl::raw_event.eq(outlier)),
                     ),
                 )
                 .execute(&conn);
 
                 if let Some(o) = outliers_from_database
                     .iter()
-                    .find(|o| o.raw_event == outlier.as_bytes())
+                    .find(|o| o.raw_event == *outlier)
                 {
-                    if let (event_ids, Some(raw_event_id)) = (o.event_ids.as_ref(), o.raw_event_id)
-                    {
-                        if let Ok(event_ids) = rmp_serde::decode::from_slice::<Vec<u64>>(event_ids)
-                        {
-                            return Some((event_ids, raw_event_id));
-                        }
+                    if let (event_ids, Some(raw_event_id)) = (o.event_ids.clone(), o.raw_event_id) {
+                        return Some((event_ids, raw_event_id));
                     }
                 }
                 None
@@ -142,14 +143,12 @@ pub(crate) fn delete_outliers(
                     .eq(data_source_id)
                     .and(c_dsl::raw_event_id.is_null()),
             )
-            .load::<(i32, Option<Vec<u8>>)>(&conn)
+            .load::<(i32, Option<Vec<BigDecimal>>)>(&conn)
             .unwrap_or_default()
             .into_iter()
             .filter_map(|(id, event_ids)| {
                 if let (id, Some(event_ids)) = (id, event_ids) {
-                    if let Ok(event_ids) = rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids) {
-                        return Some((id, event_ids));
-                    }
+                    return Some((id, event_ids));
                 }
                 None
             })
@@ -248,7 +247,7 @@ pub(crate) fn update_outliers(
         if let Ok(data_source_id) = get_data_source_id(&pool, &outlier.data_source) {
             query = query.or_filter(
                 dsl::raw_event
-                    .eq(&outlier.outlier)
+                    .eq(bytes_to_string(&outlier.outlier))
                     .and(dsl::data_source_id.eq(data_source_id)),
             );
         }
@@ -263,7 +262,7 @@ pub(crate) fn update_outliers(
                     .filter_map(|o| {
                         if let Some(outlier) = outlier_list
                             .iter()
-                            .find(|outlier| o.outlier == outlier.raw_event)
+                            .find(|outlier| bytes_to_string(&o.outlier) == outlier.raw_event)
                         {
                             let new_size = o.event_ids.len();
                             let o_size = match &outlier.size {
@@ -282,27 +281,27 @@ pub(crate) fn update_outliers(
                                 }
                                 None => new_size.to_string(),
                             };
-                            let mut event_ids =
-                                rmp_serde::decode::from_slice::<Vec<u64>>(&outlier.event_ids)
-                                    .unwrap_or_default();
-                            event_ids.extend(&o.event_ids);
+                            let mut event_ids = o
+                                .event_ids
+                                .iter()
+                                .filter_map(|e| FromPrimitive::from_u64(*e))
+                                .collect::<Vec<BigDecimal>>();
+                            event_ids.extend(outlier.event_ids.clone());
                             // only store most recent 25 event_ids per outlier
                             let event_ids = if event_ids.len() > 25 {
                                 event_ids.sort();
                                 let (_, event_ids) = event_ids.split_at(event_ids.len() - 25);
-                                event_ids
+                                event_ids.to_vec()
                             } else {
-                                &event_ids
+                                event_ids
                             };
-                            let event_ids =
-                                rmp_serde::encode::to_vec(event_ids).unwrap_or_default();
                             let data_source_id =
                                 get_data_source_id(&pool, &o.data_source).unwrap_or_default();
                             if data_source_id == 0 {
                                 None
                             } else {
                                 Some((
-                                    dsl::raw_event.eq(o.outlier.clone()),
+                                    dsl::raw_event.eq(outlier.raw_event.clone()),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::raw_event_id.eq(outlier.raw_event_id),
@@ -311,18 +310,19 @@ pub(crate) fn update_outliers(
                             }
                         } else {
                             // only store most recent 25 event_ids per outlier
-                            let mut event_ids_cloned = o.event_ids.clone();
-                            let event_ids = if event_ids_cloned.len() > 25 {
-                                event_ids_cloned.sort();
-                                let (_, event_ids) =
-                                    event_ids_cloned.split_at(o.event_ids.len() - 25);
-                                event_ids
+                            let mut event_ids = o
+                                .event_ids
+                                .iter()
+                                .filter_map(|e| FromPrimitive::from_u64(*e))
+                                .collect::<Vec<BigDecimal>>();
+                            let event_ids = if event_ids.len() > 25 {
+                                event_ids.sort();
+                                let (_, event_ids) = event_ids.split_at(o.event_ids.len() - 25);
+                                event_ids.to_vec()
                             } else {
-                                &o.event_ids
+                                event_ids
                             };
                             let size = o.event_ids.len();
-                            let event_ids =
-                                rmp_serde::encode::to_vec(event_ids).unwrap_or_default();
                             let data_source_id = get_data_source_id(&pool, &o.data_source)
                                 .unwrap_or_else(|_| {
                                     add_data_source(&pool, &o.data_source, &o.data_source_type)
@@ -331,7 +331,7 @@ pub(crate) fn update_outliers(
                                 None
                             } else {
                                 Some((
-                                    dsl::raw_event.eq(o.outlier.clone()),
+                                    dsl::raw_event.eq(bytes_to_string(&o.outlier)),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::raw_event_id.eq(Option::<i32>::None),
@@ -375,16 +375,14 @@ fn build_http_response(data: Vec<(OutliersTable, DataSourceTable)>) -> HttpRespo
     let resp = data
         .into_iter()
         .map(|d| {
-            let event_ids =
-                rmp_serde::decode::from_slice::<Vec<u64>>(&d.0.event_ids).unwrap_or_default();
             let size =
                 d.0.size
                     .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
             OutlierResponse {
-                outlier: bytes_to_string(&d.0.raw_event),
+                outlier: d.0.raw_event,
                 data_source: d.1.topic_name,
                 size,
-                event_ids,
+                event_ids: d.0.event_ids,
             }
         })
         .collect::<Vec<_>>();
@@ -392,8 +390,4 @@ fn build_http_response(data: Vec<(OutliersTable, DataSourceTable)>) -> HttpRespo
     HttpResponse::Ok()
         .header(http::header::CONTENT_TYPE, "application/json")
         .json(resp)
-}
-
-fn bytes_to_string(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| char::from(*b)).collect()
 }

@@ -9,8 +9,10 @@ actix = "0.8"
 actix-files = "0.1.6"
 actix-web = "1.0.0"
 base64 = "0.10"
+# the version of bigdecimal must be the same as diesel (https://github.com/diesel-rs/diesel/issues/1753)
+bigdecimal = { version = "0.1", features = ["serde"] }
 crossbeam-channel = "0.3"
-diesel = { version = "1.4", features = ["chrono", "r2d2", "postgres"] }
+diesel = { version = "1.4", features = ["chrono", "numeric", "postgres", "r2d2", "serde_json"] }
 diesel_migrations = "1.4"
 diesel_derives = "1.4"
 eventio = { git = "https://github.com/petabi/eventio.git", tag = "0.1.0" }

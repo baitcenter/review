@@ -40,3 +40,7 @@ pub(crate) fn build_err_msg(fail: &dyn Fail) -> String {
     })
     .to_string()
 }
+
+pub(crate) fn bytes_to_string(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| char::from(*b)).collect()
+}

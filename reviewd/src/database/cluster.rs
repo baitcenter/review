@@ -3,6 +3,7 @@ use actix_web::{
     web::{Data, Json, Path, Query},
     HttpResponse,
 };
+use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
@@ -62,7 +63,7 @@ pub(crate) struct ClustersTable {
     cluster_id: Option<String>,
     category_id: i32,
     detector_id: i32,
-    event_ids: Option<Vec<u8>>,
+    event_ids: Option<Vec<BigDecimal>>,
     raw_event_id: Option<i32>,
     qualifier_id: i32,
     status_id: i32,
@@ -88,7 +89,7 @@ pub(crate) struct ClusterUpdate {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Example {
     pub raw_event: String,
-    pub event_ids: Vec<u64>,
+    pub event_ids: Vec<BigDecimal>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,10 +124,11 @@ pub(crate) fn add_clusters(
                 if data_source_id == 0 {
                     None
                 } else {
-                    let event_ids = match &c.event_ids {
-                        Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                        None => None,
-                    };
+                    let event_ids = c.event_ids.as_ref().map(|e| {
+                        e.iter()
+                            .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
+                            .collect::<Vec<BigDecimal>>()
+                    });
 
                     // Signature is required field in central repo database
                     // but if new cluster information does not have signature field,
@@ -204,14 +206,10 @@ pub(crate) fn get_cluster_table(
         .map(|data| {
             data.into_iter()
                 .map(|d| {
-                    let examples = if let Some(event_ids) =
-                        d.0.event_ids
-                            .and_then(|eg| rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok())
-                    {
+                    let examples = if let Some(event_ids) = d.0.event_ids {
                         let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
                             get_raw_event_by_raw_event_id(&pool, raw_event_id)
-                                .ok()
-                                .map_or("-".to_string(), |raw_events| bytes_to_string(&raw_events))
+                                .unwrap_or_else(|_| "-".to_string())
                         } else {
                             "-".to_string()
                         };
@@ -406,7 +404,7 @@ pub(crate) fn update_clusters(
     struct Cluster {
         cluster_id: Option<String>,
         signature: String,
-        event_ids: Option<Vec<u8>>,
+        event_ids: Option<Vec<BigDecimal>>,
         raw_event_id: Option<i32>,
         size: String,
         category_id: i32,
@@ -496,10 +494,11 @@ pub(crate) fn update_clusters(
                                 ))
                             }
                         } else {
-                            let event_ids = match &c.event_ids {
-                                Some(eg) => rmp_serde::encode::to_vec(&eg).ok(),
-                                None => None,
-                            };
+                            let event_ids = c.event_ids.as_ref().map(|e| {
+                                e.iter()
+                                    .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
+                                    .collect::<Vec<BigDecimal>>()
+                            });
                             let sig = match &c.signature {
                                 Some(sig) => sig.clone(),
                                 None => "-".to_string(),
@@ -653,38 +652,24 @@ pub(crate) fn update_qualifiers(
     future::result(result)
 }
 
-fn bytes_to_string(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| char::from(*b)).collect()
-}
-
 fn merge_cluster_examples(
-    current_examples: Option<Vec<u8>>,
+    current_examples: Option<Vec<BigDecimal>>,
     new_examples: Option<Vec<u64>>,
-) -> Option<Vec<u8>> {
+) -> Option<Vec<BigDecimal>> {
     let max_example_num: usize = 25;
     new_examples.map_or(current_examples.clone(), |new_examples| {
-        if new_examples.len() >= max_example_num {
-            match rmp_serde::encode::to_vec(&new_examples) {
-                Ok(new_examples) => Some(new_examples),
-                Err(_) => current_examples,
-            }
+        let new_examples = new_examples
+            .into_iter()
+            .filter_map(FromPrimitive::from_u64)
+            .collect::<Vec<_>>();
+        let mut current_eg = current_examples.unwrap_or_default();
+        current_eg.extend(new_examples);
+        if current_eg.len() > max_example_num {
+            current_eg.sort();
+            let (_, current_eg) = current_eg.split_at(current_eg.len() - max_example_num);
+            Some(current_eg.to_vec())
         } else {
-            current_examples.map(|current_eg| {
-                match rmp_serde::decode::from_slice::<Vec<u64>>(&current_eg) {
-                    Ok(mut eg) => {
-                        eg.extend(new_examples);
-                        let example = if eg.len() > max_example_num {
-                            eg.sort();
-                            let (_, eg) = eg.split_at(eg.len() - max_example_num);
-                            rmp_serde::encode::to_vec(&eg)
-                        } else {
-                            rmp_serde::encode::to_vec(&eg)
-                        };
-                        example.unwrap_or(current_eg)
-                    }
-                    Err(_) => current_eg,
-                }
-            })
+            Some(current_eg)
         }
     })
 }
@@ -954,15 +939,10 @@ pub(crate) fn get_selected_clusters(
                         };
                         let score = if select.8 { Some(d.0.score.unwrap_or(std::f64::NAN)) } else { None };
                         let examples = if select.9 {
-                            if let Some(event_ids) = d.0.event_ids.and_then(|eg| {
-                                rmp_serde::decode::from_slice::<Vec<u64>>(&eg).ok()
-                            }) {
+                            if let Some(event_ids) = d.0.event_ids {
                                 let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
                                     get_raw_event_by_raw_event_id(&pool, raw_event_id)
-                                        .ok()
-                                        .map_or("-".to_string(), |raw_events| {
-                                            bytes_to_string(&raw_events)
-                                        })
+                                        .unwrap_or_else(|_| "-".to_string())
                                 } else {
                                     "-".to_string()
                                 };

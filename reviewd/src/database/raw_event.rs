@@ -2,6 +2,7 @@ use actix_web::{
     web::{Data, Query},
     HttpResponse,
 };
+use bigdecimal::{BigDecimal, ToPrimitive};
 use diesel::prelude::*;
 use eventio::kafka;
 use futures::{future, prelude::*};
@@ -10,13 +11,13 @@ use std::collections::HashMap;
 use std::thread;
 
 use super::schema::{cluster, outlier, raw_event};
-use crate::database::{get_data_source_id, DatabaseError, Error, ErrorKind, Pool};
+use crate::database::{bytes_to_string, get_data_source_id, DatabaseError, Error, ErrorKind, Pool};
 
 #[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "raw_event"]
 struct RawEventTable {
     id: i32,
-    data: Vec<u8>,
+    data: String,
     data_source_id: i32,
 }
 
@@ -29,14 +30,14 @@ pub(crate) struct RawEventQuery {
 #[derive(Insertable)]
 #[table_name = "raw_event"]
 struct InsertRawEvent {
-    data: Vec<u8>,
+    data: String,
     data_source_id: i32,
 }
 
 #[derive(Queryable)]
 struct UpdateRawEventId {
     id: i32,
-    data: Vec<u8>,
+    data: String,
     is_cluster: bool,
 }
 
@@ -79,25 +80,27 @@ pub(crate) fn add_raw_events(
                 let id = ev.entry.time;
                 if let Some(c) = event_ids_from_clusters.iter().find(|d| id == d.1) {
                     if let Some(raw) = ev.entry.record.get("message") {
+                        let raw = bytes_to_string(raw);
                         update_lists.push(UpdateRawEventId {
                             id: c.0,
-                            data: raw.to_vec(),
+                            data: raw.clone(),
                             is_cluster: true,
                         });
                         raw_events.push(InsertRawEvent {
-                            data: raw.to_vec(),
+                            data: raw,
                             data_source_id,
                         });
                     }
                 } else if let Some(o) = event_ids_from_outliers.iter().find(|d| id == d.1) {
                     if let Some(raw) = ev.entry.record.get("message") {
+                        let raw = bytes_to_string(raw);
                         update_lists.push(UpdateRawEventId {
                             id: o.0,
-                            data: raw.to_vec(),
+                            data: raw.clone(),
                             is_cluster: false,
                         });
                         raw_events.push(InsertRawEvent {
-                            data: raw.to_vec(),
+                            data: raw,
                             data_source_id,
                         });
                     }
@@ -121,7 +124,7 @@ pub(crate) fn add_raw_events(
                     let raw_events = raw_events
                         .into_iter()
                         .map(|e| (e.1, e.0))
-                        .collect::<HashMap<Vec<u8>, i32>>();
+                        .collect::<HashMap<String, i32>>();
                     for u in update_lists {
                         if let Some(raw_event_id) = raw_events.get(&u.data) {
                             if u.is_cluster {
@@ -153,13 +156,13 @@ pub(crate) fn add_raw_events(
 pub(crate) fn get_raw_events_by_data_source_id(
     pool: &Data<Pool>,
     data_source_id: i32,
-) -> Result<Vec<(i32, Vec<u8>)>, Error> {
+) -> Result<Vec<(i32, String)>, Error> {
     use raw_event::dsl;
     pool.get().map_err(Into::into).and_then(|conn| {
         dsl::raw_event
             .filter(dsl::data_source_id.eq(data_source_id))
             .select((dsl::id, dsl::data))
-            .load::<(i32, Vec<u8>)>(&conn)
+            .load::<(i32, String)>(&conn)
             .map_err(Into::into)
     })
 }
@@ -167,13 +170,13 @@ pub(crate) fn get_raw_events_by_data_source_id(
 pub(crate) fn get_raw_event_by_raw_event_id(
     pool: &Data<Pool>,
     raw_event_id: i32,
-) -> Result<Vec<u8>, Error> {
+) -> Result<String, Error> {
     use raw_event::dsl;
     pool.get().map_err(Into::into).and_then(|conn| {
         dsl::raw_event
             .filter(dsl::id.eq(raw_event_id))
             .select(dsl::data)
-            .first::<Vec<u8>>(&conn)
+            .first::<String>(&conn)
             .map_err(Into::into)
     })
 }
@@ -194,21 +197,16 @@ fn get_event_ids_from_cluster(
                             .and(dsl::raw_event_id.is_null()),
                     )
                     .select((dsl::id, dsl::event_ids))
-                    .load::<(i32, Option<Vec<u8>>)>(&conn)
+                    .load::<(i32, Option<Vec<BigDecimal>>)>(&conn)
                     .map_err(Into::into)
             })
             .map(|data| {
                 data.into_iter()
                     .filter_map(|d| {
                         let id = d.0;
-                        d.1.and_then(|event_ids| {
-                            rmp_serde::decode::from_slice::<Vec<u64>>(&event_ids).ok()
-                        })
-                        .filter(|event_ids| !event_ids.is_empty())
-                        .map(|mut event_ids| {
-                            event_ids.sort();
-                            (id, event_ids[event_ids.len() - 1])
-                        })
+                        d.1.and_then(|event_ids| event_ids.into_iter().max())
+                            .and_then(|e| ToPrimitive::to_u64(&e))
+                            .map(|e| (id, e))
                     })
                     .collect()
             })
@@ -233,20 +231,17 @@ fn get_event_ids_from_outlier(
                             .and(dsl::raw_event_id.is_null()),
                     )
                     .select((dsl::id, dsl::event_ids))
-                    .load::<(i32, Vec<u8>)>(&conn)
+                    .load::<(i32, Vec<BigDecimal>)>(&conn)
                     .map_err(Into::into)
             })
             .map(|data| {
                 data.into_iter()
                     .filter_map(|d| {
                         let id = d.0;
-                        rmp_serde::decode::from_slice::<Vec<u64>>(&d.1)
-                            .ok()
-                            .filter(|examples| !examples.is_empty())
-                            .map(|mut examples| {
-                                examples.sort();
-                                (id, examples[examples.len() - 1])
-                            })
+                        d.1.into_iter()
+                            .max()
+                            .and_then(|e| ToPrimitive::to_u64(&e))
+                            .map(|e| (id, e))
                     })
                     .collect()
             })

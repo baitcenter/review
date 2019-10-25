@@ -13,7 +13,7 @@ CREATE TABLE data_source (
 
 CREATE TABLE raw_event (
   id SERIAL PRIMARY KEY,
-  data BYTEA NOT NULL,
+  data TEXT NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id)
 );
 
@@ -38,7 +38,7 @@ CREATE TABLE cluster (
   cluster_id TEXT,
   category_id INTEGER NOT NULL REFERENCES category(id),
   detector_id INTEGER NOT NULL,
-  event_ids BYTEA,
+  event_ids NUMERIC(20, 0)[],
   raw_event_id INTEGER REFERENCES raw_event(id),
   qualifier_id INTEGER NOT NULL REFERENCES qualifier(id),
   status_id INTEGER NOT NULL REFERENCES Status(id),
@@ -52,9 +52,9 @@ CREATE TABLE cluster (
 
 CREATE TABLE outlier (
   id SERIAL PRIMARY KEY,
-  raw_event BYTEA NOT NULL,
+  raw_event TEXT NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
-  event_ids BYTEA NOT NULL,
+  event_ids NUMERIC(20, 0)[] NOT NULL,
   raw_event_id INTEGER REFERENCES raw_event(id),
   size TEXT,
   UNIQUE (raw_event, data_source_id)
