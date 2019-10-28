@@ -39,7 +39,7 @@ CREATE TABLE cluster (
   category_id INTEGER NOT NULL REFERENCES category(id),
   detector_id INTEGER NOT NULL,
   event_ids NUMERIC(20, 0)[],
-  raw_event_id INTEGER REFERENCES raw_event(id),
+  raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
   qualifier_id INTEGER NOT NULL REFERENCES qualifier(id),
   status_id INTEGER NOT NULL REFERENCES Status(id),
   signature TEXT NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE outlier (
   raw_event TEXT NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   event_ids NUMERIC(20, 0)[] NOT NULL,
-  raw_event_id INTEGER REFERENCES raw_event(id),
+  raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
   size TEXT,
   UNIQUE (raw_event, data_source_id)
 );
@@ -196,3 +196,21 @@ CREATE TABLE top_n_datetime (
   count BIGINT,
   UNIQUE(description_id, ranking)
 );
+
+CREATE FUNCTION insert_empty_raw_event()
+RETURNS TRIGGER AS 
+$$
+BEGIN
+  INSERT INTO raw_event 
+    (data, data_source_id)
+  VALUES
+    ('-', NEW.id);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_data_source_insertion_trigger
+  AFTER INSERT
+  ON data_source
+  FOR EACH ROW
+  EXECUTE PROCEDURE insert_empty_raw_event();

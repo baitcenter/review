@@ -21,19 +21,20 @@ pub(crate) struct DataSourceTable {
 pub(crate) fn add_data_source(pool: &web::Data<Pool>, data_source: &str, data_type: &str) -> i32 {
     use data_source::dsl;
 
-    let _: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        diesel::insert_into(dsl::data_source)
-            .values((
-                dsl::topic_name.eq(data_source),
-                dsl::data_type.eq(data_type),
-            ))
-            .on_conflict(dsl::topic_name)
-            .do_nothing()
-            .execute(&conn)
-            .map_err(Into::into)
-    });
+    let new_data_source: Result<DataSourceTable, Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            diesel::insert_into(dsl::data_source)
+                .values((
+                    dsl::topic_name.eq(data_source),
+                    dsl::data_type.eq(data_type),
+                ))
+                .on_conflict(dsl::topic_name)
+                .do_nothing()
+                .get_result(&conn)
+                .map_err(Into::into)
+        });
 
-    get_data_source_id(pool, data_source).unwrap_or_default()
+    new_data_source.ok().map_or(0, |d| d.id)
 }
 
 pub(crate) fn get_data_source_id(pool: &web::Data<Pool>, data_source: &str) -> Result<i32, Error> {

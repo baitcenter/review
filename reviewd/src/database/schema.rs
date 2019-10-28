@@ -12,7 +12,7 @@ table! {
         category_id -> Int4,
         detector_id -> Int4,
         event_ids -> Nullable<Array<Numeric>>,
-        raw_event_id -> Nullable<Int4>,
+        raw_event_id -> Int4,
         qualifier_id -> Int4,
         status_id -> Int4,
         signature -> Text,
@@ -124,7 +124,7 @@ table! {
         raw_event -> Text,
         data_source_id -> Int4,
         event_ids -> Array<Numeric>,
-        raw_event_id -> Nullable<Int4>,
+        raw_event_id -> Int4,
         size -> Nullable<Text>,
     }
 }

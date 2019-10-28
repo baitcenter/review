@@ -64,7 +64,7 @@ pub(crate) struct ClustersTable {
     category_id: i32,
     detector_id: i32,
     event_ids: Option<Vec<BigDecimal>>,
-    raw_event_id: Option<i32>,
+    raw_event_id: i32,
     qualifier_id: i32,
     status_id: i32,
     signature: String,
@@ -121,7 +121,9 @@ pub(crate) fn add_clusters(
                     get_data_source_id(&pool, &c.data_source).unwrap_or_else(|_| {
                         add_data_source(&pool, &c.data_source, &c.data_source_type)
                     });
-                if data_source_id == 0 {
+                let raw_event_id =
+                    get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
+                if data_source_id == 0 || raw_event_id == 0 {
                     None
                 } else {
                     let event_ids = c.event_ids.as_ref().map(|e| {
@@ -149,7 +151,7 @@ pub(crate) fn add_clusters(
                         dsl::category_id.eq(1),
                         dsl::detector_id.eq(c.detector_id),
                         dsl::event_ids.eq(event_ids),
-                        dsl::raw_event_id.eq(Option::<i32>::None),
+                        dsl::raw_event_id.eq(raw_event_id),
                         dsl::qualifier_id.eq(2),
                         dsl::status_id.eq(2),
                         dsl::signature.eq(sig),
@@ -207,12 +209,8 @@ pub(crate) fn get_cluster_table(
             data.into_iter()
                 .map(|d| {
                     let examples = if let Some(event_ids) = d.0.event_ids {
-                        let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
-                            get_raw_event_by_raw_event_id(&pool, raw_event_id)
-                                .unwrap_or_else(|_| "-".to_string())
-                        } else {
-                            "-".to_string()
-                        };
+                        let raw_event = get_raw_event_by_raw_event_id(&pool, d.0.raw_event_id)
+                            .unwrap_or_else(|_| "-".to_string());
                         Some(Example {
                             raw_event,
                             event_ids,
@@ -405,7 +403,7 @@ pub(crate) fn update_clusters(
         cluster_id: Option<String>,
         signature: String,
         event_ids: Option<Vec<BigDecimal>>,
-        raw_event_id: Option<i32>,
+        raw_event_id: i32,
         size: String,
         category_id: i32,
         qualifier_id: i32,
@@ -511,7 +509,9 @@ pub(crate) fn update_clusters(
                                 .unwrap_or_else(|_| {
                                     add_data_source(&pool, &c.data_source, &c.data_source_type)
                                 });
-                            if data_source_id == 0 {
+                            let raw_event_id =
+                                get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
+                            if data_source_id == 0 || raw_event_id == 0 {
                                 None
                             } else {
                                 Some((
@@ -519,7 +519,7 @@ pub(crate) fn update_clusters(
                                     dsl::category_id.eq(1),
                                     dsl::detector_id.eq(c.detector_id),
                                     dsl::event_ids.eq(event_ids),
-                                    dsl::raw_event_id.eq(None),
+                                    dsl::raw_event_id.eq(raw_event_id),
                                     dsl::qualifier_id.eq(2),
                                     dsl::status_id.eq(2),
                                     dsl::signature.eq(sig),
@@ -940,12 +940,8 @@ pub(crate) fn get_selected_clusters(
                         let score = if select.8 { Some(d.0.score.unwrap_or(std::f64::NAN)) } else { None };
                         let examples = if select.9 {
                             if let Some(event_ids) = d.0.event_ids {
-                                let raw_event = if let Some(raw_event_id) = d.0.raw_event_id {
-                                    get_raw_event_by_raw_event_id(&pool, raw_event_id)
-                                        .unwrap_or_else(|_| "-".to_string())
-                                } else {
-                                    "-".to_string()
-                                };
+                                let raw_event = get_raw_event_by_raw_event_id(&pool, d.0.raw_event_id)
+                                        .unwrap_or_else(|_| "-".to_string());
                                 Some(Example {
                                     raw_event,
                                     event_ids,

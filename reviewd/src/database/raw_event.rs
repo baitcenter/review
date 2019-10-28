@@ -130,12 +130,12 @@ pub(crate) fn add_raw_events(
                             if u.is_cluster {
                                 use cluster::dsl;
                                 let _ = diesel::update(dsl::cluster.filter(dsl::id.eq(u.id)))
-                                    .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                    .set(dsl::raw_event_id.eq(raw_event_id))
                                     .execute(&*conn);
                             } else {
                                 use outlier::dsl;
                                 let _ = diesel::update(dsl::outlier.filter(dsl::id.eq(u.id)))
-                                    .set(dsl::raw_event_id.eq(Some(raw_event_id)))
+                                    .set(dsl::raw_event_id.eq(raw_event_id))
                                     .execute(&*conn);
                             }
                         }
@@ -151,6 +151,21 @@ pub(crate) fn add_raw_events(
     }
 
     future::result(Ok(HttpResponse::Ok().into()))
+}
+
+pub(crate) fn get_empty_raw_event_id(pool: &Data<Pool>, data_source_id: i32) -> Result<i32, Error> {
+    use raw_event::dsl;
+    pool.get().map_err(Into::into).and_then(|conn| {
+        dsl::raw_event
+            .filter(
+                dsl::data_source_id
+                    .eq(data_source_id)
+                    .and(dsl::data.eq("-")),
+            )
+            .select(dsl::id)
+            .first::<i32>(&conn)
+            .map_err(Into::into)
+    })
 }
 
 pub(crate) fn get_raw_events_by_data_source_id(
@@ -187,6 +202,7 @@ fn get_event_ids_from_cluster(
 ) -> Result<Vec<(i32, u64)>, Error> {
     use cluster::dsl;
     if let Ok(data_source_id) = get_data_source_id(&pool, data_source) {
+        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
         pool.get()
             .map_err(Into::into)
             .and_then(|conn| {
@@ -194,7 +210,7 @@ fn get_event_ids_from_cluster(
                     .filter(
                         dsl::data_source_id
                             .eq(data_source_id)
-                            .and(dsl::raw_event_id.is_null()),
+                            .and(dsl::raw_event_id.eq(raw_event_id)),
                     )
                     .select((dsl::id, dsl::event_ids))
                     .load::<(i32, Option<Vec<BigDecimal>>)>(&conn)
@@ -221,6 +237,7 @@ fn get_event_ids_from_outlier(
 ) -> Result<Vec<(i32, u64)>, Error> {
     use outlier::dsl;
     if let Ok(data_source_id) = get_data_source_id(&pool, data_source) {
+        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
         pool.get()
             .map_err(Into::into)
             .and_then(|conn| {
@@ -228,7 +245,7 @@ fn get_event_ids_from_outlier(
                     .filter(
                         dsl::data_source_id
                             .eq(data_source_id)
-                            .and(dsl::raw_event_id.is_null()),
+                            .and(dsl::raw_event_id.eq(raw_event_id)),
                     )
                     .select((dsl::id, dsl::event_ids))
                     .load::<(i32, Vec<BigDecimal>)>(&conn)

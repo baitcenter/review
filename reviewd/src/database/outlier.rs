@@ -22,7 +22,7 @@ struct OutliersTable {
     raw_event: String,
     data_source_id: i32,
     event_ids: Vec<BigDecimal>,
-    raw_event_id: Option<i32>,
+    raw_event_id: i32,
     size: Option<String>,
 }
 
@@ -63,11 +63,13 @@ pub(crate) fn add_outliers(
                 get_data_source_id(&pool, &new_outlier.data_source)
                     .ok()
                     .map(|data_source_id| {
+                        let raw_event_id =
+                            get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
                         (
                             dsl::raw_event.eq(bytes_to_string(&new_outlier.outlier)),
                             dsl::data_source_id.eq(data_source_id),
                             dsl::event_ids.eq(event_ids),
-                            dsl::raw_event_id.eq(Option::<i32>::None),
+                            dsl::raw_event_id.eq(raw_event_id),
                             dsl::size.eq(o_size),
                         )
                     })
@@ -128,20 +130,19 @@ pub(crate) fn delete_outliers(
                     .iter()
                     .find(|o| o.raw_event == *outlier)
                 {
-                    if let (event_ids, Some(raw_event_id)) = (o.event_ids.clone(), o.raw_event_id) {
-                        return Some((event_ids, raw_event_id));
-                    }
+                    return Some((o.event_ids.clone(), o.raw_event_id));
                 }
                 None
             })
             .collect::<Vec<_>>();
 
+        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
         let clusters_from_database = c_dsl::cluster
             .select((c_dsl::id, c_dsl::event_ids))
             .filter(
                 c_dsl::data_source_id
                     .eq(data_source_id)
-                    .and(c_dsl::raw_event_id.is_null()),
+                    .and(c_dsl::raw_event_id.eq(raw_event_id)),
             )
             .load::<(i32, Option<Vec<BigDecimal>>)>(&conn)
             .unwrap_or_default()
@@ -327,14 +328,16 @@ pub(crate) fn update_outliers(
                                 .unwrap_or_else(|_| {
                                     add_data_source(&pool, &o.data_source, &o.data_source_type)
                                 });
-                            if data_source_id == 0 {
+                            let raw_event_id =
+                                get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
+                            if data_source_id == 0 || raw_event_id == 0 {
                                 None
                             } else {
                                 Some((
                                     dsl::raw_event.eq(bytes_to_string(&o.outlier)),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
-                                    dsl::raw_event_id.eq(Option::<i32>::None),
+                                    dsl::raw_event_id.eq(raw_event_id),
                                     dsl::size.eq(Some(size.to_string())),
                                 ))
                             }
