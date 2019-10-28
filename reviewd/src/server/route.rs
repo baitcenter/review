@@ -91,8 +91,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     )
     .service(
         resource("/api/cluster")
-            .guard(guard::Any(guard::Get()).or(guard::Post()).or(guard::Put()))
-            .route(get().to_async(get_cluster_table))
+            .guard(guard::Get())
+            .route(get().to_async(get_cluster_table)),
+    )
+    .service(
+        resource("/api/cluster")
+            .guard(guard::Any(guard::Post()).or(guard::Put()))
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<ClusterUpdate>>::configure(|cfg| {
                 // increase max size of payload from 32kb to 1024kb
@@ -128,7 +132,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/cluster/qualifier")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<ClusterSelectQuery>>::configure(|cfg| {
+            .data(Json::<Vec<QualifierUpdate>>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
@@ -139,7 +143,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/cluster/search")
             .guard(guard::Get())
-            .data(Query::<DataSourceQuery>::configure(|cfg| {
+            .data(Query::<ClusterSelectQuery>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
@@ -174,8 +178,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     )
     .service(
         resource("/api/outlier")
-            .guard(guard::Any(guard::Get()).or(guard::Post()).or(guard::Put()))
-            .route(get().to_async(get_outlier_table))
+            .guard(guard::Get())
+            .route(get().to_async(get_outlier_table)),
+    )
+    .service(
+        resource("/api/outlier")
+            .guard(guard::Any(guard::Post()).or(guard::Put()))
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<OutlierUpdate>>::configure(|cfg| {
                 // increase max size of payload from 32kb to 1024kb
