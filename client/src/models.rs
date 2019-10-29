@@ -87,7 +87,7 @@ impl ClusterSet {
             .map(|q| (q.id, q.description.clone()))
             .collect();
 
-        Ok(ClusterSet {
+        Ok(Self {
             clusters,
             qualifier,
             updated_clusters: HashMap::<String, usize>::default(),

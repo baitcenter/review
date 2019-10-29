@@ -49,7 +49,7 @@ impl MainView {
         let mut view = LinearLayout::horizontal();
         view.add_child(cluster_prop_box1);
         view.add_child(cluster_prop_box2);
-        Ok(MainView { view })
+        Ok(Self { view })
     }
 }
 
@@ -85,7 +85,7 @@ impl ClusterSelectView {
         view.set_on_submit(|siv, &i| {
             let mut cluster_prop_window1 = siv.find_id::<TextView>("cluster_properties").unwrap();
             let properties = siv
-                .call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                .call_on_id("cluster_select", |view: &mut Self| {
                     Cluster::get_cluster_properties(&view.clusters[i])
                 })
                 .unwrap();
@@ -93,7 +93,7 @@ impl ClusterSelectView {
 
             let mut cluster_prop_window2 = siv.find_id::<Dialog>("cluster_properties2").unwrap();
             let qualifier_select = siv
-                .call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                .call_on_id("cluster_select", |view: &mut Self| {
                     let mut qualifier_select = SelectView::new();
                     for (i, qualifier) in view.clusters.qualifier.iter() {
                         qualifier_select.add_item(qualifier.to_string(), *i);
@@ -104,7 +104,7 @@ impl ClusterSelectView {
 
             cluster_prop_window2.set_content(qualifier_select.on_submit(
                 move |siv, qualifier_val| {
-                    siv.call_on_id("cluster_select", |view: &mut ClusterSelectView| {
+                    siv.call_on_id("cluster_select", |view: &mut Self| {
                         if view.clusters[i].qualifier != view.clusters.qualifier[qualifier_val] {
                             view.clusters[i].qualifier =
                                 view.clusters.qualifier[qualifier_val].clone();
@@ -117,7 +117,7 @@ impl ClusterSelectView {
             ))
         });
 
-        Ok(ClusterSelectView { view, clusters })
+        Ok(Self { view, clusters })
     }
 }
 

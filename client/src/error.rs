@@ -33,8 +33,8 @@ impl Display for Error {
 }
 
 impl Error {
-    pub fn new(inner: Context<ErrorKind>) -> Error {
-        Error { inner }
+    pub fn new(inner: Context<ErrorKind>) -> Self {
+        Self { inner }
     }
 
     pub fn kind(&self) -> &ErrorKind {
@@ -43,16 +43,16 @@ impl Error {
 }
 
 impl From<ErrorKind> for Error {
-    fn from(kind: ErrorKind) -> Error {
-        Error {
+    fn from(kind: ErrorKind) -> Self {
+        Self {
             inner: Context::new(kind),
         }
     }
 }
 
 impl From<Context<ErrorKind>> for Error {
-    fn from(inner: Context<ErrorKind>) -> Error {
-        Error { inner }
+    fn from(inner: Context<ErrorKind>) -> Self {
+        Self { inner }
     }
 }
 
@@ -66,17 +66,15 @@ pub enum InitializeErrorReason {
 impl Display for InitializeErrorReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            InitializeErrorReason::UnexpectedResponse => write!(
+            Self::UnexpectedResponse => write!(
                 f,
                 "Unexpected response from server. Cannot deserialize the received data from REviewd"
             ),
-            InitializeErrorReason::Reqwest => write!(
+            Self::Reqwest => write!(
                 f,
                 "An error occurs while sending an http request to REviewd"
             ),
-            InitializeErrorReason::EmptyCluster => {
-                write!(f, "Cluster with pending review status was not found")
-            }
+            Self::EmptyCluster => write!(f, "Cluster with pending review status was not found"),
         }
     }
 }

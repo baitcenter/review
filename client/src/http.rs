@@ -11,9 +11,9 @@ pub struct ClusterView {
 }
 
 impl ClusterView {
-    pub fn new(url: &str) -> Result<ClusterView, Error> {
+    pub fn new(url: &str) -> Result<Self, Error> {
         let main_view = MainView::from_reviewd(url)?;
-        let mut cluster_view = ClusterView {
+        let mut cluster_view = Self {
             cursive: Cursive::default(),
         };
 
