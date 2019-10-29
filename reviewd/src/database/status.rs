@@ -8,7 +8,6 @@ use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "status"]
-#[primary_key(id)]
 pub(crate) struct StatusTable {
     pub(crate) id: i32,
     pub(crate) description: String,

@@ -8,7 +8,6 @@ use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "qualifier"]
-#[primary_key(id)]
 pub struct QualifierTable {
     pub id: i32,
     pub description: String,

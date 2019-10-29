@@ -28,7 +28,6 @@ pub(crate) struct DescriptionUpdate {
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_element_type"]
-#[primary_key(id)]
 pub(crate) struct DescriptionElementTypeTable {
     pub id: i32,
     pub name: String,

@@ -11,7 +11,6 @@ pub(crate) struct DataSourceQuery {
 
 #[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "data_source"]
-#[primary_key(id)]
 pub(crate) struct DataSourceTable {
     pub(crate) id: i32,
     pub(crate) topic_name: String,
