@@ -45,12 +45,11 @@ impl Server {
             docker_host_addr,
         };
 
-        let frontend_path = match std::env::var("FRONTEND_DIR") {
-            Ok(path) => path,
-            Err(_) => {
-                eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
-                ".".to_string()
-            }
+        let frontend_path = if let Ok(path) = std::env::var("FRONTEND_DIR") {
+            path
+        } else {
+            eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
+            ".".to_string()
         };
         HttpServer::new(move || {
             App::new()
