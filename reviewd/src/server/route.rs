@@ -39,7 +39,7 @@ fn send_suspicious_tokens_to_etcd(
                 .post(&etcd_server.into_inner().etcd_url)
                 .body(data)
                 .send()
-                .and_then(|response| response.error_for_status())
+                .and_then(reqwest::r#async::Response::error_for_status)
                 .then(move |response| tx.send(response))
                 .map(|_| ())
                 .map_err(|_| ());

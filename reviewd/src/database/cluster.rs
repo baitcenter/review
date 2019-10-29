@@ -685,7 +685,7 @@ fn update_etcd(url: &str, key: &str, value: &str) {
         .post(url)
         .body(data)
         .send()
-        .and_then(|response| response.error_for_status())
+        .and_then(reqwest::r#async::Response::error_for_status)
         .then(move |response| tx.send(response))
         .map(|_| ())
         .map_err(|_| ());
