@@ -10,6 +10,7 @@ mod description;
 mod error;
 mod outlier;
 mod qualifier;
+mod query;
 mod raw_event;
 mod schema;
 mod status;
@@ -21,6 +22,7 @@ pub(crate) use self::description::*;
 pub(crate) use self::error::{DatabaseError, Error, ErrorKind};
 pub(crate) use self::outlier::*;
 pub(crate) use self::qualifier::*;
+pub(crate) use self::query::*;
 pub(crate) use self::raw_event::*;
 pub(crate) use self::status::*;
 

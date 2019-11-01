@@ -92,7 +92,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/cluster")
             .guard(guard::Get())
-            .route(get().to_async(get_cluster_table)),
+            .route(get().to_async(get_clusters)),
     )
     .service(
         resource("/api/cluster")
@@ -107,6 +107,18 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             }))
             .route(post().to_async(add_clusters))
             .route(put().to_async(update_clusters)),
+    )
+    .service(
+        resource("/api/cluster/qualifier")
+            .guard(guard::Put())
+            .guard(guard::Header("content-type", "application/json"))
+            .data(Json::<Vec<QualifierUpdate>>::configure(|cfg| {
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
+                        .into()
+                })
+            }))
+            .route(put().to_async(update_qualifiers)),
     )
     .service(
         resource("/api/cluster/{cluster_id}")
@@ -127,29 +139,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                 })
             }))
             .route(put().to_async(update_cluster)),
-    )
-    .service(
-        resource("/api/cluster/qualifier")
-            .guard(guard::Put())
-            .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<QualifierUpdate>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
-            .route(put().to_async(update_qualifiers)),
-    )
-    .service(
-        resource("/api/cluster/search")
-            .guard(guard::Get())
-            .data(Query::<ClusterSelectQuery>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
-            .route(get().to_async(get_selected_clusters)),
     )
     .service(
         resource("/api/description")
@@ -179,7 +168,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/outlier")
             .guard(guard::Get())
-            .route(get().to_async(get_outlier_table)),
+            .route(get().to_async(get_outliers)),
     )
     .service(
         resource("/api/outlier")
@@ -212,17 +201,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                 })
             }))
             .route(delete().to_async(delete_outliers)),
-    )
-    .service(
-        resource("/api/outlier/{data_source}")
-            .guard(guard::Get())
-            .data(Query::<DataSourceQuery>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
-            .route(get().to_async(get_outlier_by_data_source)),
     )
     .service(
         resource("/api/qualifier")

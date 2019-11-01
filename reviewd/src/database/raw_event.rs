@@ -182,20 +182,6 @@ pub(crate) fn get_raw_events_by_data_source_id(
     })
 }
 
-pub(crate) fn get_raw_event_by_raw_event_id(
-    pool: &Data<Pool>,
-    raw_event_id: i32,
-) -> Result<String, Error> {
-    use raw_event::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::raw_event
-            .filter(dsl::id.eq(raw_event_id))
-            .select(dsl::data)
-            .first::<String>(&conn)
-            .map_err(Into::into)
-    })
-}
-
 fn get_event_ids_from_cluster(
     pool: &Data<Pool>,
     data_source: &str,

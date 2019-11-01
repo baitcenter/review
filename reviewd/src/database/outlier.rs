@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Path, Query},
+    web::{Data, Json, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
@@ -8,10 +8,11 @@ use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 use super::data_source::DataSourceTable;
-use super::schema::{cluster, data_source, outlier};
+use super::schema::{cluster, outlier};
 use crate::database::*;
 
 #[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
@@ -32,14 +33,6 @@ pub(crate) struct OutlierUpdate {
     data_source: String,
     data_source_type: String,
     event_ids: Vec<u64>,
-}
-
-#[derive(Debug, Serialize)]
-struct OutlierResponse {
-    outlier: String,
-    data_source: String,
-    size: usize,
-    event_ids: Vec<BigDecimal>,
 }
 
 pub(crate) fn add_outliers(
@@ -185,49 +178,87 @@ pub(crate) fn delete_outliers(
     future::result(Ok(HttpResponse::Ok().into()))
 }
 
-pub(crate) fn get_outlier_table(
+pub(crate) fn get_outliers(
     pool: Data<Pool>,
+    query: Query<Value>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    let query_result: Result<Vec<(OutliersTable, DataSourceTable)>, Error> =
+    let default_per_page = 10;
+    let max_per_page = 100;
+    let outlier_schema =
+        "(outlier INNER JOIN data_source ON outlier.data_source_id = data_source.id)";
+    let select = vec![
+        "outlier.raw_event as outlier",
+        "data_source.topic_name as data_source",
+        "outlier.size",
+        "outlier.event_ids",
+    ];
+    let filter = query
+        .get("filter")
+        .and_then(Value::as_str)
+        .and_then(|f| serde_json::from_str::<Value>(f).ok());
+    let where_clause = if let Some(filter) = filter {
+        filter.get("data_source")
+        .and_then(Value::as_array)
+        .map(|f| {
+            let mut where_clause = String::new();
+            for (index, f) in f.iter().enumerate() {
+                if let Some(f) = f.as_str() {
+                    let filter = format!("Outlier.data_source_id = (SELECT id FROM data_source WHERE topic_name = '{}')", f);
+                    if index == 0 {
+                        where_clause.push_str(&filter);
+                    } else {
+                        where_clause.push_str(&format!(" or {}", filter));
+                    }
+                }
+            }
+            where_clause
+        })
+    } else {
+        None
+    };
+    let page = query
+        .get("page")
+        .and_then(Value::as_str)
+        .and_then(|p| p.parse::<i64>().ok())
+        .filter(|p| *p > 0);
+    let per_page = query
+        .get("per_page")
+        .and_then(Value::as_str)
+        .and_then(|p| p.parse::<i64>().ok())
+        .filter(|p| *p > 0)
+        .map(|p| if p > max_per_page { max_per_page } else { p });
+    let per_page = per_page.unwrap_or_else(|| default_per_page);
+
+    let query_result: Result<Vec<GetQueryData>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
-            outlier::dsl::outlier
-                .inner_join(data_source::dsl::data_source)
-                .load::<(OutliersTable, DataSourceTable)>(&conn)
+            GetQuery::new(select, outlier_schema, where_clause, page, per_page)
+                .get_results::<GetQueryData>(&conn)
                 .map_err(Into::into)
         });
-
     let result = match query_result {
-        Ok(outliers_table) => Ok(build_http_response(outliers_table)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
-    };
+        Ok(data) => {
+            let pagination = match (query.get("page"), query.get("per_page")) {
+                (Some(_), _) | (_, Some(_)) if !data.is_empty() => {
+                    let total = data[0].count;
+                    let total_pages = (total as f64 / per_page as f64).ceil() as u64;
+                    Some((total, total_pages))
+                }
+                _ => None,
+            };
+            let data = data.into_iter().map(|d| d.data).collect::<Vec<Value>>();
 
-    future::result(result)
-}
-
-pub(crate) fn get_outlier_by_data_source(
-    pool: Data<Pool>,
-    data_source: Path<String>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    use schema::outlier::dsl;
-
-    let data_source = data_source.into_inner();
-    let query_result: Result<Vec<(OutliersTable, DataSourceTable)>, Error> =
-        pool.get().map_err(Into::into).and_then(|conn| {
-            if let Ok(data_source_id) = get_data_source_id(&pool, &data_source) {
-                dsl::outlier
-                    .inner_join(schema::data_source::dsl::data_source)
-                    .filter(dsl::data_source_id.eq(data_source_id))
-                    .load::<(OutliersTable, DataSourceTable)>(&conn)
-                    .map_err(Into::into)
+            if let Some(pagination) = pagination {
+                Ok(HttpResponse::Ok()
+                    .header("X-REviewd-Total", pagination.0.to_string())
+                    .header("X-REviewd-TotalPages", pagination.1.to_string())
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .json(data))
             } else {
-                Ok(Vec::<(OutliersTable, DataSourceTable)>::new())
+                Ok(HttpResponse::Ok()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .json(data))
             }
-        });
-
-    let result = match query_result {
-        Ok(outliers_table) => Ok(build_http_response(outliers_table)),
+        }
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
@@ -372,25 +403,4 @@ pub(crate) fn update_outliers(
     };
 
     future::result(result)
-}
-
-fn build_http_response(data: Vec<(OutliersTable, DataSourceTable)>) -> HttpResponse {
-    let resp = data
-        .into_iter()
-        .map(|d| {
-            let size =
-                d.0.size
-                    .map_or(0, |size| size.parse::<usize>().unwrap_or(0));
-            OutlierResponse {
-                outlier: d.0.raw_event,
-                data_source: d.1.topic_name,
-                size,
-                event_ids: d.0.event_ids,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    HttpResponse::Ok()
-        .header(http::header::CONTENT_TYPE, "application/json")
-        .json(resp)
 }

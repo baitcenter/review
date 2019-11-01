@@ -9,39 +9,12 @@ use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 
-use super::schema;
 use super::schema::cluster;
-
 use crate::database::*;
 use crate::server::EtcdServer;
-
-#[derive(Debug, Serialize)]
-struct ClusterResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cluster_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    detector_id: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    qualifier: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    category: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    signature: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data_source: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    size: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    score: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    examples: Option<Example>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    last_modification_time: Option<NaiveDateTime>,
-}
 
 #[derive(
     Debug,
@@ -184,64 +157,103 @@ pub(crate) fn add_clusters(
     future::result(result)
 }
 
-pub(crate) fn get_cluster_table(
+pub(crate) fn get_clusters(
     pool: Data<Pool>,
+    query: Query<Value>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    let query_result: Result<Vec<ClusterResponse>, Error> = pool
-        .get()
-        .map_err(Into::into)
-        .and_then(|conn| {
-            cluster::dsl::cluster
-                .inner_join(schema::status::dsl::status)
-                .inner_join(schema::qualifier::dsl::qualifier)
-                .inner_join(schema::category::dsl::category)
-                .inner_join(schema::data_source::dsl::data_source)
-                .load::<(
-                    ClustersTable,
-                    StatusTable,
-                    QualifierTable,
-                    CategoryTable,
-                    DataSourceTable,
-                )>(&conn)
-                .map_err(Into::into)
-        })
-        .map(|data| {
-            data.into_iter()
-                .map(|d| {
-                    let examples = if let Some(event_ids) = d.0.event_ids {
-                        let raw_event = get_raw_event_by_raw_event_id(&pool, d.0.raw_event_id)
-                            .unwrap_or_else(|_| "-".to_string());
-                        Some(Example {
-                            raw_event,
-                            event_ids,
-                        })
-                    } else {
-                        None
-                    };
-                    let score = Some(d.0.score.unwrap_or(std::f64::NAN));
-                    let size = Some(d.0.size.parse::<usize>().unwrap_or_default());
-
-                    ClusterResponse {
-                        cluster_id: d.0.cluster_id,
-                        detector_id: Some(d.0.detector_id),
-                        qualifier: Some(d.2.description),
-                        status: Some(d.1.description),
-                        category: Some(d.3.name),
-                        signature: Some(d.0.signature),
-                        data_source: Some(d.4.topic_name),
-                        size,
-                        score,
-                        examples,
-                        last_modification_time: d.0.last_modification_time,
-                    }
+    let default_per_page = 10;
+    let max_per_page = 100;
+    let cluster_schema = "(((((cluster INNER JOIN status ON cluster.status_id = status.id) INNER JOIN qualifier ON cluster.qualifier_id = qualifier.id) INNER JOIN category ON cluster.category_id = category.id) INNER JOIN data_source ON cluster.data_source_id = data_source.id) INNER JOIN raw_event ON cluster.raw_event_id = raw_event.id)";
+    let select = query
+        .get("select")
+        .and_then(Value::as_str)
+        .and_then(|s| serde_json::from_str::<HashMap<String, bool>>(s).ok())
+        .map(|s| {
+            s.iter()
+                .filter(|s| *s.1)
+                .filter_map(|s| match s.0.as_ref() {
+                    "cluster_id" => Some("cluster.cluster_id"),
+                    "detector_id" => Some("cluster.detector_id"),
+                    "qualifier" => Some("qualifier.description as qualifier"),
+                    "status" => Some("status.description as status"),
+                    "category" => Some("category.name as category"),
+                    "signature" => Some("cluster.signature"),
+                    "data_source" => Some("data_source.topic_name as data_source"),
+                    "size" => Some("cluster.size"),
+                    "score" => Some("cluster.score"),
+                    "raw_event" => Some("raw_event.data as raw_event"),
+                    "event_ids" => Some("cluster.event_ids"),
+                    "last_modification_time" => Some("cluster.last_modification_time"),
+                    _ => None,
                 })
-                .collect()
+                .collect::<Vec<_>>()
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            vec![
+                "cluster.cluster_id",
+                "cluster.detector_id",
+                "qualifier.description as qualifier",
+                "status.description as status",
+                "category.name as category",
+                "cluster.signature",
+                "data_source.topic_name as data_source",
+                "cluster.size",
+                "cluster.score",
+                "cluster.last_modification_time",
+                "raw_event.data as raw_event",
+                "cluster.event_ids",
+            ]
+        });
+    let where_clause = query
+        .get("filter")
+        .and_then(Value::as_str)
+        .and_then(|f| Filter::get_where_clause(&f).ok())
+        .filter(|f| !f.is_empty());
+    let page = query
+        .get("page")
+        .and_then(Value::as_str)
+        .and_then(|p| p.parse::<i64>().ok())
+        .filter(|p| *p > 0);
+    let per_page = query
+        .get("per_page")
+        .and_then(Value::as_str)
+        .and_then(|p| p.parse::<i64>().ok())
+        .filter(|p| *p > 0)
+        .map(|p| if p > max_per_page { max_per_page } else { p });
+    let per_page = per_page.unwrap_or_else(|| default_per_page);
+
+    let query_result: Result<Vec<GetQueryData>, Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            GetQuery::new(select, cluster_schema, where_clause, page, per_page)
+                .get_results::<GetQueryData>(&conn)
+                .map_err(Into::into)
         });
 
     let result = match query_result {
-        Ok(clusters) => Ok(HttpResponse::Ok()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .json(&clusters)),
+        Ok(data) => {
+            let pagination = match (query.get("page"), query.get("per_page")) {
+                (Some(_), _) | (_, Some(_)) if !data.is_empty() => {
+                    let total = data[0].count;
+                    let total_pages = (total as f64 / per_page as f64).ceil() as u64;
+                    Some((total, total_pages))
+                }
+                _ => None,
+            };
+            let data = data.into_iter().map(|d| d.data).collect::<Vec<Value>>();
+
+            if let Some(pagination) = pagination {
+                Ok(HttpResponse::Ok()
+                    .header("X-REviewd-Total", pagination.0.to_string())
+                    .header("X-REviewd-TotalPages", pagination.1.to_string())
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .json(data))
+            } else {
+                Ok(HttpResponse::Ok()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .json(data))
+            }
+        }
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
@@ -695,20 +707,6 @@ fn update_etcd(url: &str, key: &str, value: &str) {
     }
 }
 
-type SelectCluster = (
-    bool, // cluster_id,
-    bool, // detector_id
-    bool, // qualifier
-    bool, // status
-    bool, // category
-    bool, // signature
-    bool, // data_source
-    bool, // size
-    bool, // score
-    bool, // examples
-    bool, // last_modification_time
-);
-
 #[derive(Debug, Deserialize)]
 struct Filter {
     category: Option<Vec<String>>,
@@ -815,173 +813,4 @@ impl Filter {
                 Ok(where_clause)
             })
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct Select {
-    cluster_id: Option<bool>,
-    detector_id: Option<bool>,
-    qualifier: Option<bool>,
-    status: Option<bool>,
-    category: Option<bool>,
-    signature: Option<bool>,
-    data_source: Option<bool>,
-    size: Option<bool>,
-    score: Option<bool>,
-    examples: Option<bool>,
-    last_modification_time: Option<bool>,
-}
-
-impl Select {
-    fn response_type_builder(&self) -> SelectCluster {
-        (
-            self.cluster_id.unwrap_or_else(|| false),
-            self.detector_id.unwrap_or_else(|| false),
-            self.qualifier.unwrap_or_else(|| false),
-            self.status.unwrap_or_else(|| false),
-            self.category.unwrap_or_else(|| false),
-            self.signature.unwrap_or_else(|| false),
-            self.data_source.unwrap_or_else(|| false),
-            self.size.unwrap_or_else(|| false),
-            self.score.unwrap_or_else(|| false),
-            self.examples.unwrap_or_else(|| false),
-            self.last_modification_time.unwrap_or_else(|| false),
-        )
-    }
-}
-
-const SELECT_ALL: SelectCluster = (
-    true, true, true, true, true, true, true, true, true, true, true,
-);
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct ClusterSelectQuery {
-    filter: Option<String>,
-    limit: Option<String>,
-    select: Option<String>,
-}
-
-pub(crate) fn get_selected_clusters(
-    pool: Data<Pool>,
-    query: Query<ClusterSelectQuery>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    let query = query.into_inner();
-    let where_clause = query.filter.map(|f| match Filter::get_where_clause(&f) {
-        Ok(where_clause) => {
-            if where_clause.is_empty() {
-                None
-            } else {
-                Some(where_clause)
-            }
-        }
-        Err(_) => None,
-    });
-    let select = query
-        .select
-        .map_or(SELECT_ALL, |s| match serde_json::from_str::<Select>(&s) {
-            Ok(s) => Select::response_type_builder(&s),
-            Err(_) => SELECT_ALL,
-        });
-    let limit = query.limit;
-
-    let query_result: Result<Vec<ClusterResponse>, Error> =
-        pool.get()
-            .map_err(Into::into)
-            .and_then(|conn| {
-                let mut query = "SELECT * FROM cluster INNER JOIN category ON cluster.category_id = category.id INNER JOIN qualifier ON cluster.qualifier_id = qualifier.id INNER JOIN status ON cluster.status_id = status.id INNER JOIN data_source ON cluster.data_source_id = data_source.id".to_string();
-                if let Some(Some(where_clause)) = where_clause {
-                    query.push_str(&format!(" WHERE {}", where_clause));
-                }
-                if let Some(limit) = limit {
-                    query.push_str(&format!(" LIMIT {}", limit));
-                }
-                query.push_str(";");
-                diesel::sql_query(query)
-                    .load::<(
-                        ClustersTable,
-                        StatusTable,
-                        QualifierTable,
-                        CategoryTable,
-                        DataSourceTable,
-                    )>(&conn)
-                    .map_err(Into::into)
-            })
-            .map(|data| {
-                data.into_iter()
-                    .map(|d| {
-                        let cluster_id = if select.0 { d.0.cluster_id } else { None };
-                        let detector_id = if select.1 {
-                            Some(d.0.detector_id)
-                        } else {
-                            None
-                        };
-                        let qualifier = if select.2 {
-                            Some(d.2.description)
-                        } else {
-                            None
-                        };
-                        let status = if select.3 {
-                            Some(d.1.description)
-                        } else {
-                            None
-                        };
-                        let category = if select.4 { Some(d.3.name) } else { None };
-                        let signature = if select.5 { Some(d.0.signature) } else { None };
-                        let data_source = if select.6 {
-                            Some(d.4.topic_name.clone())
-                        } else {
-                            None
-                        };
-                        let size = if select.7 {
-                            Some(d.0.size.parse::<usize>().unwrap_or(0))
-                        } else {
-                            None
-                        };
-                        let score = if select.8 { Some(d.0.score.unwrap_or(std::f64::NAN)) } else { None };
-                        let examples = if select.9 {
-                            if let Some(event_ids) = d.0.event_ids {
-                                let raw_event = get_raw_event_by_raw_event_id(&pool, d.0.raw_event_id)
-                                        .unwrap_or_else(|_| "-".to_string());
-                                Some(Example {
-                                    raw_event,
-                                    event_ids,
-                                })
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        let last_modification_time = if select.10 {
-                            d.0.last_modification_time
-                        } else {
-                            None
-                        };
-                        ClusterResponse {
-                            cluster_id,
-                            detector_id,
-                            qualifier,
-                            status,
-                            category,
-                            signature,
-                            data_source,
-                            size,
-                            score,
-                            examples,
-                            last_modification_time,
-                        }
-                    })
-                    .collect()
-            });
-
-    let result = match query_result {
-        Ok(clusters) => Ok(HttpResponse::Ok()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .json(&clusters)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
 }
