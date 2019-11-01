@@ -15,11 +15,42 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Added saving column descriptions for multidimensional clustering into db.
 - Can designated the frontend app directory to be served through HTTP.
+- Added pagination support. Please refer to the API documentation for details.
 
 ### Changed
 
 - Fetching raw events from Kafka runs faster by running I/O operations in
   parallel with internal data udpates.
+
+- The number of clusters/outliers returned per request is 10 by default.
+
+- The format of response body has changed: 
+    - `examples` field, which consists of `raw_event` and `event_ids` fields, has been removed. `raw_event` and `event_ids` fields are displayed separately.
+    - Field names of clusters/outliers in response body are in alphabetical order like below:
+
+    ```
+        {
+            "category": "Non-Specified Alert",
+            "cluster_id": "f-14-f",
+            "data_source": "log01",
+            "detector_id": 1,
+            "event_ids": [
+                281474977755983,
+                281474977760773
+            ],
+            "last_modification_time": null,
+            "qualifier": "unknown",
+            "raw_event": "Error: username or password error,please input again.\r",
+            "score": null,
+            "signature": "(?i)(yadm.*x=di.*yadm)",
+            "size": "10",
+            "status": "pending review"
+        }
+    ```
+
+### Removed
+
+- Removed `GET /api/cluster/search` and `GET /api/outlier/{data_source}` endpoints.
 
 ## [0.6.1] - 2019-10-08
 

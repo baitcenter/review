@@ -15,8 +15,44 @@ paths:
   /api/cluster:
     get:
       tags: [cluster]
-      summary: "Get all clusters"
-      description: "This endpoint returns all clusters in database."
+      summary: "Get clusters"
+      description: "This endpoint returns clusters in database."
+      parameters:
+        - name: "filter"
+          in: "query"
+          description: |
+            A JSON encoded value of the filters. Available filters:
+              - `category:[string]` array of category names
+              - `data_source:[string]` array of data_source names
+              - `status:[string]` array of status names
+              - `qualifier:[string]` array of qualifier names
+              - `cluster_id:[string]` array of cluster_id
+              - `detector_id:[integer]` array of detector_id
+          type: "string"
+        - name: "page"
+          in: "query"
+          description: Specify the page of results to return.
+          type: integer
+        - name: "per_page"
+          in: "query"
+          description: Specify the number of records to return in one request, specified as an integer from 1 to 100.
+          type: integer
+        - name: "select"
+          in: "query"
+          description: |
+            A JSON encoded value of the properties which will be returned if data is available in database. Available selects:
+              - `cluster_id:<boolean>` When set to `true`, `cluster_id` will be returned
+              - `detector_id:<boolean>` When set to `true`, `detector_id` will be returned
+              - `qualifier:<boolean>` When set to `true`, `qualifier` will be returned
+              - `status:<boolean>` When set to `true`, `status` will be returned
+              - `category:<boolean>` When set to `true`, `category` will be returned
+              - `signature:<boolean>` When set to `true`, `signature` will be returned
+              - `data_source:<boolean>` When set to `true`, `data_source` will be returned
+              - `size:<boolean>` When set to `true`, `size` will be returned
+              - `score:<boolean>` When set to `true`, `score` will be returned
+              - `examples:<boolean>` When set to `true`, `examples` will be returned
+              - `last_modification_time:<boolean>` When set to `true`, `last_modification_time` will be returned
+          type: "string"  
       produces:
       - "application/json"
       responses:
@@ -26,12 +62,15 @@ paths:
             type: "array"
             items:
               $ref: "#/definitions/Clusters"
+          headers:
+            X-REviewd-Total:
+              type: "string"
+              description: "the total number of records in the database"
+            X-REviewd-TotalPages:
+              type: "string"
+              description: "the total number of pages encompassing all available records"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
     post:
@@ -58,10 +97,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
     put:
       tags: [cluster]
       summary: "Update properties for a selected clusters"
@@ -80,14 +115,10 @@ paths:
           items:
             $ref: "#/definitions/ClusterCreateBody"
       responses:
-        '200':
+        200:
           description: "Clusters have been successfully updated"
-        '500':
+        500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        '503':
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
   /api/cluster/{cluster_id}:
@@ -117,14 +148,10 @@ paths:
             $ref: "#/definitions/ClusterUpdateBody"
           description: "New values of cluster_id, category, and/or qualifier. At least one of the parameters must be specified to update the cluster."
       responses:
-        '200':
+        200:
           description: "Updated cluster successfully"
-        '500':
+        500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        '503':
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
   /api/cluster/qualifier:
@@ -146,77 +173,32 @@ paths:
               $ref: "#/definitions/QualifierUpdateBody"
           description: "New values of qualifier. cluster_id and data_source are used to identify the cluster to be updated."
       responses:
-        '200':
-          description: "Updated cluster successfully"
-        '500':
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        '503':
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-  /api/cluster/search:
-    get:
-      tags: [cluster]
-      summary: "Search for clusters"
-      description: "This endpoint returns a list of clusters in the database."
-      parameters:
-        - name: "filter"
-          in: "query"
-          description: |
-            A JSON encoded value of the filters. If the filter is empty, all clusters in database will be returned. Available filters:
-              - `category:[string]` array of category names
-              - `data_source:[string]` array of data_source names
-              - `status:[string]` array of status names
-              - `qualifier:[string]` array of qualifier names
-              - `cluster_id:[string]` array of cluster_id
-              - `detector_id:[integer]` array of detector_id
-          required: true
-          type: "string"
-        - name: "limit"
-          in: "query"
-          description: "Limit the number of clusters to be returned by a query."
-          type: "string"
-        - name: "select"
-          in: "query"
-          description: |
-            A JSON encoded value of the properties which will be returned if data is available in database. Available selects:
-              - `cluster_id:<boolean>` When set to `true`, `cluster_id` will be returned
-              - `detector_id:<boolean>` When set to `true`, `detector_id` will be returned
-              - `qualifier:<boolean>` When set to `true`, `qualifier` will be returned
-              - `status:<boolean>` When set to `true`, `status` will be returned
-              - `category:<boolean>` When set to `true`, `category` will be returned
-              - `signature:<boolean>` When set to `true`, `signature` will be returned
-              - `data_source:<boolean>` When set to `true`, `data_source` will be returned
-              - `size:<boolean>` When set to `true`, `size` will be returned
-              - `score:<boolean>` When set to `true`, `score` will be returned
-              - `examples:<boolean>` When set to `true`, `examples` will be returned
-              - `last_modification_time:<boolean>` When set to `true`, `last_modification_time` will be returned
-          type: "string"  
-      produces:
-        - "application/json"
-        - "text/plain"
-      responses:
         200:
-          description: "OK"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/Clusters"
+          description: "Updated cluster successfully"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
   /api/outlier:
     get:
       tags: [outlier]
-      summary: "Get all outliers"
-      description: "This endpoint returns all outliers in database."
+      summary: "Get outliers"
+      description: "This endpoint returns outliers in database."
+      parameters:
+      - name: "filter"
+        in: "query"
+        description: |
+          A JSON encoded value of the filters. Available filter:
+            - `data_source:[string]` array of data_source names
+        type: "string"
+      - name: "page"
+        in: "query"
+        description: Specify the page of results to return.
+        type: integer
+      - name: "per_page"
+        in: "query"
+        description: Specify the number of records to return in one request, specified as an integer from 1 to 100.
+        type: integer
       produces:
         - "application/json"
         - "text/plain"
@@ -227,10 +209,15 @@ paths:
             type: "array"
             items:
               $ref: "#/definitions/Outlier"
+          headers:
+            X-REviewd-Total:
+              type: "string"
+              description: "the total number of records in the database"
+            X-REviewd-TotalPages:
+              type: "string"
+              description: "the total number of pages encompassing all available records"
         500:
           description: "Internal server error"
-        503:
-          description: "Service temporarily unavailable"
     post:
       tags: [outlier]
       summary: "Create one or more new outliers"
@@ -255,10 +242,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
     put:
       tags: [outlier]
       summary: "Update properties for a selected outliers"
@@ -281,10 +264,6 @@ paths:
           description: "Outliers have been successfully updated"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
     delete:
@@ -312,39 +291,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-  /api/outlier/{data_source}:
-    get:
-      tags: [outlier]
-      summary: "Get a list of outliers"
-      description: "This endpoint returns specific outliers by data_source."
-      parameters:
-        - name: "data_source"
-          in: "path"
-          description: "data_source"
-          type: "string"
-          required: true
-      produces:
-        - "application/json"
-        - "text/plain"
-      responses:
-        200:
-          description: "OK"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/Outlier"
-        500:
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
   /api/category:
     get:
       tags: [category]
@@ -360,10 +306,6 @@ paths:
             $ref: "#/definitions/Category"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
     post:
@@ -383,10 +325,6 @@ paths:
           description: "The new category has been successfully inserted into database"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
   /api/category/{category}:
@@ -420,10 +358,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
   /api/qualifier:
     get:
       tags: [qualifier]
@@ -443,10 +377,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
   /api/status:
     get:
       tags: [status]
@@ -464,10 +394,6 @@ paths:
               $ref: "#/definitions/Status"
         500:
           description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-        503:
-          description: "Service temporarily unavailable"
           schema:
             $ref: "#/definitions/ErrorResponse"
   /api/etcd/suspicious_token:
@@ -515,50 +441,48 @@ definitions:
   Clusters:
     type: "object"
     properties:
+      category:
+        type: "string"
+        description: "category for this cluster"
       cluster_id:
         type: "string"
         description: "a unique id for this cluster"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
       detector_id:
         type: "integer"
         format: "uint32"
         description: "detector_id in REconverge config file configured for this cluster"
+      event_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "uint64"
+        description: "a list of event ids for this cluster"
+      last_modification_time:
+        type: "string"
+        format: "dateTime"
       qualifier:
         type: "string"
         description: "qualifier for this cluster"
-      status:
+      raw_event:
         type: "string"
-        description: "status for this cluster"
-      category:
-        type: "string"
-        description: "category for this cluster"
-      signature:
-        type: "string"
-        description: "A signature for this cluster generated by REmake"
-      data_source:
-        type: "string"
-        description: "Kafka topic name"
-      size:
-        type: "integer"
-        format: "uint64"
-        description: "The number of events for this cluster"
+        description: "raw_event"
       score:
         type: "number"
         format: "double"
         description: "score for this cluster based on indicator file"
-      examples:
-        type: "array"
-        items:
-          type: "object"
-          properties:
-            id:
-              type: "integer"
-              format: "uint64"
-            raw_event:
-              type: "string"
-        description: "pairs of id and raw event"
-      last_modification_time:
+      signature:
         type: "string"
-        format: "dateTime"
+        description: "A signature for this cluster generated by REmake"
+      size:
+        type: "integer"
+        format: "uint64"
+        description: "The number of events for this cluster"
+      status:
+        type: "string"
+        description: "status for this cluster"
   ClusterCreateBody:
     type: "object"
     required:
@@ -603,42 +527,25 @@ definitions:
       qualifier:
         type: "string"
         description: "New value of qualifier"
-  Examples:
-    type: "object"
-    properties:
-      cluster_id:
-        type: "string"
-        description: "a unique id for this cluster"
-      examples:
-        type: "array"
-        items:
-          type: "object"
-          properties:
-            id:
-              type: "integer"
-              format: "uint64"
-            raw_event:
-              type: "string"
-        description: "pairs of id and raw event"
   Outlier:
     type: "object"
     properties:
-      outlier:
-        type: "string"
-        description: "raw event for this outlier"
       data_source:
         type: "string"
         description: "Kafka topic name"
-      size:
-        type: "integer"
-        format: "uint64"
-        description: "The number of events for this cluster"
       event_ids:
         type: "array"
         items:
           type: "integer"
           format: "uint64"
         description: "list of event ids for this outlier"
+      outlier:
+        type: "string"
+        description: "raw event for this outlier"
+      size:
+        type: "integer"
+        format: "uint64"
+        description: "The number of events for this cluster"
   OutlierCreateBody:
     type: "object"
     required:
