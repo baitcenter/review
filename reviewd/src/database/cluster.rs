@@ -163,7 +163,11 @@ pub(crate) fn get_clusters(
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let default_per_page = 10;
     let max_per_page = 100;
-    let cluster_schema = "(((((cluster INNER JOIN status ON cluster.status_id = status.id) INNER JOIN qualifier ON cluster.qualifier_id = qualifier.id) INNER JOIN category ON cluster.category_id = category.id) INNER JOIN data_source ON cluster.data_source_id = data_source.id) INNER JOIN raw_event ON cluster.raw_event_id = raw_event.id)";
+    let cluster_schema = "(((((cluster INNER JOIN status ON cluster.status_id = status.id) \
+                          INNER JOIN qualifier ON cluster.qualifier_id = qualifier.id) \
+                          INNER JOIN category ON cluster.category_id = category.id) \
+                          INNER JOIN data_source ON cluster.data_source_id = data_source.id) \
+                          INNER JOIN raw_event ON cluster.raw_event_id = raw_event.id)";
     let select = query
         .get("select")
         .and_then(Value::as_str)

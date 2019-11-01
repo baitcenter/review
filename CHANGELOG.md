@@ -25,8 +25,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The number of clusters/outliers returned per request is 10 by default.
 
 - The format of response body has changed: 
-    - `examples` field, which consists of `raw_event` and `event_ids` fields, has been removed. `raw_event` and `event_ids` fields are displayed separately.
-    - Field names of clusters/outliers in response body are in alphabetical order like below:
+    - `examples` field, which consists of `raw_event` and `event_ids` fields,
+      has been removed. `raw_event` and `event_ids` fields are displayed
+      separately.
+    - Field names of clusters/outliers in response body are in alphabetical
+      order like below:
 
     ```
         {
@@ -50,7 +53,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- Removed `GET /api/cluster/search` and `GET /api/outlier/{data_source}` endpoints.
+- Removed `GET /api/cluster/search` and `GET /api/outlier/{data_source}`
+  endpoints.
 
 ## [0.6.1] - 2019-10-08
 
