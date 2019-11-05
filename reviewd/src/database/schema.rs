@@ -16,7 +16,7 @@ table! {
         qualifier_id -> Int4,
         status_id -> Int4,
         signature -> Text,
-        size -> Text,
+        size -> Numeric,
         score -> Nullable<Float8>,
         data_source_id -> Int4,
         last_modification_time -> Nullable<Timestamp>,
@@ -125,7 +125,7 @@ table! {
         data_source_id -> Int4,
         event_ids -> Array<Numeric>,
         raw_event_id -> Int4,
-        size -> Nullable<Text>,
+        size -> Numeric,
     }
 }
 

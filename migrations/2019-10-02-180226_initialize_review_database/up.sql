@@ -43,7 +43,7 @@ CREATE TABLE cluster (
   qualifier_id INTEGER NOT NULL REFERENCES qualifier(id),
   status_id INTEGER NOT NULL REFERENCES Status(id),
   signature TEXT NOT NULL,
-  size TEXT NOT NULL DEFAULT '1',
+  size NUMERIC(20, 0) NOT NULL,
   score FLOAT8,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -56,7 +56,7 @@ CREATE TABLE outlier (
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   event_ids NUMERIC(20, 0)[] NOT NULL,
   raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
-  size TEXT,
+  size NUMERIC(20, 0) NOT NULL,
   UNIQUE (raw_event, data_source_id)
 );
 

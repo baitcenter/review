@@ -41,7 +41,7 @@ pub(crate) struct ClustersTable {
     qualifier_id: i32,
     status_id: i32,
     signature: String,
-    size: String,
+    size: BigDecimal,
     score: Option<f64>,
     data_source_id: i32,
     last_modification_time: Option<chrono::NaiveDateTime>,
@@ -112,10 +112,10 @@ pub(crate) fn add_clusters(
                         Some(sig) => sig.clone(),
                         None => "-".to_string(),
                     };
-                    let cluster_size = match c.size {
-                        Some(cluster_size) => cluster_size.to_string(),
-                        None => "1".to_string(),
-                    };
+                    let cluster_size: BigDecimal = c
+                        .size
+                        .and_then(FromPrimitive::from_usize)
+                        .unwrap_or_else(|| FromPrimitive::from_usize(1).unwrap_or_default());
 
                     // We always insert 1 for category_id
                     // "unknown" for qualifier_id, and "pending review" for status_id.
@@ -420,7 +420,7 @@ pub(crate) fn update_clusters(
         signature: String,
         event_ids: Option<Vec<BigDecimal>>,
         raw_event_id: i32,
-        size: String,
+        size: BigDecimal,
         category_id: i32,
         qualifier_id: i32,
         status_id: i32,
@@ -451,103 +451,104 @@ pub(crate) fn update_clusters(
             .load::<Cluster>(&conn)
             .map_err(Into::into)
             .and_then(|cluster_list| {
-                let replace_clusters: Vec<_> = cluster_update
-                    .iter()
-                    .filter_map(|c| {
-                        if let Some(cluster) = cluster_list
-                            .iter()
-                            .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
-                        {
-                            c.event_ids.as_ref()?;
-                            let now = Utc::now();
-                            let timestamp = NaiveDateTime::from_timestamp(now.timestamp(), 0);
+                let replace_clusters: Vec<_> =
+                    cluster_update
+                        .iter()
+                        .filter_map(|c| {
+                            use std::str::FromStr;
+                            if let Some(cluster) = cluster_list
+                                .iter()
+                                .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
+                            {
+                                c.event_ids.as_ref()?;
+                                let now = Utc::now();
+                                let timestamp = NaiveDateTime::from_timestamp(now.timestamp(), 0);
 
-                            let sig = match &c.signature {
-                                Some(sig) => sig.clone(),
-                                None => cluster.signature.clone(),
-                            };
-                            let event_ids = merge_cluster_examples(
-                                cluster.event_ids.clone(),
-                                c.event_ids.clone(),
-                            );
-                            let cluster_size = match c.size {
-                                Some(new_size) => {
-                                    if let Ok(current_size) = cluster.size.clone().parse::<usize>()
-                                    {
-                                        // check if sum of new_size and current_size exceeds max_value
-                                        // if it does, we cannot calculate sum anymore, so reset the value of size
-                                        if new_size > usize::max_value() - current_size {
-                                            new_size.to_string()
-                                        } else {
-                                            (current_size + new_size).to_string()
-                                        }
-                                    } else {
-                                        cluster.size.clone()
-                                    }
+                                let sig = match &c.signature {
+                                    Some(sig) => sig.clone(),
+                                    None => cluster.signature.clone(),
+                                };
+                                let event_ids = merge_cluster_examples(
+                                    cluster.event_ids.clone(),
+                                    c.event_ids.clone(),
+                                );
+                                let cluster_size =
+                                    c.size.and_then(FromPrimitive::from_usize).map_or_else(
+                                        || cluster.size.clone(),
+                                        |new_size: BigDecimal| {
+                                            // Reset the value of size if it exceeds 20 digits
+                                            BigDecimal::from_str("100000000000000000000")
+                                                .ok()
+                                                .map_or(new_size.clone(), |max_size| {
+                                                    if &new_size + &cluster.size < max_size {
+                                                        &new_size + &cluster.size
+                                                    } else {
+                                                        new_size
+                                                    }
+                                                })
+                                        },
+                                    );
+                                let data_source_id =
+                                    get_data_source_id(&pool, &c.data_source).unwrap_or_default();
+                                if data_source_id == 0 {
+                                    None
+                                } else {
+                                    Some((
+                                        dsl::cluster_id.eq(c.cluster_id.clone()),
+                                        dsl::category_id.eq(cluster.category_id),
+                                        dsl::detector_id.eq(c.detector_id),
+                                        dsl::event_ids.eq(event_ids),
+                                        dsl::raw_event_id.eq(cluster.raw_event_id),
+                                        dsl::qualifier_id.eq(cluster.qualifier_id),
+                                        dsl::status_id.eq(cluster.status_id),
+                                        dsl::signature.eq(sig),
+                                        dsl::size.eq(cluster_size),
+                                        dsl::score.eq(c.score),
+                                        dsl::data_source_id.eq(data_source_id),
+                                        dsl::last_modification_time.eq(Some(timestamp)),
+                                    ))
                                 }
-                                None => cluster.size.clone(),
-                            };
-                            let data_source_id =
-                                get_data_source_id(&pool, &c.data_source).unwrap_or_default();
-                            if data_source_id == 0 {
-                                None
                             } else {
-                                Some((
-                                    dsl::cluster_id.eq(c.cluster_id.clone()),
-                                    dsl::category_id.eq(cluster.category_id),
-                                    dsl::detector_id.eq(c.detector_id),
-                                    dsl::event_ids.eq(event_ids),
-                                    dsl::raw_event_id.eq(cluster.raw_event_id),
-                                    dsl::qualifier_id.eq(cluster.qualifier_id),
-                                    dsl::status_id.eq(cluster.status_id),
-                                    dsl::signature.eq(sig),
-                                    dsl::size.eq(cluster_size),
-                                    dsl::score.eq(c.score),
-                                    dsl::data_source_id.eq(data_source_id),
-                                    dsl::last_modification_time.eq(Some(timestamp)),
-                                ))
-                            }
-                        } else {
-                            let event_ids = c.event_ids.as_ref().map(|e| {
-                                e.iter()
-                                    .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
-                                    .collect::<Vec<BigDecimal>>()
-                            });
-                            let sig = match &c.signature {
-                                Some(sig) => sig.clone(),
-                                None => "-".to_string(),
-                            };
-                            let cluster_size = match c.size {
-                                Some(cluster_size) => cluster_size.to_string(),
-                                None => "1".to_string(),
-                            };
-                            let data_source_id = get_data_source_id(&pool, &c.data_source)
-                                .unwrap_or_else(|_| {
-                                    add_data_source(&pool, &c.data_source, &c.data_source_type)
+                                let event_ids = c.event_ids.as_ref().map(|e| {
+                                    e.iter()
+                                        .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
+                                        .collect::<Vec<BigDecimal>>()
                                 });
-                            let raw_event_id =
-                                get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
-                            if data_source_id == 0 || raw_event_id == 0 {
-                                None
-                            } else {
-                                Some((
-                                    dsl::cluster_id.eq(c.cluster_id.clone()),
-                                    dsl::category_id.eq(1),
-                                    dsl::detector_id.eq(c.detector_id),
-                                    dsl::event_ids.eq(event_ids),
-                                    dsl::raw_event_id.eq(raw_event_id),
-                                    dsl::qualifier_id.eq(2),
-                                    dsl::status_id.eq(2),
-                                    dsl::signature.eq(sig),
-                                    dsl::size.eq(cluster_size),
-                                    dsl::score.eq(c.score),
-                                    dsl::data_source_id.eq(data_source_id),
-                                    dsl::last_modification_time.eq(None),
-                                ))
+                                let sig = match &c.signature {
+                                    Some(sig) => sig.clone(),
+                                    None => "-".to_string(),
+                                };
+                                let cluster_size: BigDecimal =
+                                    c.size.and_then(FromPrimitive::from_usize).unwrap_or_else(
+                                        || FromPrimitive::from_usize(1).unwrap_or_default(),
+                                    );
+                                let data_source_id = get_data_source_id(&pool, &c.data_source)
+                                    .unwrap_or_else(|_| {
+                                        add_data_source(&pool, &c.data_source, &c.data_source_type)
+                                    });
+                                let raw_event_id = get_empty_raw_event_id(&pool, data_source_id)
+                                    .unwrap_or_default();
+                                if data_source_id == 0 || raw_event_id == 0 {
+                                    None
+                                } else {
+                                    Some((
+                                        dsl::cluster_id.eq(c.cluster_id.clone()),
+                                        dsl::category_id.eq(1),
+                                        dsl::detector_id.eq(c.detector_id),
+                                        dsl::event_ids.eq(event_ids),
+                                        dsl::raw_event_id.eq(raw_event_id),
+                                        dsl::qualifier_id.eq(2),
+                                        dsl::status_id.eq(2),
+                                        dsl::signature.eq(sig),
+                                        dsl::size.eq(cluster_size),
+                                        dsl::score.eq(c.score),
+                                        dsl::data_source_id.eq(data_source_id),
+                                        dsl::last_modification_time.eq(None),
+                                    ))
+                                }
                             }
-                        }
-                    })
-                    .collect();
+                        })
+                        .collect();
 
                 if replace_clusters.is_empty() {
                     Ok(0)

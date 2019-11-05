@@ -24,7 +24,7 @@ struct OutliersTable {
     data_source_id: i32,
     event_ids: Vec<BigDecimal>,
     raw_event_id: i32,
-    size: Option<String>,
+    size: BigDecimal,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -46,7 +46,8 @@ pub(crate) fn add_outliers(
             .into_inner()
             .iter()
             .filter_map(|new_outlier| {
-                let o_size = Some(new_outlier.event_ids.len().to_string());
+                let o_size: BigDecimal = FromPrimitive::from_usize(new_outlier.event_ids.len())
+                    .unwrap_or_else(|| FromPrimitive::from_usize(1).unwrap_or_default());
                 let event_ids = new_outlier
                     .event_ids
                     .iter()
@@ -292,27 +293,27 @@ pub(crate) fn update_outliers(
                 let replace_outliers: Vec<_> = outlier_update
                     .iter()
                     .filter_map(|o| {
+                        use std::str::FromStr;
                         if let Some(outlier) = outlier_list
                             .iter()
                             .find(|outlier| bytes_to_string(&o.outlier) == outlier.raw_event)
                         {
-                            let new_size = o.event_ids.len();
-                            let o_size = match &outlier.size {
-                                Some(current_size) => {
-                                    if let Ok(current_size) = current_size.parse::<usize>() {
-                                        // check if sum of new_size and current_size exceeds max_value
-                                        // if it does, we cannot calculate sum anymore, so reset the value of size
-                                        if new_size > usize::max_value() - current_size {
-                                            new_size.to_string()
-                                        } else {
-                                            (current_size + new_size).to_string()
-                                        }
-                                    } else {
-                                        new_size.to_string()
-                                    }
-                                }
-                                None => new_size.to_string(),
-                            };
+                            let o_size = FromPrimitive::from_usize(o.event_ids.len()).map_or_else(
+                                || outlier.size.clone(),
+                                |new_size: BigDecimal| {
+                                    // Reset the value of size if it exceeds 20 digits
+                                    BigDecimal::from_str("100000000000000000000").ok().map_or(
+                                        new_size.clone(),
+                                        |max_size| {
+                                            if &new_size + &outlier.size < max_size {
+                                                &new_size + &outlier.size
+                                            } else {
+                                                new_size
+                                            }
+                                        },
+                                    )
+                                },
+                            );
                             let mut event_ids = o
                                 .event_ids
                                 .iter()
@@ -337,7 +338,7 @@ pub(crate) fn update_outliers(
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::raw_event_id.eq(outlier.raw_event_id),
-                                    dsl::size.eq(Some(o_size)),
+                                    dsl::size.eq(o_size),
                                 ))
                             }
                         } else {
@@ -354,7 +355,10 @@ pub(crate) fn update_outliers(
                             } else {
                                 event_ids
                             };
-                            let size = o.event_ids.len();
+                            let size: BigDecimal = FromPrimitive::from_usize(o.event_ids.len())
+                                .unwrap_or_else(|| {
+                                    FromPrimitive::from_usize(1).unwrap_or_default()
+                                });
                             let data_source_id = get_data_source_id(&pool, &o.data_source)
                                 .unwrap_or_else(|_| {
                                     add_data_source(&pool, &o.data_source, &o.data_source_type)
@@ -369,7 +373,7 @@ pub(crate) fn update_outliers(
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::raw_event_id.eq(raw_event_id),
-                                    dsl::size.eq(Some(size.to_string())),
+                                    dsl::size.eq(size),
                                 ))
                             }
                         }
