@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use failure::Fail;
+use log::error;
 use serde_json::json;
 
 mod category;
@@ -33,8 +34,10 @@ pub use self::qualifier::QualifierTable;
 pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 pub(crate) fn build_err_msg(fail: &dyn Fail) -> String {
+    error!("{}", fail);
     let mut err_msg = fail.to_string();
     for cause in fail.iter_causes() {
+        error!("\tcaused by: {}", cause);
         err_msg.push_str(&format!("\n\tcaused by: {}", cause));
     }
 
