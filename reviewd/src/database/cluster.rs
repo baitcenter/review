@@ -595,7 +595,6 @@ pub(crate) fn update_clusters(
                         .on_conflict((dsl::cluster_id, dsl::data_source_id))
                         .do_update()
                         .set((
-                            dsl::id.eq(excluded(dsl::id)),
                             dsl::category_id.eq(excluded(dsl::category_id)),
                             dsl::detector_id.eq(excluded(dsl::detector_id)),
                             dsl::event_ids.eq(excluded(dsl::event_ids)),

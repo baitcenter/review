@@ -417,7 +417,6 @@ pub(crate) fn update_outliers(
                         .on_conflict((dsl::raw_event, dsl::data_source_id))
                         .do_update()
                         .set((
-                            dsl::id.eq(excluded(dsl::id)),
                             dsl::event_ids.eq(excluded(dsl::event_ids)),
                             dsl::raw_event_id.eq(excluded(dsl::raw_event_id)),
                             dsl::size.eq(excluded(dsl::size)),
