@@ -1,28 +1,42 @@
 use actix_web::{
     http,
-    web::{Data, Json},
+    web::{Data, Json, Query},
     HttpResponse,
 };
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use futures::{future, prelude::*};
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use structured::{Description, DescriptionElement};
 
 use super::schema;
 use super::schema::{
-    column_description, description_datetime, description_element_type, description_enum,
-    description_float, description_int, description_ipaddr, description_text, top_n_datetime,
-    top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
+    cluster, column_description, data_source, description_datetime, description_element_type,
+    description_enum, description_float, description_int, description_ipaddr, description_text,
+    top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
 use crate::database::*;
 
+#[derive(Clone, Debug, Default, Serialize)]
+pub(crate) struct DescriptionLoad {
+    pub count: usize,
+    pub unique_count: usize,
+    pub mean: Option<f64>,
+    pub s_deviation: Option<f64>,
+    pub min: Option<DescriptionElement>,
+    pub max: Option<DescriptionElement>,
+    pub top_n: Option<Vec<(DescriptionElement, usize)>>,
+    pub mode: Option<DescriptionElement>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct DescriptionUpdate {
-    pub cluster_id: String,
-    pub first_event_id: Option<u64>,
-    pub last_event_id: Option<u64>,
+    pub cluster_id: String,          // NOT cluster_id but id of cluster table
+    pub first_event_id: Option<u64>, // String in other places
+    pub last_event_id: Option<u64>,  // String in other places
     pub descriptions: Vec<Description>,
 }
 
@@ -180,6 +194,35 @@ pub(crate) struct TopNDatetimeTable {
     pub count: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct RoundSelectQuery {
+    pub(crate) cluster_id: String,
+    pub(crate) data_source: String,
+}
+
+#[derive(Debug, Queryable, Serialize)]
+pub(crate) struct RoundResponse {
+    pub(crate) first_event_id: String,
+    pub(crate) last_event_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DescriptionSelectQuery {
+    pub(crate) cluster_id: String,
+    pub(crate) data_source: String,
+    pub(crate) first_event_id: String,
+    pub(crate) last_event_id: String,
+}
+
+#[derive(Debug, Queryable, Serialize)]
+pub(crate) struct ColumnDescription {
+    pub(crate) id: i32,
+    pub(crate) column_index: i32,
+    pub(crate) type_id: i32,
+    pub(crate) count: i64,
+    pub(crate) unique_count: i64,
+}
+
 macro_rules! insert_top_n_number {
     ($p:ident, $cdsc:expr, $id:expr, $conn:expr, $re:expr) => {{
         use schema::$p::*;
@@ -248,6 +291,9 @@ macro_rules! insert_short_description {
 
 const MAX_VALUE_OF_I64_I64: i64 = 9_223_372_036_854_775_807_i64;
 const MAX_VALUE_OF_I64_USIZE: usize = 9_223_372_036_854_775_807_usize;
+const MAX_VALUE_OF_I32_USIZE: usize = 2_147_483_647_usize;
+const MAX_VALUE_OF_U32_I64: i64 = 4_294_967_295_i64;
+const MAX_VALUE_OF_U32_U32: u32 = 4_294_967_295_u32;
 
 pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
     if value > MAX_VALUE_OF_I64_USIZE {
@@ -276,7 +322,7 @@ pub(crate) fn add_descriptions(
                     .first::<i32>(&conn)
                 {
                     Ok(v) => cid = v,
-                    Err(e) => return Err(e).map_err(Into::into),
+                    Err(_) => continue,
                 }
             }
 
@@ -310,11 +356,7 @@ pub(crate) fn add_descriptions(
                     } else {
                         continue;
                     };
-                    let c_index = if i
-                        <= i32::max_value()
-                            .to_usize()
-                            .expect("Safe cast: MaxOfi32 -> usize")
-                    {
+                    let c_index = if i <= MAX_VALUE_OF_I32_USIZE {
                         i.to_i32().expect("Safe cast: 0..=MaxOfi32 -> i32")
                     } else {
                         continue;
@@ -332,7 +374,7 @@ pub(crate) fn add_descriptions(
                         .get_result(&conn)
                     {
                         Ok(v) => v,
-                        Err(e) => return Err(e).map_err(Into::into),
+                        Err(_) => continue,
                     }
                 }
 
@@ -522,12 +564,445 @@ pub(crate) fn add_descriptions(
         Ok(c_result)
     });
 
-    let final_result = match insert_result {
+    let result = match insert_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
     };
 
-    future::result(final_result)
+    future::result(result)
+}
+
+pub(crate) fn get_rounds_by_cluster(
+    pool: Data<Pool>,
+    query: Query<RoundSelectQuery>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    use cluster::dsl as c_d;
+    use column_description::dsl as cd_d;
+    use data_source::dsl as d_d;
+    let query_result: Result<Vec<RoundResponse>, Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            cd_d::column_description
+                .inner_join(c_d::cluster.on(cd_d::cluster_id.eq(c_d::id)))
+                .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                .select((cd_d::first_event_id, cd_d::last_event_id))
+                .filter(
+                    c_d::cluster_id
+                        .eq(&query.cluster_id)
+                        .and(d_d::topic_name.eq(&query.data_source)),
+                )
+                .distinct_on((cd_d::first_event_id, cd_d::last_event_id))
+                .load::<RoundResponse>(&conn)
+                .map_err(Into::into)
+        });
+
+    let result = match query_result {
+        Ok(round_response) => Ok(HttpResponse::Ok()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .json(round_response)),
+        Err(e) => Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e))),
+    };
+
+    future::result(result)
+}
+
+struct GetValueByType {}
+
+impl GetValueByType {
+    pub fn top_n_enum(value: &Option<i64>) -> DescriptionElement {
+        match value {
+            Some(value) => {
+                if *value <= MAX_VALUE_OF_U32_I64 {
+                    DescriptionElement::UInt(
+                        value.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
+                    )
+                } else {
+                    DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)
+                }
+            }
+            None => DescriptionElement::UInt(0_u32), // No chance
+        }
+    }
+
+    pub fn top_n_text(value: &Option<String>) -> DescriptionElement {
+        match value {
+            Some(value) => DescriptionElement::Text(value.clone()),
+            None => DescriptionElement::Text(String::from("N/A")), // No chance
+        }
+    }
+
+    pub fn top_n_ipaddr(value: &Option<String>) -> DescriptionElement {
+        match value {
+            Some(value) => DescriptionElement::IpAddr(IpAddr::V4(
+                Ipv4Addr::from_str(value).unwrap_or_else(|_| Ipv4Addr::new(0, 0, 0, 0)),
+            )),
+            None => DescriptionElement::IpAddr(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))), // No chance
+        }
+    }
+
+    pub fn top_n_datetime(value: &Option<NaiveDateTime>) -> DescriptionElement {
+        match value {
+            Some(value) => DescriptionElement::DateTime(*value),
+            None => DescriptionElement::DateTime(NaiveDate::from_ymd(1, 1, 1).and_hms(1, 1, 1)), // No chance
+        }
+    }
+
+    pub fn mode_enum(value: Option<i64>) -> Option<DescriptionElement> {
+        match value {
+            Some(m) => {
+                if m <= MAX_VALUE_OF_U32_I64 {
+                    Some(DescriptionElement::UInt(
+                        m.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
+                    ))
+                } else {
+                    Some(DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)) // No chance
+                }
+            }
+            None => None,
+        }
+    }
+
+    pub fn mode_text(value: Option<String>) -> Option<DescriptionElement> {
+        match value {
+            Some(m) => Some(DescriptionElement::Text(m)),
+            None => None,
+        }
+    }
+
+    pub fn mode_ipaddr(value: Option<String>) -> Option<DescriptionElement> {
+        match value {
+            Some(m) => Some(DescriptionElement::IpAddr(IpAddr::V4(
+                Ipv4Addr::from_str(&m).unwrap_or_else(|_| Ipv4Addr::new(0, 0, 0, 0)),
+            ))),
+            None => None,
+        }
+    }
+
+    pub fn mode_datetime(value: Option<NaiveDateTime>) -> Option<DescriptionElement> {
+        match value {
+            Some(m) => Some(DescriptionElement::DateTime(m)),
+            None => None,
+        }
+    }
+}
+
+macro_rules! load_descriptions_others {
+    ($s_desc:ident, $s_top_n:ident, $t_desc:ty, $t_top_n:ty,
+        $conn:expr, $column:expr, $description:expr, $value_top_n:tt, $value_mode:tt) => {{
+        use $s_desc::dsl as d_d;
+        if let Ok(mode) = d_d::$s_desc
+            .select(d_d::mode)
+            .filter(d_d::description_id.eq(&$column.id))
+            .first::<Option<$t_desc>>($conn)
+        {
+            use $s_top_n::dsl as t_d;
+            let top_n = if let Ok(top_n) = t_d::$s_top_n
+                .filter(t_d::description_id.eq(&$column.id))
+                .order_by(t_d::ranking.asc())
+                .load::<$t_top_n>($conn)
+            {
+                let top_n: Vec<(DescriptionElement, usize)> = top_n
+                    .iter()
+                    .map(|t| {
+                        let value = GetValueByType::$value_top_n(&t.value);
+                        let count = match t.count {
+                            Some(count) => count as usize, // safe
+                            None => 0_usize,               // No chance
+                        };
+                        (value, count)
+                    })
+                    .collect();
+                Some(top_n)
+            } else {
+                None
+            };
+            let mode = GetValueByType::$value_mode(mode);
+            $description = DescriptionLoad {
+                count: $column.count as usize,               // safe
+                unique_count: $column.unique_count as usize, // safe
+                mean: None,
+                s_deviation: None,
+                min: None,
+                max: None,
+                top_n: top_n,
+                mode: mode,
+            }
+        } else {
+            $description = DescriptionLoad::default()
+        }
+    }};
+}
+
+pub(crate) fn get_description(
+    pool: Data<Pool>,
+    query: Query<DescriptionSelectQuery>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    use cluster::dsl as c_d;
+    use column_description::dsl as cd_d;
+    use data_source::dsl as d_d;
+    let query_result: Result<Vec<DescriptionLoad>, Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            cd_d::column_description
+                .inner_join(c_d::cluster.on(cd_d::cluster_id.eq(c_d::id)))
+                .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                .select((
+                    cd_d::id,
+                    cd_d::column_index,
+                    cd_d::type_id,
+                    cd_d::count,
+                    cd_d::unique_count,
+                ))
+                .filter(
+                    c_d::cluster_id
+                        .eq(&query.cluster_id)
+                        .and(d_d::topic_name.eq(&query.data_source))
+                        .and(cd_d::first_event_id.eq(&query.first_event_id))
+                        .and(cd_d::last_event_id.eq(&query.last_event_id)),
+                )
+                .order_by(cd_d::column_index.asc())
+                .load::<ColumnDescription>(&conn)
+                .and_then(|columns| {
+                    Ok(columns
+                        .iter()
+                        .map(|column| match column.type_id {
+                            1 => {
+                                use description_int::dsl as di_d;
+                                if let Ok((min, max, mean, s_deviation, mode)) =
+                                    di_d::description_int
+                                        .select((
+                                            di_d::min,
+                                            di_d::max,
+                                            di_d::mean,
+                                            di_d::s_deviation,
+                                            di_d::mode,
+                                        ))
+                                        .filter(di_d::description_id.eq(&column.id))
+                                        .first::<(
+                                            Option<i64>,
+                                            Option<i64>,
+                                            Option<f64>,
+                                            Option<f64>,
+                                            Option<i64>,
+                                        )>(&conn)
+                                {
+                                    use top_n_int::dsl as ti_d;
+                                    let top_n = if let Ok(top_n) = ti_d::top_n_int
+                                        .filter(ti_d::description_id.eq(&column.id))
+                                        .order_by(ti_d::ranking.asc())
+                                        .load::<TopNIntTable>(&conn)
+                                    {
+                                        let top_n: Vec<(DescriptionElement, usize)> = top_n
+                                            .iter()
+                                            .map(|t| {
+                                                let value = match t.value {
+                                                    Some(value) => DescriptionElement::Int(value),
+                                                    None => DescriptionElement::Int(0_i64), // No chance
+                                                };
+                                                let count = match t.count {
+                                                    Some(count) => count as usize, // safe
+                                                    None => 0_usize,               // No chance
+                                                };
+                                                (value, count)
+                                            })
+                                            .collect();
+                                        Some(top_n)
+                                    } else {
+                                        None
+                                    };
+                                    let min = match min {
+                                        Some(m) => Some(DescriptionElement::Int(m)),
+                                        None => None,
+                                    };
+                                    let max = match max {
+                                        Some(m) => Some(DescriptionElement::Int(m)),
+                                        None => None,
+                                    };
+                                    let mode = match mode {
+                                        Some(m) => Some(DescriptionElement::Int(m)),
+                                        None => None,
+                                    };
+                                    DescriptionLoad {
+                                        count: column.count as usize,               // safe
+                                        unique_count: column.unique_count as usize, // safe
+                                        mean,
+                                        s_deviation,
+                                        min,
+                                        max,
+                                        top_n,
+                                        mode,
+                                    }
+                                } else {
+                                    DescriptionLoad::default()
+                                }
+                            }
+                            2 => {
+                                let description;
+                                load_descriptions_others!(
+                                    description_enum,
+                                    top_n_enum,
+                                    i64,
+                                    TopNEnumTable,
+                                    &conn,
+                                    column,
+                                    description,
+                                    top_n_enum,
+                                    mode_enum
+                                );
+                                description
+                            }
+                            3 => {
+                                use description_float::dsl as df_d;
+                                if let Ok((
+                                    min,
+                                    max,
+                                    mean,
+                                    s_deviation,
+                                    mode_smallest,
+                                    mode_largest,
+                                )) = df_d::description_float
+                                    .select((
+                                        df_d::min,
+                                        df_d::max,
+                                        df_d::mean,
+                                        df_d::s_deviation,
+                                        df_d::mode_smallest,
+                                        df_d::mode_largest,
+                                    ))
+                                    .filter(df_d::description_id.eq(&column.id))
+                                    .first::<(
+                                        Option<f64>,
+                                        Option<f64>,
+                                        Option<f64>,
+                                        Option<f64>,
+                                        Option<f64>,
+                                        Option<f64>,
+                                    )>(&conn)
+                                {
+                                    use top_n_float::dsl as tf_d;
+                                    let top_n = if let Ok(top_n) = tf_d::top_n_float
+                                        .filter(tf_d::description_id.eq(&column.id))
+                                        .order_by(tf_d::ranking.asc())
+                                        .load::<TopNFloatTable>(&conn)
+                                    {
+                                        let top_n: Vec<(DescriptionElement, usize)> = top_n
+                                            .iter()
+                                            .map(|t| {
+                                                let smallest = match t.value_smallest {
+                                                    Some(value) => value,
+                                                    None => 0_f64, // No chance
+                                                };
+                                                let largest = match t.value_largest {
+                                                    Some(value) => value,
+                                                    None => 0_f64, // No chance
+                                                };
+                                                let count = match t.count {
+                                                    Some(count) => count as usize, // safe
+                                                    None => 0_usize,               // No chance
+                                                };
+                                                (
+                                                    DescriptionElement::FloatRange(
+                                                        smallest, largest,
+                                                    ),
+                                                    count,
+                                                )
+                                            })
+                                            .collect();
+                                        Some(top_n)
+                                    } else {
+                                        None
+                                    };
+                                    let min = match min {
+                                        Some(m) => Some(DescriptionElement::Float(m)),
+                                        None => None,
+                                    };
+                                    let max = match max {
+                                        Some(m) => Some(DescriptionElement::Float(m)),
+                                        None => None,
+                                    };
+                                    let mode = if let (Some(smallest), Some(largest)) =
+                                        (mode_smallest, mode_largest)
+                                    {
+                                        Some(DescriptionElement::FloatRange(smallest, largest))
+                                    } else {
+                                        None
+                                    };
+                                    DescriptionLoad {
+                                        count: column.count as usize,               // safe
+                                        unique_count: column.unique_count as usize, // safe
+                                        mean,
+                                        s_deviation,
+                                        min,
+                                        max,
+                                        top_n,
+                                        mode,
+                                    }
+                                } else {
+                                    DescriptionLoad::default()
+                                }
+                            }
+                            4 => {
+                                let description;
+                                load_descriptions_others!(
+                                    description_text,
+                                    top_n_text,
+                                    String,
+                                    TopNTextTable,
+                                    &conn,
+                                    column,
+                                    description,
+                                    top_n_text,
+                                    mode_text
+                                );
+                                description
+                            }
+                            5 => {
+                                let description;
+                                load_descriptions_others!(
+                                    description_ipaddr,
+                                    top_n_ipaddr,
+                                    String,
+                                    TopNIpaddrTable,
+                                    &conn,
+                                    column,
+                                    description,
+                                    top_n_ipaddr,
+                                    mode_ipaddr
+                                );
+                                description
+                            }
+                            6 => {
+                                let description;
+                                load_descriptions_others!(
+                                    description_datetime,
+                                    top_n_datetime,
+                                    NaiveDateTime,
+                                    TopNDatetimeTable,
+                                    &conn,
+                                    column,
+                                    description,
+                                    top_n_datetime,
+                                    mode_datetime
+                                );
+                                description
+                            }
+                            _ => DescriptionLoad::default(),
+                        })
+                        .collect::<Vec<DescriptionLoad>>())
+                })
+                .map_err(Into::into)
+        });
+
+    let result = match query_result {
+        Ok(response) => Ok(HttpResponse::Ok()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .json(response)),
+        Err(e) => Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e))),
+    };
+
+    future::result(result)
 }

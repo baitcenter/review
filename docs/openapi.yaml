@@ -6,9 +6,11 @@ tags:
 - name: "cluster"
 - name: "outlier"
 - name: "category"
+- name: "data_source"
 - name: "qualifier"
 - name: "status"
 - name: "etcd"
+- name: "description"
 schemes:
 - "http"
 paths:
@@ -392,6 +394,25 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
+  /api/data_source:
+    get:
+      tags: [data_source]
+      summary: "Get all data_source"
+      description: "This endpoint returns all data_source in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/DataSource"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
   /api/qualifier:
     get:
       tags: [qualifier]
@@ -462,6 +483,87 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
+  /api/description:
+    get:
+      tags: [description]
+      summary: "Get descriptions"
+      description: "This endpoint returns descriptions in database."
+      parameters:
+        - name: "cluster_id"
+          in: "query"
+          description: Specify the cluster_id of a cluster to return descriptions for.
+          type: "string"
+          required: true
+        - name: "data_source"
+          in: "query"
+          description: Specify the topic name of the source which a cluster originated from.
+          type: "string"
+          required: true
+        - name: "first_event_id"
+          in: "query"
+          description: Specify the id of first event in the round which a cluster belongs to.
+          type: "string"
+          required: true
+        - name: "last_event_id"
+          in: "query"
+          description: Specify the id of last event in the round which a cluster belongs to.
+          type: "string"
+          required: true                    
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/DescriptionForCluster"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"      
+    put:
+      tags: [description]
+      summary: "Create new descriptions"
+      description: "This endpoint is for clients to create descriptions in database."
+      consumes:
+        - "application/json"
+      produces:
+        - "text/plain"
+      parameters:
+        - in: "body"
+          name: "Description"
+          description: "Description to be created"
+          required: true
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/DescriptionCreateBody"
+      responses:
+        200:
+          description: "The new descriptions have been successfully inserted into database"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/description/round:
+    get:
+      tags: [description]
+      summary: "Get rounds of description for a selected cluster"
+      description: "This endpoint returns the information of description rounds for a selected cluster in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            $ref: "#/definitions/DescriptionRound"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"               
 definitions:
   Category:
     type: "object"
@@ -561,6 +663,74 @@ definitions:
       qualifier:
         type: "string"
         description: "New value of qualifier"
+  DescriptionCreateBody:
+    type: "object"
+    required:
+    - "cluster_id"
+    - "first_event_id"
+    - "last_event_id"
+    - "description"
+    properties:
+      cluster_id:
+        type: "string"
+        description: "cluster_id of the cluster whose descriptions are to be inserted"
+      first_event_id:
+        type: "integer"
+        format: "uint64"
+        description: "id of the first event belonging to this round of this cluster"
+      last_event_id:
+        type: "integer"
+        format: "uint64"
+        description: "id of the last event beloning to this round of this cluster"
+      description:
+        type: "array"
+        items:
+          $ref: "#/definitions/DescriptionForCluster"
+  DescriptionForCluster:
+    type: "object"
+    properties:
+      count:
+        type: "integer"
+        format: "uint64"
+      unique_count:
+        type: "integer"
+        format: "uint64"
+      mean:
+        type: "number"
+        format: "double"
+      s-deviation:
+        type: "number"
+        format: "double"
+      min:
+        $ref: "#/definitions/DescriptionMin"
+      max:
+        $ref: "#/definitions/DescriptionMax"
+      top_n:
+        type: "array"
+        items:
+          $ref: "#/definitions/DescriptionTopN"
+      mode:
+        $ref: "#/definitions/DescriptionMode"
+  DescriptionMin:
+    type: "object"
+  DescriptionMax:
+    type: "object"
+  DescriptionTopN:
+    type: "object"
+  DescriptionMode:
+    type: "object"
+  DescriptionRound:
+    type: "object"
+    required:
+    - "first_event_id"
+    - "last_event_id"
+    properties:
+      first_event_id:
+        type: "string"
+        description: "id of first event belonging to this cluster"
+      last_event_id:
+        type: "string"
+        description: "id of last event belonging to this cluster"        
   Outlier:
     type: "object"
     properties:
@@ -606,13 +776,25 @@ definitions:
           type: "integer"
           format: "uint64"
         description: "list of event ids for this outlier"
+  DataSource:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+        description: "a unique id for this data_source"
+      topic_name:
+        type: "string"
+        description: "kafka topic name"
+      data_type:
+        type: "string"
+        description: "data type of this data_source"
   Qualifier:
     type: "object"
     properties:
-      qualifier_id:
+      id:
         type: "integer"
         description: "a unique id for this qualifier"
-      qualifier:
+      description:
         type: "string"
         description: "qualifier name"
   QualifierUpdateBody:
@@ -634,10 +816,10 @@ definitions:
   Status:
     type: "object"
     properties:
-      status_id:
+      id:
         type: "integer"
         description: "a unique id for this status"
-      status:
+      description:
         type: "string"
         description: "status name"
   ErrorResponse:

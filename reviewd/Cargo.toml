@@ -23,7 +23,7 @@ reqwest = "0.9"
 r2d2 = "0.8"
 serde_json = "1"
 serde = { version = "1",  features = ["derive"] }
-structured = { git = "https://github.com/petabi/structured.git", rev = "b37c661" }
+structured = { git = "https://github.com/petabi/structured.git", rev = "7d10bba" }
 tokio = "0.1"
 
 [dependencies.chrono]

@@ -1,8 +1,10 @@
-use super::schema::data_source;
-use crate::database::{Error, Pool};
-use actix_web::web;
+use actix_web::{http, web, HttpResponse};
 use diesel::prelude::*;
+use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
+
+use super::schema::data_source;
+use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DataSourceQuery {
@@ -45,4 +47,26 @@ pub(crate) fn get_data_source_id(pool: &web::Data<Pool>, data_source: &str) -> R
             .first::<i32>(&conn)
             .map_err(Into::into)
     })
+}
+
+pub(crate) fn get_data_source_table(
+    pool: web::Data<Pool>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    let query_result: Result<Vec<DataSourceTable>, Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            data_source::dsl::data_source
+                .load::<DataSourceTable>(&conn)
+                .map_err(Into::into)
+        });
+
+    let result = match query_result {
+        Ok(data_source_table) => Ok(HttpResponse::Ok()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .json(data_source_table)),
+        Err(e) => Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e))),
+    };
+
+    future::result(result)
 }

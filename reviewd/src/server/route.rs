@@ -141,6 +141,16 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(put().to_async(update_cluster)),
     )
     .service(
+        resource("/api/data_source")
+            .guard(guard::Get())
+            .route(get().to_async(get_data_source_table)),
+    )
+    .service(
+        resource("/api/description")
+            .guard(guard::Get())
+            .route(get().to_async(get_description)),
+    )
+    .service(
         resource("/api/description")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
@@ -152,6 +162,17 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                 })
             }))
             .route(put().to_async(add_descriptions)),
+    )
+    .service(
+        resource("/api/description/round")
+            .guard(guard::Get())
+            .data(Query::<RoundSelectQuery>::configure(|cfg| {
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
+                        .into()
+                })
+            }))
+            .route(get().to_async(get_rounds_by_cluster)),
     )
     .service(
         resource("/api/etcd/suspicious_tokens")
