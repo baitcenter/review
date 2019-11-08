@@ -20,6 +20,8 @@ pub(crate) struct GetQuery<'a> {
     pub(crate) where_clause: Option<String>,
     pub(crate) page: Option<i64>,
     pub(crate) per_page: i64,
+    pub(crate) orderby: Option<&'a str>,
+    pub(crate) order: Option<&'a str>,
 }
 
 impl<'a> GetQuery<'a> {
@@ -29,6 +31,8 @@ impl<'a> GetQuery<'a> {
         where_clause: Option<String>,
         page: Option<i64>,
         per_page: i64,
+        orderby: Option<&'a str>,
+        order: Option<&'a str>,
     ) -> Self {
         Self {
             select,
@@ -36,6 +40,8 @@ impl<'a> GetQuery<'a> {
             where_clause,
             page,
             per_page,
+            orderby,
+            order,
         }
     }
 }
@@ -56,6 +62,14 @@ impl<'a> QueryFragment<Pg> for GetQuery<'a> {
         if let Some(where_clause) = &self.where_clause {
             out.push_sql(" WHERE ");
             out.push_sql(&where_clause);
+        }
+        if let Some(orderby) = &self.orderby {
+            out.push_sql(" ORDER BY ");
+            out.push_sql(orderby);
+        }
+        if let Some(order) = &self.order {
+            out.push_sql(" ");
+            out.push_sql(order);
         }
         out.push_sql(" LIMIT ");
         out.push_bind_param::<BigInt, _>(&self.per_page)?;

@@ -175,7 +175,7 @@ pub(crate) fn get_clusters(
         .map(|s| {
             s.iter()
                 .filter(|s| *s.1)
-                .filter_map(|s| match s.0.as_ref() {
+                .filter_map(|s| match s.0.to_lowercase().as_str() {
                     "cluster_id" => Some("cluster.cluster_id"),
                     "detector_id" => Some("cluster.detector_id"),
                     "qualifier" => Some("qualifier.description as qualifier"),
@@ -226,12 +226,49 @@ pub(crate) fn get_clusters(
         .filter(|p| *p > 0)
         .map(|p| if p > max_per_page { max_per_page } else { p });
     let per_page = per_page.unwrap_or_else(|| default_per_page);
+    let orderby = query
+        .get("orderby")
+        .and_then(Value::as_str)
+        .and_then(|column_name| match column_name.to_lowercase().as_str() {
+            "cluster_id" => Some("cluster.cluster_id"),
+            "detector_id" => Some("cluster.detector_id"),
+            "qualifier" => Some("qualifier.description"),
+            "status" => Some("status.description"),
+            "category" => Some("category.name"),
+            "signature" => Some("cluster.signature"),
+            "data_source" => Some("data_source.topic_name"),
+            "size" => Some("cluster.size"),
+            "score" => Some("cluster.score"),
+            "raw_event" => Some("raw_event.data"),
+            "event_ids" => Some("cluster.event_ids"),
+            "last_modification_time" => Some("cluster.last_modification_time"),
+            _ => None,
+        });
+    let order = if orderby.is_some() {
+        query
+            .get("order")
+            .and_then(Value::as_str)
+            .and_then(|order| match order.to_lowercase().as_str() {
+                "desc" => Some("desc"),
+                _ => None,
+            })
+    } else {
+        None
+    };
 
     let query_result: Result<Vec<GetQueryData>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
-            GetQuery::new(select, cluster_schema, where_clause, page, per_page)
-                .get_results::<GetQueryData>(&conn)
-                .map_err(Into::into)
+            GetQuery::new(
+                select,
+                cluster_schema,
+                where_clause,
+                page,
+                per_page,
+                orderby,
+                order,
+            )
+            .get_results::<GetQueryData>(&conn)
+            .map_err(Into::into)
         });
 
     let result = match query_result {

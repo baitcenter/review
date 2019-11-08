@@ -1,6 +1,6 @@
 swagger: "2.0"
 info:
-  version: "0.6.0"
+  version: "0.6.2"
   title: "REviewd API"
 tags:
 - name: "cluster"
@@ -28,6 +28,27 @@ paths:
               - `qualifier:[string]` array of qualifier names
               - `cluster_id:[string]` array of cluster_id
               - `detector_id:[integer]` array of detector_id
+          type: "string"
+        - name: "orderby"
+          in: "query"
+          description: |
+            Specify the column name used to sort the returned data. The data is sorted in ascending order by default. Available column names:
+              - `cluster_id`
+              - `detector_id`
+              - `qualifier`
+              - `status`
+              - `category`
+              - `signature`
+              - `data_source`
+              - `size`
+              - `score`
+              - `raw_event`
+              - `event_ids`
+              - `last_modification_time`
+          type: "string"
+        - name: "order"
+          in: "query"
+          description: Use `order=desc` to sort the returned data in descending order. Must be used with orderby query.
           type: "string"
         - name: "page"
           in: "query"
@@ -190,6 +211,19 @@ paths:
         description: |
           A JSON encoded value of the filters. Available filter:
             - `data_source:[string]` array of data_source names
+        type: "string"
+      - name: "orderby"
+        in: "query"
+        description: |
+          Specify the column name used to sort the returned data. The data is sorted in ascending order by default. Available column names:
+            - `outlier`
+            - `data_source`
+            - `size`
+            - `event_ids`
+        type: "string"
+      - name: "order"
+        in: "query"
+        description: Use `order=desc` to sort the returned data in descending order. Must be used with orderby query.
         type: "string"
       - name: "page"
         in: "query"

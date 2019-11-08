@@ -229,12 +229,41 @@ pub(crate) fn get_outliers(
         .filter(|p| *p > 0)
         .map(|p| if p > max_per_page { max_per_page } else { p });
     let per_page = per_page.unwrap_or_else(|| default_per_page);
+    let orderby = query
+        .get("orderby")
+        .and_then(Value::as_str)
+        .and_then(|column_name| match column_name.to_lowercase().as_str() {
+            "outlier" => Some("outlier.raw_event"),
+            "data_source" => Some("data_source.topic_name"),
+            "size" => Some("outlier.size"),
+            "event_ids" => Some("outlier.event_ids"),
+            _ => None,
+        });
+    let order = if orderby.is_some() {
+        query
+            .get("order")
+            .and_then(Value::as_str)
+            .and_then(|order| match order.to_lowercase().as_str() {
+                "desc" => Some("desc"),
+                _ => None,
+            })
+    } else {
+        None
+    };
 
     let query_result: Result<Vec<GetQueryData>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
-            GetQuery::new(select, outlier_schema, where_clause, page, per_page)
-                .get_results::<GetQueryData>(&conn)
-                .map_err(Into::into)
+            GetQuery::new(
+                select,
+                outlier_schema,
+                where_clause,
+                page,
+                per_page,
+                orderby,
+                order,
+            )
+            .get_results::<GetQueryData>(&conn)
+            .map_err(Into::into)
         });
     let result = match query_result {
         Ok(data) => {

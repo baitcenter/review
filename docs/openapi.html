@@ -491,7 +491,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="sect2">
 <h3 id="_version_information">Version information</h3>
 <div class="paragraph">
-<p><em>Version</em> : 0.6.0</p>
+<p><em>Version</em> : 0.6.2</p>
 </div>
 </div>
 <div class="sect2">
@@ -1099,6 +1099,48 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
  - <code>qualifier:[string]</code> array of qualifier names
  - <code>cluster_id:[string]</code> array of cluster_id
  - <code>detector_id:[integer]</code> array of detector_id</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>order</strong><br>
+<em>optional</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>Use <code>order=desc</code> to sort the returned data in descending order. Must be used with orderby query.</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>orderby</strong><br>
+<em>optional</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>Specify the column name used to sort the returned data. The data is sorted in ascending order by default. Available column names:
+ - <code>cluster_id</code>
+ - <code>detector_id</code>
+ - <code>qualifier</code>
+ - <code>status</code>
+ - <code>category</code>
+ - <code>signature</code>
+ - <code>data_source</code>
+ - <code>size</code>
+ - <code>score</code>
+ - <code>raw_event</code>
+ - <code>event_ids</code>
+ - <code>last_modification_time</code></p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
 <p>string</p>
@@ -1998,6 +2040,40 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
 <p>A JSON encoded value of the filters. Available filter:
  - <code>data_source:[string]</code> array of data_source names</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>order</strong><br>
+<em>optional</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>Use <code>order=desc</code> to sort the returned data in descending order. Must be used with orderby query.</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>orderby</strong><br>
+<em>optional</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>Specify the column name used to sort the returned data. The data is sorted in ascending order by default. Available column names:
+ - <code>outlier</code>
+ - <code>data_source</code>
+ - <code>size</code>
+ - <code>event_ids</code></p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
 <p>string</p>
@@ -3230,7 +3306,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2019-11-01 13:02:06 -0700
+Last updated 2019-11-07 15:53:11 -0800
 </div>
 </div>
 </body>

@@ -4,7 +4,7 @@ This file documents all notable changes to this project. The format of this file
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2] - 2019-10-17
+## [0.6.2] - 2019-11-XX
 
 ### Added
 
@@ -15,7 +15,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Added saving column descriptions for multidimensional clustering into db.
 - Can designated the frontend app directory to be served through HTTP.
-- Added pagination support. Please refer to the API documentation for details.
+- Added pagination and ordering for cluster and outlier tables. Please refer to
+  the API documentation for details.
 
 ### Changed
 
