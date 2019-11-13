@@ -1,4 +1,4 @@
-use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
+use clap::{App, AppSettings, SubCommand};
 use failure::ResultExt;
 
 use crate::error::{Error, ErrorKind::Initialize, InitializeErrorReason};
@@ -8,43 +8,12 @@ fn create_app() -> App<'static, 'static> {
         .version(env!("CARGO_PKG_VERSION"))
         .author("Petabi, Inc.")
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .subcommand(
-            SubCommand::with_name("client")
-                .about("Runs REview client modes")
-                .arg(
-                    Arg::with_name("url")
-                        .short("u")
-                        .long("url")
-                        .takes_value(true)
-                        .value_name("http://<hostname>:<port number>")
-                        .help("HTTP URL of backend server"),
-                )
-                .group(
-                    ArgGroup::with_name("review_option")
-                        .args(&["url"])
-                        .required(true),
-                ),
-        )
         .subcommand(SubCommand::with_name("reviewd").about("Runs REviewd (http server mode)"))
 }
 
 pub fn init() -> Result<(), Error> {
     let matches = create_app().get_matches();
-    if let Some(review_matches) = matches.subcommand_matches("client") {
-        if let Some(url) = review_matches.value_of("url") {
-            let parsed_url =
-                url::Url::parse(url).context(Initialize(InitializeErrorReason::ClientUrl))?;
-            if parsed_url.scheme() != "http"
-                || parsed_url.path() != "/"
-                || parsed_url.port().is_none()
-            {
-                return Err(Initialize(InitializeErrorReason::ClientUrl).into());
-            }
-            let mut cluster_view = client::http::ClusterView::new(&url)
-                .context(Initialize(InitializeErrorReason::ClientMode))?;
-            cluster_view.run();
-        }
-    } else if matches.subcommand_matches("reviewd").is_some() {
+    if matches.subcommand_matches("reviewd").is_some() {
         dotenv::dotenv().ok();
         let database_url = std::env::var("DATABASE_URL")
             .context(Initialize(InitializeErrorReason::MissingDatabaseURL))?;
