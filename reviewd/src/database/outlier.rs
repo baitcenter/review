@@ -217,18 +217,8 @@ pub(crate) fn get_outliers(
     } else {
         None
     };
-    let page = query
-        .get("page")
-        .and_then(Value::as_str)
-        .and_then(|p| p.parse::<i64>().ok())
-        .filter(|p| *p > 0);
-    let per_page = query
-        .get("per_page")
-        .and_then(Value::as_str)
-        .and_then(|p| p.parse::<i64>().ok())
-        .filter(|p| *p > 0)
-        .map(|p| if p > max_per_page { max_per_page } else { p });
-    let per_page = per_page.unwrap_or_else(|| default_per_page);
+    let page = GetQuery::get_page(&query);
+    let per_page = GetQuery::get_per_page(&query, max_per_page).unwrap_or_else(|| default_per_page);
     let orderby = query
         .get("orderby")
         .and_then(Value::as_str)
@@ -240,13 +230,7 @@ pub(crate) fn get_outliers(
             _ => None,
         });
     let order = if orderby.is_some() {
-        query
-            .get("order")
-            .and_then(Value::as_str)
-            .and_then(|order| match order.to_lowercase().as_str() {
-                "desc" => Some("desc"),
-                _ => None,
-            })
+        GetQuery::get_order(&query)
     } else {
         None
     };
@@ -265,36 +249,8 @@ pub(crate) fn get_outliers(
             .get_results::<GetQueryData>(&conn)
             .map_err(Into::into)
         });
-    let result = match query_result {
-        Ok(data) => {
-            let pagination = match (query.get("page"), query.get("per_page")) {
-                (Some(_), _) | (_, Some(_)) if !data.is_empty() => {
-                    let total = data[0].count;
-                    let total_pages = (total as f64 / per_page as f64).ceil() as u64;
-                    Some((total, total_pages))
-                }
-                _ => None,
-            };
-            let data = data.into_iter().map(|d| d.data).collect::<Vec<Value>>();
 
-            if let Some(pagination) = pagination {
-                Ok(HttpResponse::Ok()
-                    .header("X-REviewd-Total", pagination.0.to_string())
-                    .header("X-REviewd-TotalPages", pagination.1.to_string())
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .json(data))
-            } else {
-                Ok(HttpResponse::Ok()
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .json(data))
-            }
-        }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    future::result(GetQuery::build_response(&query, per_page, query_result))
 }
 
 pub(crate) fn update_outliers(
