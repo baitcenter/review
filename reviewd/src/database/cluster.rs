@@ -16,37 +16,6 @@ use super::schema::cluster;
 use crate::database::*;
 use crate::server::EtcdServer;
 
-#[derive(
-    Debug,
-    AsChangeset,
-    Associations,
-    Identifiable,
-    Insertable,
-    Queryable,
-    QueryableByName,
-    Serialize,
-)]
-#[table_name = "cluster"]
-#[belongs_to(CategoryTable, foreign_key = "category_id")]
-#[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
-#[belongs_to(StatusTable, foreign_key = "status_id")]
-#[belongs_to(QualifierTable, foreign_key = "qualifier_id")]
-pub(crate) struct ClustersTable {
-    id: i32,
-    cluster_id: Option<String>,
-    category_id: i32,
-    detector_id: i32,
-    event_ids: Option<Vec<BigDecimal>>,
-    raw_event_id: i32,
-    qualifier_id: i32,
-    status_id: i32,
-    signature: String,
-    size: BigDecimal,
-    score: Option<f64>,
-    data_source_id: i32,
-    last_modification_time: Option<chrono::NaiveDateTime>,
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ClusterUpdate {
     cluster_id: String,

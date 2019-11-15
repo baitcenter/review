@@ -11,13 +11,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use super::data_source::DataSourceTable;
 use super::schema::{cluster, outlier};
 use crate::database::*;
 
-#[derive(Debug, Associations, Insertable, AsChangeset, Queryable, Serialize)]
+#[derive(Debug, Insertable, AsChangeset, Queryable, Serialize)]
 #[table_name = "outlier"]
-#[belongs_to(DataSourceTable, foreign_key = "data_source_id")]
 struct OutliersTable {
     id: i32,
     raw_event: String,

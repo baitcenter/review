@@ -47,10 +47,8 @@ pub(crate) struct DescriptionElementTypeTable {
     pub name: String,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "column_description"]
-#[belongs_to(ClustersTable, foreign_key = "cluster_id")]
-#[belongs_to(DescriptionElementTypeTable, foreign_key = "type_id")]
 pub(crate) struct ColumnDescriptionsTable {
     pub id: i32,
     pub cluster_id: i32,
@@ -62,9 +60,8 @@ pub(crate) struct ColumnDescriptionsTable {
     pub unique_count: i64,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_int"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsIntTable {
     pub id: i32,
     pub description_id: i32,
@@ -75,18 +72,16 @@ pub(crate) struct DescriptionsIntTable {
     pub mode: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_enum"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsEnumTable {
     pub id: i32,
     pub description_id: i32,
     pub mode: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_float"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsFloatTable {
     pub id: i32,
     pub description_id: i32,
@@ -98,9 +93,8 @@ pub(crate) struct DescriptionsFloatTable {
     pub mode_largest: Option<f64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_text"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsTextTable {
     pub id: i32,
     pub description_id: i32,
@@ -108,27 +102,24 @@ pub(crate) struct DescriptionsTextTable {
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_ipaddr"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsIpaddrTable {
     pub id: i32,
     pub description_id: i32,
     pub mode: Option<String>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "description_datetime"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct DescriptionsDatetimeTable {
     pub id: i32,
     pub description_id: i32,
     pub mode: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_int"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNIntTable {
     pub id: i32,
     pub description_id: i32,
@@ -137,9 +128,8 @@ pub(crate) struct TopNIntTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_enum"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNEnumTable {
     pub id: i32,
     pub description_id: i32,
@@ -148,9 +138,8 @@ pub(crate) struct TopNEnumTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_float"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNFloatTable {
     pub id: i32,
     pub description_id: i32,
@@ -160,9 +149,8 @@ pub(crate) struct TopNFloatTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_text"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNTextTable {
     pub id: i32,
     pub description_id: i32,
@@ -172,9 +160,8 @@ pub(crate) struct TopNTextTable {
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_ipaddr"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNIpaddrTable {
     pub id: i32,
     pub description_id: i32,
@@ -183,9 +170,8 @@ pub(crate) struct TopNIpaddrTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Associations, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "top_n_datetime"]
-#[belongs_to(ColumnDescriptionsTable, foreign_key = "description_id")]
 pub(crate) struct TopNDatetimeTable {
     pub id: i32,
     pub description_id: i32,
