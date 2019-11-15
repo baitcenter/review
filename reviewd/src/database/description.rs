@@ -40,14 +40,14 @@ pub(crate) struct DescriptionUpdate {
     pub descriptions: Vec<Description>,
 }
 
-#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "description_element_type"]
 pub(crate) struct DescriptionElementTypeTable {
     pub id: i32,
     pub name: String,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "column_description"]
 pub(crate) struct ColumnDescriptionsTable {
     pub id: i32,
@@ -60,7 +60,7 @@ pub(crate) struct ColumnDescriptionsTable {
     pub unique_count: i64,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_int"]
 pub(crate) struct DescriptionsIntTable {
     pub id: i32,
@@ -72,7 +72,7 @@ pub(crate) struct DescriptionsIntTable {
     pub mode: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_enum"]
 pub(crate) struct DescriptionsEnumTable {
     pub id: i32,
@@ -80,7 +80,7 @@ pub(crate) struct DescriptionsEnumTable {
     pub mode: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_float"]
 pub(crate) struct DescriptionsFloatTable {
     pub id: i32,
@@ -93,7 +93,7 @@ pub(crate) struct DescriptionsFloatTable {
     pub mode_largest: Option<f64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_text"]
 pub(crate) struct DescriptionsTextTable {
     pub id: i32,
@@ -102,7 +102,7 @@ pub(crate) struct DescriptionsTextTable {
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_ipaddr"]
 pub(crate) struct DescriptionsIpaddrTable {
     pub id: i32,
@@ -110,7 +110,7 @@ pub(crate) struct DescriptionsIpaddrTable {
     pub mode: Option<String>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "description_datetime"]
 pub(crate) struct DescriptionsDatetimeTable {
     pub id: i32,
@@ -118,7 +118,7 @@ pub(crate) struct DescriptionsDatetimeTable {
     pub mode: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_int"]
 pub(crate) struct TopNIntTable {
     pub id: i32,
@@ -128,7 +128,7 @@ pub(crate) struct TopNIntTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_enum"]
 pub(crate) struct TopNEnumTable {
     pub id: i32,
@@ -138,7 +138,7 @@ pub(crate) struct TopNEnumTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_float"]
 pub(crate) struct TopNFloatTable {
     pub id: i32,
@@ -149,7 +149,7 @@ pub(crate) struct TopNFloatTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_text"]
 pub(crate) struct TopNTextTable {
     pub id: i32,
@@ -160,7 +160,7 @@ pub(crate) struct TopNTextTable {
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_ipaddr"]
 pub(crate) struct TopNIpaddrTable {
     pub id: i32,
@@ -170,7 +170,7 @@ pub(crate) struct TopNIpaddrTable {
     pub count: Option<i64>,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "top_n_datetime"]
 pub(crate) struct TopNDatetimeTable {
     pub id: i32,

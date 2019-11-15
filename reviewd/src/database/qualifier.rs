@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::schema::qualifier;
 use crate::database::{build_err_msg, Error, Pool};
 
-#[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[table_name = "qualifier"]
 pub(crate) struct QualifierTable {
     pub(crate) id: i32,

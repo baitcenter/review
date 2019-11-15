@@ -13,7 +13,7 @@ use std::thread;
 use super::schema::{cluster, outlier, raw_event};
 use crate::database::{bytes_to_string, get_data_source_id, DatabaseError, Error, ErrorKind, Pool};
 
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "raw_event"]
 struct RawEventTable {
     id: i32,

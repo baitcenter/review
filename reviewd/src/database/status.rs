@@ -6,7 +6,7 @@ use serde::Serialize;
 use super::schema::status;
 use crate::database::{build_err_msg, Error, Pool};
 
-#[derive(Debug, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
+#[derive(Debug, Identifiable, Queryable, Serialize)]
 #[table_name = "status"]
 pub(crate) struct StatusTable {
     pub(crate) id: i32,
