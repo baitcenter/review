@@ -35,61 +35,6 @@ pub(crate) struct OutlierUpdate {
     event_ids: Vec<u64>,
 }
 
-pub(crate) fn add_outliers(
-    pool: Data<Pool>,
-    new_outliers: Json<Vec<OutlierUpdate>>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    use outlier::dsl;
-
-    let insert_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let insert_outliers: Vec<_> = new_outliers
-            .into_inner()
-            .iter()
-            .filter_map(|new_outlier| {
-                let o_size: BigDecimal = FromPrimitive::from_usize(new_outlier.event_ids.len())
-                    .unwrap_or_else(|| FromPrimitive::from_usize(1).unwrap_or_default());
-                let event_ids = new_outlier
-                    .event_ids
-                    .iter()
-                    .filter_map(|e| FromPrimitive::from_u64(*e))
-                    .collect::<Vec<BigDecimal>>();
-
-                get_data_source_id(&pool, &new_outlier.data_source)
-                    .ok()
-                    .map(|data_source_id| {
-                        let raw_event_id =
-                            get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
-                        (
-                            dsl::raw_event.eq(bytes_to_string(&new_outlier.outlier)),
-                            dsl::data_source_id.eq(data_source_id),
-                            dsl::event_ids.eq(event_ids),
-                            dsl::raw_event_id.eq(raw_event_id),
-                            dsl::size.eq(o_size),
-                        )
-                    })
-            })
-            .collect();
-
-        if insert_outliers.is_empty() {
-            Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
-        } else {
-            diesel::insert_into(outlier::dsl::outlier)
-                .values(&insert_outliers)
-                .execute(&*conn)
-                .map_err(Into::into)
-        }
-    });
-
-    let result = match insert_result {
-        Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
-}
-
 pub(crate) fn delete_outliers(
     pool: Data<Pool>,
     outliers: Json<Vec<String>>,

@@ -96,30 +96,6 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-    post:
-      tags: [cluster]
-      summary: "Create one or more new clusters"
-      description: "This endpoint is for clients to create one or more new clusters."
-      consumes:
-      - "application/json"
-      produces:
-      - "text/plain"
-      parameters:
-      - in: "body"
-        name: "Cluster"
-        description: "New clusters to be created in database"
-        required: true
-        schema:
-          type: "array"
-          items:
-            $ref: "#/definitions/ClusterCreateBody"
-      responses:
-        201:
-          description: "New clusters have been successfully inserted into database"
-        500:
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
     put:
       tags: [cluster]
       summary: "Update properties for a selected clusters"
@@ -254,30 +230,6 @@ paths:
               description: "the total number of pages encompassing all available records"
         500:
           description: "Internal server error"
-    post:
-      tags: [outlier]
-      summary: "Create one or more new outliers"
-      description: "This endpoint is for clients to create one or more new outliers."
-      consumes:
-      - "application/json"
-      produces:
-      - "text/plain"
-      parameters:
-      - in: "body"
-        name: "Outlier"
-        description: "New outliers to be created in database"
-        required: true
-        schema:
-          type: "array"
-          items:
-            $ref: "#/definitions/OutlierCreateBody"
-      responses:
-        201:
-          description: "New outliers have been successfully inserted into database"
-        500:
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
     put:
       tags: [outlier]
       summary: "Update properties for a selected outliers"
