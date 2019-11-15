@@ -329,9 +329,6 @@ pub(crate) fn update_clusters(
         event_ids: Option<Vec<BigDecimal>>,
         raw_event_id: i32,
         size: BigDecimal,
-        category_id: i32,
-        qualifier_id: i32,
-        status_id: i32,
     }
     let cluster_update = cluster_update.into_inner();
     let mut query = dsl::cluster.into_boxed();
@@ -352,9 +349,6 @@ pub(crate) fn update_clusters(
                 dsl::event_ids,
                 dsl::raw_event_id,
                 dsl::size,
-                dsl::category_id,
-                dsl::qualifier_id,
-                dsl::status_id,
             ))
             .load::<Cluster>(&conn)
             .map_err(Into::into)
@@ -403,12 +397,9 @@ pub(crate) fn update_clusters(
                                 } else {
                                     Some((
                                         dsl::cluster_id.eq(c.cluster_id.clone()),
-                                        dsl::category_id.eq(cluster.category_id),
                                         dsl::detector_id.eq(c.detector_id),
                                         dsl::event_ids.eq(event_ids),
                                         dsl::raw_event_id.eq(cluster.raw_event_id),
-                                        dsl::qualifier_id.eq(cluster.qualifier_id),
-                                        dsl::status_id.eq(cluster.status_id),
                                         dsl::signature.eq(sig),
                                         dsl::size.eq(cluster_size),
                                         dsl::score.eq(c.score),
@@ -441,12 +432,9 @@ pub(crate) fn update_clusters(
                                 } else {
                                     Some((
                                         dsl::cluster_id.eq(c.cluster_id.clone()),
-                                        dsl::category_id.eq(1),
                                         dsl::detector_id.eq(c.detector_id),
                                         dsl::event_ids.eq(event_ids),
                                         dsl::raw_event_id.eq(raw_event_id),
-                                        dsl::qualifier_id.eq(2),
-                                        dsl::status_id.eq(2),
                                         dsl::signature.eq(sig),
                                         dsl::size.eq(cluster_size),
                                         dsl::score.eq(c.score),
@@ -466,12 +454,7 @@ pub(crate) fn update_clusters(
                         .on_conflict((dsl::cluster_id, dsl::data_source_id))
                         .do_update()
                         .set((
-                            dsl::category_id.eq(excluded(dsl::category_id)),
-                            dsl::detector_id.eq(excluded(dsl::detector_id)),
                             dsl::event_ids.eq(excluded(dsl::event_ids)),
-                            dsl::raw_event_id.eq(excluded(dsl::raw_event_id)),
-                            dsl::qualifier_id.eq(excluded(dsl::qualifier_id)),
-                            dsl::status_id.eq(excluded(dsl::status_id)),
                             dsl::signature.eq(excluded(dsl::signature)),
                             dsl::size.eq(excluded(dsl::size)),
                             dsl::score.eq(excluded(dsl::score)),
