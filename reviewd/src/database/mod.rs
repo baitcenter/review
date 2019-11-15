@@ -27,10 +27,6 @@ pub(crate) use self::query::*;
 pub(crate) use self::raw_event::*;
 pub(crate) use self::status::*;
 
-// for client crate
-pub use self::cluster::{Example, QualifierUpdate};
-pub use self::qualifier::QualifierTable;
-
 pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 pub(crate) fn build_err_msg(fail: &dyn Fail) -> String {

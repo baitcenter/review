@@ -59,12 +59,6 @@ pub(crate) struct ClusterUpdate {
     event_ids: Option<Vec<u64>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Example {
-    pub raw_event: String,
-    pub event_ids: Vec<BigDecimal>,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct NewClusterValues {
     cluster_id: Option<String>,
@@ -73,10 +67,10 @@ pub struct NewClusterValues {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct QualifierUpdate {
-    pub cluster_id: String,
-    pub data_source: String,
-    pub qualifier: String,
+pub(crate) struct QualifierUpdate {
+    cluster_id: String,
+    data_source: String,
+    qualifier: String,
 }
 
 pub(crate) fn add_clusters(

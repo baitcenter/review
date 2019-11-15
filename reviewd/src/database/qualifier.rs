@@ -8,9 +8,9 @@ use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Deserialize, Identifiable, Insertable, Queryable, QueryableByName, Serialize)]
 #[table_name = "qualifier"]
-pub struct QualifierTable {
-    pub id: i32,
-    pub description: String,
+pub(crate) struct QualifierTable {
+    pub(crate) id: i32,
+    pub(crate) description: String,
 }
 
 pub(crate) fn get_qualifier_id(pool: &Data<Pool>, qualifier: &str) -> Result<i32, Error> {
