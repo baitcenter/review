@@ -63,7 +63,7 @@ table! {
     description_enum (id) {
         id -> Int4,
         description_id -> Int4,
-        mode -> Nullable<Int8>,
+        mode -> Nullable<Text>,
     }
 }
 
@@ -167,7 +167,7 @@ table! {
         id -> Int4,
         description_id -> Int4,
         ranking -> Nullable<Int8>,
-        value -> Nullable<Int8>,
+        value -> Nullable<Text>,
         count -> Nullable<Int8>,
     }
 }

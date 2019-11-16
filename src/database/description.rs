@@ -76,7 +76,7 @@ pub(crate) struct DescriptionsIntTable {
 pub(crate) struct DescriptionsEnumTable {
     pub id: i32,
     pub description_id: i32,
-    pub mode: Option<i64>,
+    pub mode: Option<String>,
 }
 
 #[derive(Debug, Insertable, Queryable, Serialize)]
@@ -133,7 +133,7 @@ pub(crate) struct TopNEnumTable {
     pub id: i32,
     pub description_id: i32,
     pub ranking: Option<i64>,
-    pub value: Option<i64>,
+    pub value: Option<String>,
     pub count: Option<i64>,
 }
 
@@ -215,9 +215,6 @@ macro_rules! insert_top_n_number {
             for (r, (v, c)) in top_n.iter().enumerate() {
                 let insert_v = match v {
                     DescriptionElement::Int(v) => Some(*v),
-                    DescriptionElement::UInt(v) => {
-                        Some(v.to_i64().expect("Safe cast: 0..=MaxOfu32 -> i64"))
-                    }
                     _ => None,
                 };
                 $re.push(
@@ -277,8 +274,6 @@ macro_rules! insert_short_description {
 const MAX_VALUE_OF_I64_I64: i64 = 9_223_372_036_854_775_807_i64;
 const MAX_VALUE_OF_I64_USIZE: usize = 9_223_372_036_854_775_807_usize;
 const MAX_VALUE_OF_I32_USIZE: usize = 2_147_483_647_usize;
-const MAX_VALUE_OF_U32_I64: i64 = 4_294_967_295_i64;
-const MAX_VALUE_OF_U32_U32: u32 = 4_294_967_295_u32;
 
 pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
     if value > MAX_VALUE_OF_I64_USIZE {
@@ -317,13 +312,12 @@ pub(crate) fn add_descriptions(
                 let type_id: i32 = match column_description.get_mode() {
                     // TODO: Do I have to read this value from description_element_type table?
                     Some(DescriptionElement::Int(_)) => 1_i32,
-                    Some(DescriptionElement::UInt(_)) => 2_i32,
-                    Some(DescriptionElement::Float(_)) => continue,
+                    Some(DescriptionElement::Enum(_)) => 2_i32,
                     Some(DescriptionElement::FloatRange(_, _)) => 3_i32,
                     Some(DescriptionElement::Text(_)) => 4_i32,
                     Some(DescriptionElement::IpAddr(_)) => 5_i32,
                     Some(DescriptionElement::DateTime(_)) => 6_i32,
-                    None => continue,
+                    _ => continue,
                 };
 
                 let inserted: ColumnDescriptionsTable;
@@ -402,23 +396,24 @@ pub(crate) fn add_descriptions(
                             result
                         );
                     }
-                    Some(DescriptionElement::UInt(md)) => {
+                    Some(DescriptionElement::Enum(md)) => {
                         insert_short_description!(
                             description_enum,
                             inserted.id,
-                            Some(md.to_i64().expect("Safe cast: 0..=MaxOfu32 -> i64")),
+                            Some(md.clone()),
                             &conn,
                             result
                         );
-                        insert_top_n_number!(
+                        insert_top_n_others!(
                             top_n_enum,
                             column_description,
+                            DescriptionElement::Enum,
+                            clone,
                             inserted.id,
                             &conn,
                             result
                         );
                     }
-                    Some(DescriptionElement::Float(_)) => (),
                     Some(DescriptionElement::FloatRange(x, y)) => {
                         {
                             use schema::description_float::*;
@@ -531,7 +526,7 @@ pub(crate) fn add_descriptions(
                             result
                         );
                     }
-                    None => continue,
+                    _ => continue,
                 }
             }
         }
@@ -596,18 +591,10 @@ pub(crate) fn get_rounds_by_cluster(
 struct GetValueByType {}
 
 impl GetValueByType {
-    pub fn top_n_enum(value: &Option<i64>) -> DescriptionElement {
+    pub fn top_n_enum(value: &Option<String>) -> DescriptionElement {
         match value {
-            Some(value) => {
-                if *value <= MAX_VALUE_OF_U32_I64 {
-                    DescriptionElement::UInt(
-                        value.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
-                    )
-                } else {
-                    DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)
-                }
-            }
-            None => DescriptionElement::UInt(0_u32), // No chance
+            Some(value) => DescriptionElement::Enum(value.clone()),
+            None => DescriptionElement::Enum(String::from("N/A")), // No chance
         }
     }
 
@@ -634,17 +621,21 @@ impl GetValueByType {
         }
     }
 
-    pub fn mode_enum(value: Option<i64>) -> Option<DescriptionElement> {
+    pub fn mode_enum(value: Option<String>) -> Option<DescriptionElement> {
+        // match value {
+        //     Some(m) => {
+        //         if m <= MAX_VALUE_OF_U32_I64 {
+        //             Some(DescriptionElement::UInt(
+        //                 m.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
+        //             ))
+        //         } else {
+        //             Some(DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)) // No chance
+        //         }
+        //     }
+        //     None => None,
+        // }
         match value {
-            Some(m) => {
-                if m <= MAX_VALUE_OF_U32_I64 {
-                    Some(DescriptionElement::UInt(
-                        m.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
-                    ))
-                } else {
-                    Some(DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)) // No chance
-                }
-            }
+            Some(m) => Some(DescriptionElement::Enum(m)),
             None => None,
         }
     }
@@ -827,7 +818,7 @@ pub(crate) fn get_description(
                                 load_descriptions_others!(
                                     description_enum,
                                     top_n_enum,
-                                    i64,
+                                    String,
                                     TopNEnumTable,
                                     &conn,
                                     column,

@@ -75,7 +75,7 @@ CREATE TABLE description_element_type (
   name TEXT NOT NULL
 );
 INSERT INTO description_element_type VALUES(1,'Int');
-INSERT INTO description_element_type VALUES(2,'UInt');
+INSERT INTO description_element_type VALUES(2,'Enum');
 INSERT INTO description_element_type VALUES(3,'Float');
 INSERT INTO description_element_type VALUES(4,'Text');
 INSERT INTO description_element_type VALUES(5,'IpAddr');
@@ -106,7 +106,7 @@ CREATE TABLE description_int (
 CREATE TABLE description_enum (
   id SERIAL PRIMARY KEY,
   description_id INTEGER NOT NULL REFERENCES column_description (id),
-  mode BIGINT
+  mode TEXT
 );
 
 CREATE TABLE description_float (
@@ -151,7 +151,7 @@ CREATE TABLE top_n_enum (
   id SERIAL PRIMARY KEY,
   description_id INTEGER NOT NULL REFERENCES column_description (id),
   ranking BIGINT,
-  value BIGINT,
+  value TEXT,
   count BIGINT,
   UNIQUE(description_id, ranking)
 );
