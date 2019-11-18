@@ -622,18 +622,6 @@ impl GetValueByType {
     }
 
     pub fn mode_enum(value: Option<String>) -> Option<DescriptionElement> {
-        // match value {
-        //     Some(m) => {
-        //         if m <= MAX_VALUE_OF_U32_I64 {
-        //             Some(DescriptionElement::UInt(
-        //                 m.to_u32().expect("Safe cast: 0..=MaxOfu32 -> u32"),
-        //             ))
-        //         } else {
-        //             Some(DescriptionElement::UInt(MAX_VALUE_OF_U32_U32)) // No chance
-        //         }
-        //     }
-        //     None => None,
-        // }
         match value {
             Some(m) => Some(DescriptionElement::Enum(m)),
             None => None,
