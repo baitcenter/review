@@ -9,6 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Removed
 
 - The `client` subcommand was obsoleted by REsolutions-frontend.
+- Removed `POST /api/cluster/` and `POST /api/cluster` endpoints.
 
 ## [0.6.2] - 2019-11-08
 

@@ -96,7 +96,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     )
     .service(
         resource("/api/cluster")
-            .guard(guard::Any(guard::Post()).or(guard::Put()))
+            .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<ClusterUpdate>>::configure(|cfg| {
                 // increase max size of payload from 32kb to 1024kb
@@ -105,7 +105,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(post().to_async(add_clusters))
             .route(put().to_async(update_clusters)),
     )
     .service(
@@ -193,7 +192,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     )
     .service(
         resource("/api/outlier")
-            .guard(guard::Any(guard::Post()).or(guard::Put()))
+            .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<OutlierUpdate>>::configure(|cfg| {
                 // increase max size of payload from 32kb to 1024kb
@@ -202,7 +201,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(post().to_async(add_outliers))
             .route(put().to_async(update_outliers)),
     )
     .service(
