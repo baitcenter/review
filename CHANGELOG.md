@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Deprecated
+
+- Subcommands on the `review` command line is deprecated. Simply running
+  `review` is preferred to running `review reviewd`. The subcommand is currently
+  ignored silently, but will become an error in 0.8.0.
+
 ### Removed
 
 - The `client` subcommand was obsoleted by REsolutions-frontend.
