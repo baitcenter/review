@@ -12,13 +12,12 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 use structured::{Description, DescriptionElement};
 
-use super::schema;
 use super::schema::{
-    cluster, column_description, data_source, description_datetime, description_element_type,
+    self, cluster, column_description, data_source, description_datetime, description_element_type,
     description_enum, description_float, description_int, description_ipaddr, description_text,
     top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
-use crate::database::*;
+use crate::database::{self, build_err_msg};
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub(crate) struct DescriptionLoad {
@@ -291,32 +290,31 @@ pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
 
 #[allow(clippy::cognitive_complexity)]
 pub(crate) fn add_descriptions(
-    pool: Data<Pool>,
+    pool: Data<database::Pool>,
     new_descriptions: Json<Vec<DescriptionUpdate>>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let insert_descriptions: Vec<_> = new_descriptions.into_inner();
 
-    let insert_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let mut result: Vec<Result<usize, Error>> = Vec::new();
+    let insert_result = pool.get().map_err(Into::into).and_then(|conn| {
+        let mut result: Vec<Result<usize, database::Error>> = Vec::new();
         for descriptions_of_cluster in insert_descriptions {
-            let cid;
-            {
-                use schema::cluster::*;
+            let cluster_id = {
+                use schema::cluster::dsl;
                 match dsl::cluster
                     .filter(dsl::cluster_id.eq(&descriptions_of_cluster.cluster_id))
                     .select(dsl::id)
                     .first::<i32>(&conn)
                 {
-                    Ok(v) => cid = v,
+                    Ok(v) => v,
                     Err(_) => continue,
                 }
-            }
+            };
 
             for (i, column_description) in descriptions_of_cluster.descriptions.iter().enumerate() {
                 let cnt = safe_cast_usize_to_i64(column_description.get_count());
                 let unique_cnt = safe_cast_usize_to_i64(column_description.get_unique_count());
 
-                let tid: i32 = match column_description.get_mode() {
+                let type_id: i32 = match column_description.get_mode() {
                     // TODO: Do I have to read this value from description_element_type table?
                     Some(DescriptionElement::Int(_)) => 1_i32,
                     Some(DescriptionElement::UInt(_)) => 2_i32,
@@ -330,7 +328,7 @@ pub(crate) fn add_descriptions(
 
                 let inserted: ColumnDescriptionsTable;
                 {
-                    use schema::column_description::*;
+                    use schema::column_description::dsl;
 
                     let first_e_i = if let Some(v) = descriptions_of_cluster.first_event_id {
                         v.to_string()
@@ -349,11 +347,11 @@ pub(crate) fn add_descriptions(
                     };
                     inserted = match diesel::insert_into(dsl::column_description)
                         .values((
-                            dsl::cluster_id.eq(cid),
+                            dsl::cluster_id.eq(cluster_id),
                             dsl::first_event_id.eq(first_e_i),
                             dsl::last_event_id.eq(last_e_i),
                             dsl::column_index.eq(c_index),
-                            dsl::type_id.eq(tid),
+                            dsl::type_id.eq(type_id),
                             dsl::count.eq(cnt),
                             dsl::unique_count.eq(unique_cnt),
                         ))
@@ -561,13 +559,13 @@ pub(crate) fn add_descriptions(
 }
 
 pub(crate) fn get_rounds_by_cluster(
-    pool: Data<Pool>,
+    pool: Data<database::Pool>,
     query: Query<RoundSelectQuery>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     use cluster::dsl as c_d;
     use column_description::dsl as cd_d;
     use data_source::dsl as d_d;
-    let query_result: Result<Vec<RoundResponse>, Error> =
+    let query_result: Result<Vec<RoundResponse>, database::Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             cd_d::column_description
                 .inner_join(c_d::cluster.on(cd_d::cluster_id.eq(c_d::id)))
@@ -723,13 +721,13 @@ macro_rules! load_descriptions_others {
 }
 
 pub(crate) fn get_description(
-    pool: Data<Pool>,
+    pool: Data<database::Pool>,
     query: Query<DescriptionSelectQuery>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     use cluster::dsl as c_d;
     use column_description::dsl as cd_d;
     use data_source::dsl as d_d;
-    let query_result: Result<Vec<DescriptionLoad>, Error> =
+    let query_result: Result<Vec<DescriptionLoad>, database::Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             cd_d::column_description
                 .inner_join(c_d::cluster.on(cd_d::cluster_id.eq(c_d::id)))
