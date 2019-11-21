@@ -2,7 +2,7 @@ CREATE TABLE category (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL
 );
-INSERT INTO category VALUES(1,'Non-Specified Alert');
+INSERT INTO category (name) VALUES('Non-Specified Alert');
 
 CREATE TABLE data_source (
   id SERIAL PRIMARY KEY,
