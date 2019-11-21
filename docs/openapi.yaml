@@ -7,6 +7,7 @@ tags:
 - name: "outlier"
 - name: "category"
 - name: "data_source"
+- name: "indicator"
 - name: "qualifier"
 - name: "status"
 - name: "etcd"
@@ -365,6 +366,134 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
+  /api/indicator:
+    get:
+      tags: [indicator]
+      summary: "Get indicators"
+      description: "This endpoint returns indicators in database."
+      parameters:
+        - name: "filter"
+          in: "query"
+          description: |
+            A JSON encoded value of the filters. Available filters:
+              - `indicator_name:[string]` array of indicator names
+          type: "string"
+        - name: "orderby"
+          in: "query"
+          description: |
+            Specify the column name used to sort the returned data. The data is sorted in ascending order by default. Available column names:
+              - `indicator_name`
+              - `token`
+          type: "string"
+        - name: "order"
+          in: "query"
+          description: Use `order=desc` to sort the returned data in descending order. Must be used with orderby query.
+          type: "string"
+        - name: "page"
+          in: "query"
+          description: Specify the page of results to return.
+          type: integer
+        - name: "per_page"
+          in: "query"
+          description: Specify the number of records to return in one request, specified as an integer from 1 to 100.
+          type: integer
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Indicator"
+          headers:
+            X-REviewd-Total:
+              type: "string"
+              description: "the total number of records in the database"
+            X-REviewd-TotalPages:
+              type: "string"
+              description: "the total number of pages encompassing all available records"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      tags: [indicator]
+      summary: "Create a new indicator"
+      description: "This endpoint is for clients to create a new indicator."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "properties"
+        description: "A new indicator to be inserted into the database"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/IndicatorCreateBody"
+      responses:
+        201:
+          description: "Created"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    delete:
+      tags: [indicator]
+      summary: "Delete indicators"
+      description: "This endpoint is to delete one or more indicators"
+      parameters:
+        - name: "all"
+          in: "query"
+          description: If `all=true`, delete all indicators from the database.
+          type: "boolean"
+        - name: "name"
+          in: "query"
+          description: Delete an indicator whose `name` in the database is equal to this value.
+          type: "string"
+      produces:
+      - "plain/text"
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/indicator/{indicator_name}:
+    put:
+      tags: [indicator]
+      summary: "Update indicator_name, data_source, description, and/or token for the specified indicator_name"
+      description: "This endpoint is aimed to update indicator_name, data_source, description, and/or token of an indicator."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+        - name: "indicator_name"
+          in: "path"
+          description: "indicator_name of the indicator whose properties are to be updated"
+          type: "string"
+          required: true
+        - name: "Properties"
+          in: "body"
+          required: true
+          schema:
+            $ref: "#/definitions/IndicatorUpdateBody"
+          description: "New values of indicator_name, data_source, and/or token. At least one of the parameters must be specified to update the indicator."
+      responses:
+        200:
+          description: "Updated indicator successfully"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
   /api/qualifier:
     get:
       tags: [qualifier]
@@ -682,7 +811,71 @@ definitions:
         description: "id of first event belonging to this cluster"
       last_event_id:
         type: "string"
-        description: "id of last event belonging to this cluster"        
+        description: "id of last event belonging to this cluster"
+  Indicator:
+    type: "object"
+    properties:
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      description:
+        type: "string"
+        description: "description of this indicator"
+      indicator_name:
+        type: "string"
+        description: "a unique identifier of this indicator"
+      token:
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
+        description: "A sequence of tokens"
+      last_modification_time:
+        type: "string"
+        format: "dateTime"
+  IndicatorCreateBody:
+    type: "object"
+    required:
+    - "name"
+    - "data_source"
+    - "token"
+    properties:
+      name:
+        type: "string"
+        description: "a unique id for this indicator"
+      data_source:
+        type: "string"
+        description: "Kafka topic name"
+      token:
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
+        description: "A sequence of tokens for this indicator"
+      description:
+        type: "string"
+        description: "The description for this indicator"
+  IndicatorUpdateBody:
+    type: "object"
+    properties:
+      indicator_name:
+        type: "string"
+        description: "New value of indicator_name"
+      data_source: 
+        type: "string"
+        description: "New value of data_source"
+      description:
+        type: "string"
+        description: "New value of description"
+      token:
+        description: "New value of token"
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
   Outlier:
     type: "object"
     properties:

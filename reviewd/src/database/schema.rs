@@ -111,10 +111,11 @@ table! {
 table! {
     indicator (id) {
         id -> Int4,
+        name -> Text,
         description -> Nullable<Text>,
-        source -> Nullable<Int4>,
-        category -> Nullable<Int4>,
-        qualification -> Nullable<Float8>,
+        token -> Jsonb,
+        data_source_id -> Int4,
+        last_modification_time -> Nullable<Timestamp>,
     }
 }
 
@@ -148,14 +149,6 @@ table! {
     status (id) {
         id -> Int4,
         description -> Text,
-    }
-}
-
-table! {
-    token (id) {
-        id -> Int4,
-        name -> Nullable<Bytea>,
-        indicator -> Nullable<Int4>,
     }
 }
 
@@ -233,12 +226,10 @@ joinable!(description_float -> column_description (description_id));
 joinable!(description_int -> column_description (description_id));
 joinable!(description_ipaddr -> column_description (description_id));
 joinable!(description_text -> column_description (description_id));
-joinable!(indicator -> category (category));
-joinable!(indicator -> data_source (source));
+joinable!(indicator -> data_source (data_source_id));
 joinable!(outlier -> data_source (data_source_id));
 joinable!(outlier -> raw_event (raw_event_id));
 joinable!(raw_event -> data_source (data_source_id));
-joinable!(token -> indicator (indicator));
 joinable!(top_n_datetime -> column_description (description_id));
 joinable!(top_n_enum -> column_description (description_id));
 joinable!(top_n_float -> column_description (description_id));
@@ -263,7 +254,6 @@ allow_tables_to_appear_in_same_query!(
     qualifier,
     raw_event,
     status,
-    token,
     top_n_datetime,
     top_n_enum,
     top_n_float,

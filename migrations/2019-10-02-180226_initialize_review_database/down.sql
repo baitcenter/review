@@ -15,7 +15,6 @@ DROP TABLE description_enum;
 DROP TABLE description_int;
 DROP TABLE column_description;
 DROP TABLE description_element_type;
-DROP TABLE token;
 DROP TABLE indicator;
 DROP TABLE outlier;
 DROP TABLE cluster;

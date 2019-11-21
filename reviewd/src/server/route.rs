@@ -186,6 +186,49 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(put().to_async(send_suspicious_tokens_to_etcd)),
     )
     .service(
+        resource("/api/indicator")
+            .guard(guard::Post())
+            .guard(guard::Header("content-type", "application/json"))
+            .data(Json::<serde_json::Value>::configure(|cfg| {
+                // increase max size of payload from 32kb to 1024kb
+                cfg.limit(1_048_576).error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
+                        .into()
+                })
+            }))
+            .route(post().to_async(add_indicator)),
+    )
+    .service(
+        resource("/api/indicator")
+            .guard(guard::Get())
+            .route(get().to_async(get_indicators)),
+    )
+    .service(
+        resource("/api/indicator")
+            .guard(guard::Delete())
+            .data(Query::<serde_json::Value>::configure(|cfg| {
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
+                        .into()
+                })
+            }))
+            .route(delete().to_async(delete_indicator)),
+    )
+    .service(
+        resource("/api/indicator/{name}")
+            .guard(guard::Header("content-type", "application/json"))
+            .data(PathConfig::default().error_handler(|err, _| {
+                error::InternalError::from_response(err, HttpResponse::BadRequest().finish()).into()
+            }))
+            .data(Json::<serde_json::Value>::configure(|cfg| {
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
+                        .into()
+                })
+            }))
+            .route(put().to_async(update_indicator)),
+    )
+    .service(
         resource("/api/outlier")
             .guard(guard::Get())
             .route(get().to_async(get_outliers)),

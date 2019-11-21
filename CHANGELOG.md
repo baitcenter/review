@@ -6,6 +6,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added new endpoints for `indicator` table.
+
 ### Deprecated
 
 - Subcommands on the `review` command line is deprecated. Simply running

@@ -62,16 +62,12 @@ CREATE TABLE outlier (
 
 CREATE TABLE indicator (
   id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
   description TEXT,
-  source INTEGER REFERENCES data_source(id),
-  category INTEGER REFERENCES category(id),
-  qualification DOUBLE PRECISION
-);
-
-CREATE TABLE token (
-  id SERIAL PRIMARY KEY,
-  name BYTEA,
-  indicator INTEGER REFERENCES indicator(id)
+  token JSONB NOT NULL,
+  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  last_modification_time TIMESTAMP,
+  UNIQUE (name)
 );
 
 CREATE TABLE description_element_type (
