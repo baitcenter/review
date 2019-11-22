@@ -376,7 +376,7 @@ paths:
           in: "query"
           description: |
             A JSON encoded value of the filters. Available filters:
-              - `indicator_name:[string]` array of indicator names
+              - `name:[string]` array of indicator names
           type: "string"
         - name: "orderby"
           in: "query"
