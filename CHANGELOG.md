@@ -26,6 +26,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - REviewd outputs logs of processed HTTP Requests and Response like below:
+
 ```
 [2019-10-12T01:36:58Z INFO  actix_web::middleware::logger] 10.0.170.135:54135 "PUT /api/cluster HTTP/1.1" 200 0 "-" "reqwest/0.9.21" 0.046250
 ```
@@ -42,32 +43,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The number of clusters/outliers returned per request is 10 by default.
 
-- The format of response body has changed: 
-    - `examples` field, which consists of `raw_event` and `event_ids` fields,
-      has been removed. `raw_event` and `event_ids` fields are displayed
-      separately.
-    - Field names of clusters/outliers in response body are in alphabetical
-      order like below:
+- The format of response body has changed:
+  - `examples` field, which consists of `raw_event` and `event_ids` fields, has
+    been removed. `raw_event` and `event_ids` fields are displayed separately.
+  - Field names of clusters/outliers in response body are in alphabetical order
+    like below:
 
-    ```
-        {
-            "category": "Non-Specified Alert",
-            "cluster_id": "f-14-f",
-            "data_source": "log01",
-            "detector_id": 1,
-            "event_ids": [
-                281474977755983,
-                281474977760773
-            ],
-            "last_modification_time": null,
-            "qualifier": "unknown",
-            "raw_event": "Error: username or password error,please input again.\r",
-            "score": null,
-            "signature": "(?i)(yadm.*x=di.*yadm)",
-            "size": "10",
-            "status": "pending review"
-        }
-    ```
+  ```
+  {
+      "category": "Non-Specified Alert",
+      "cluster_id": "f-14-f",
+      "data_source": "log01",
+      "detector_id": 1,
+      "event_ids": [
+          281474977755983,
+          281474977760773
+      ],
+      "last_modification_time": null,
+      "qualifier": "unknown",
+      "raw_event": "Error: username or password error,please input again.\r",
+      "score": null,
+      "signature": "(?i)(yadm.*x=di.*yadm)",
+      "size": "10",
+      "status": "pending review"
+  }
+  ```
 
 ### Removed
 
@@ -93,7 +93,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The underlying database has changed from SQLite to PostgreSQL.
-- Each cluster `examples` is a pair of a single `raw_event` and a list of `event_ids` like below:
+- Each cluster `examples` is a pair of a single `raw_event` and a list of
+  `event_ids` like below:
+
 ```
 "examples": {
             "raw_event": "something",
@@ -103,7 +105,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
             ]
           }
 ```
-- If a cluster is created only from training files, `raw_event` in `examples` will be `-`.
+
+- If a cluster is created only from training files, `raw_event` in `examples`
+  will be `-`.
 
 ### Removed
 
@@ -118,7 +122,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- A new field called `score` is added to `Clusters` table to store score value. Note that database files created by an older version of REview are not compatible with this version.
+- A new field called `score` is added to `Clusters` table to store score value.
+  Note that database files created by an older version of REview are not
+  compatible with this version.
 
 ### Changed
 
