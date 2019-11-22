@@ -28,13 +28,6 @@ pub(crate) struct ClusterUpdate {
     event_ids: Option<Vec<u64>>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct NewClusterValues {
-    cluster_id: Option<String>,
-    category: Option<String>,
-    qualifier: Option<String>,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct QualifierUpdate {
     cluster_id: String,
@@ -146,143 +139,46 @@ pub(crate) fn get_clusters(
 pub(crate) fn update_cluster(
     pool: Data<Pool>,
     cluster_id: Path<String>,
-    data_source: Query<DataSourceQuery>,
-    new_cluster: Json<NewClusterValues>,
-    etcd_server: Data<EtcdServer>,
+    query: Query<Value>,
+    new_cluster: Json<Value>,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    use cluster::dsl;
-
-    let cluster_id = cluster_id.into_inner();
-    let data_source = data_source.into_inner();
+    let data_source = query.get("data_source").and_then(Value::as_str);
     let new_cluster = new_cluster.into_inner();
+    let (new_cluster_id, new_category, new_qualifier) = (
+        new_cluster.get("cluster_id").and_then(Value::as_str),
+        new_cluster.get("category").and_then(Value::as_str),
+        new_cluster.get("qualifier").and_then(Value::as_str),
+    );
 
-    let execution_result: Result<bool, Error> = if let Ok(data_source_id) =
-        get_data_source_id(&pool, &data_source.data_source)
+    if let (Some(data_source), Some(_), _, _)
+    | (Some(data_source), _, Some(_), _)
+    | (Some(data_source), _, _, Some(_)) =
+        (data_source, new_cluster_id, new_category, new_qualifier)
     {
-        let query = diesel::update(dsl::cluster).filter(
-            dsl::cluster_id
-                .eq(cluster_id)
-                .and(dsl::data_source_id.eq(data_source_id)),
-        );
-        let timestamp = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
-        let category_id = new_cluster
-            .category
-            .and_then(|category| get_category_id(&pool, &category).ok());
-        let (qualifier_id, is_benign) = new_cluster.qualifier.map_or((None, false), |qualifier| {
-            (
-                get_qualifier_id(&pool, &qualifier).ok(),
-                qualifier == "benign",
-            )
-        });
-        let status_id = match get_status_id(&pool, "reviewed") {
-            Ok(id) => id,
-            _ => 1,
-        };
-        let new_cluster_id = new_cluster.cluster_id;
-        pool.get()
+        let query_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+            let cluster_id = cluster_id.into_inner();
+            diesel::select(attempt_cluster_update(
+                cluster_id,
+                data_source,
+                new_category,
+                new_cluster_id,
+                new_qualifier,
+            ))
+            .get_result::<i32>(&conn)
             .map_err(Into::into)
-            .and_then(|conn| {
-                if let (Some(cluster_id), Some(category_id), Some(qualifier_id)) =
-                    (&new_cluster_id, &category_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::category_id.eq(category_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(cluster_id), Some(category_id)) =
-                    (&new_cluster_id, &category_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::category_id.eq(category_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(cluster_id), Some(qualifier_id)) =
-                    (&new_cluster_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let (Some(category_id), Some(qualifier_id)) =
-                    (&category_id, &qualifier_id)
-                {
-                    query
-                        .set((
-                            dsl::category_id.eq(category_id),
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(cluster_id) = &new_cluster_id {
-                    query
-                        .set((
-                            dsl::cluster_id.eq(cluster_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(category_id) = &category_id {
-                    query
-                        .set((
-                            dsl::category_id.eq(category_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else if let Some(qualifier_id) = &qualifier_id {
-                    query
-                        .set((
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
-                } else {
-                    Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
-                }
-            })
-            .and_then(|_| Ok(is_benign))
+        });
+
+        let result = match query_result {
+            Ok(1) => Ok(HttpResponse::Ok().into()),
+            Ok(_) => Ok(HttpResponse::InternalServerError().into()),
+            Err(e) => Ok(HttpResponse::InternalServerError()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(build_err_msg(&e))),
+        };
+        future::result(result)
     } else {
-        Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
-    };
-
-    let result = match execution_result {
-        Ok(is_benign) => {
-            if is_benign {
-                let etcd_server = &etcd_server.into_inner();
-                let etcd_value = format!(
-                    r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
-                    &etcd_server.docker_host_addr, &data_source.data_source
-                );
-                let etcd_key = format!("benign_signatures_{}", &data_source.data_source);
-                update_etcd(&etcd_server.etcd_url, &etcd_key, &etcd_value);
-            }
-            Ok(HttpResponse::Ok().into())
-        }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+        future::result(Ok(HttpResponse::BadRequest().into()))
+    }
 }
 
 pub(crate) fn update_clusters(

@@ -8,6 +8,7 @@ use actix_web::{
 };
 use futures::{Future, Stream};
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::database::*;
 use crate::server::EtcdServer;
@@ -61,6 +62,7 @@ fn send_suspicious_tokens_to_etcd(
         })
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     cfg.service(
         resource("/api/category")
@@ -125,13 +127,13 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .data(PathConfig::default().error_handler(|err, _| {
                 error::InternalError::from_response(err, HttpResponse::BadRequest().finish()).into()
             }))
-            .data(Query::<DataSourceQuery>::configure(|cfg| {
+            .data(Query::<Value>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
             }))
-            .data(Json::<Vec<NewClusterValues>>::configure(|cfg| {
+            .data(Json::<Value>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
@@ -189,7 +191,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/indicator")
             .guard(guard::Post())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<serde_json::Value>::configure(|cfg| {
+            .data(Json::<Value>::configure(|cfg| {
                 // increase max size of payload from 32kb to 1024kb
                 cfg.limit(1_048_576).error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
@@ -206,7 +208,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/indicator")
             .guard(guard::Delete())
-            .data(Query::<serde_json::Value>::configure(|cfg| {
+            .data(Query::<Value>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
@@ -220,7 +222,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .data(PathConfig::default().error_handler(|err, _| {
                 error::InternalError::from_response(err, HttpResponse::BadRequest().finish()).into()
             }))
-            .data(Json::<serde_json::Value>::configure(|cfg| {
+            .data(Json::<Value>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
