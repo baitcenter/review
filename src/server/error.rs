@@ -29,16 +29,6 @@ impl Display for Error {
     }
 }
 
-impl Error {
-    pub fn new(inner: Context<ErrorKind>) -> Self {
-        Self { inner }
-    }
-
-    pub fn kind(&self) -> &ErrorKind {
-        self.inner.get_context()
-    }
-}
-
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Self {
         Self {

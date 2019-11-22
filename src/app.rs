@@ -33,7 +33,7 @@ pub fn init() -> Result<(), Error> {
         .parse::<std::net::SocketAddr>()
         .context(Initialize(InitializeErrorReason::REviewdUrl))?;
 
-    let runner = reviewd::Server::new(
+    let runner = super::Server::new(
         &database_url,
         &reviewd_addr,
         kafka_url,

@@ -34,7 +34,6 @@ RUN wget https://github.com/petabi/resolutions-frontend/releases/download/${FRON
     rm resolutions-frontend-${FRONTEND_VERSION}.tar.gz && \
     mv resolutions-frontend-${FRONTEND_VERSION} htdocs
 
-COPY ./reviewd ./reviewd
 COPY ./migrations ./migrations
 COPY ./src/ ./src/
 COPY ./Cargo.lock ./Cargo.lock
