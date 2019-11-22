@@ -4,7 +4,7 @@ use actix_web::{
 };
 use bigdecimal::{BigDecimal, ToPrimitive};
 use diesel::prelude::*;
-use eventio::kafka;
+use eventio::{kafka, Input};
 use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,13 +54,14 @@ pub(crate) fn add_raw_events(
     ) {
         let (data_tx, data_rx) = crossbeam_channel::bounded(256);
         let (ack_tx, ack_rx) = crossbeam_channel::bounded(256);
-        let mut event_input = match kafka::Input::new(
+        let event_input = match kafka::Input::new(
             data_tx,
             ack_rx,
             vec![kafka_url.get_ref().into()],
             "REviewd".into(),
             "REview".into(),
             query.data_source,
+            usize::max_value(),
         ) {
             Ok(input) => input,
             Err(_) => return future::result(Ok(HttpResponse::InternalServerError().into())),
