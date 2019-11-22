@@ -143,8 +143,9 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     )
     .service(
         resource("/api/data_source")
-            .guard(guard::Get())
-            .route(get().to_async(get_data_source_table)),
+            .guard(guard::Any(guard::Get()).or(guard::Post()))
+            .route(get().to_async(get_data_source_table))
+            .route(post().to_async(add_data_source_endpoint)),
     )
     .service(
         resource("/api/description")

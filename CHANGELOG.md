@@ -8,7 +8,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Added new endpoints for `indicator` table.
+- Added new endpoints for `data_source` and `indicator` table.
 
 ### Deprecated
 

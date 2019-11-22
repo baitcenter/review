@@ -366,6 +366,31 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
+    post:
+      tags: [data_source]
+      summary: "Create a new data_source"
+      description: "This endpoint is for clients to create a new data_source."
+      produces:
+        - "text/plain"
+      parameters:
+        - name: "data_source"
+          in: "query"
+          required: true
+          description: The topic name of this data_source.   
+          type: "string"
+        - name: "data_type"
+          in: "query"
+          required: true
+          description: The data type of this data_source.
+          type: "string"
+      responses: 
+        201:
+          description: "Created"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  
   /api/indicator:
     get:
       tags: [indicator]
