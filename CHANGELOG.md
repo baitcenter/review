@@ -135,7 +135,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - API documentation has been added
-  [here](https://gitlab.com/resolutions/review/tree/0.4.2/docs). Please refer to
+  [here](https://github.com/petabi/review/tree/0.4.2/docs). Please refer to
   the documentation for changes on endpoints.
 
 ### Changed
@@ -196,8 +196,8 @@ v0.4.1
   - `size` and `event_ids` fields in `Outlier` table
   - `data_source` field in `Events` table
 - `GET /api/cluster` and `GET /api/outlier` return data with newly added fields.
-- Docker-compose file to run REview server mode is added to [REsolutions
-  repo](https://gitlab.com/resolutions/resolutions/tree/master/docker/reviewd).
+- Docker-compose file to run REview server mode is added to REsolutions
+  repo.
 
 ### Changed
 
@@ -209,11 +209,11 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
-[Unreleased]: https://gitlab.com/resolutions/review/compare/0.6.2...master
-[0.6.2]: https://gitlab.com/resolutions/review/compare/0.6.1...0.6.2
-[0.6.1]: https://gitlab.com/resolutions/review/compare/0.6.0...0.6.1
-[0.6.0]: https://gitlab.com/resolutions/review/compare/0.5.0...0.6.0
-[0.5.0]: https://gitlab.com/resolutions/review/compare/0.4.2...0.5.0
-[0.4.2]: https://gitlab.com/resolutions/review/compare/0.4.1...0.4.2
-[0.4.1]: https://gitlab.com/resolutions/review/compare/0.4.0...0.4.1
-[0.4.0]: https://gitlab.com/resolutions/review/compare/0.3.9...0.4.0
+[Unreleased]: https://github.com/petabi/review/compare/0.6.2...master
+[0.6.2]: https://github.com/petabi/review/compare/0.6.1...0.6.2
+[0.6.1]: https://github.com/petabi/review/compare/0.6.0...0.6.1
+[0.6.0]: https://github.com/petabi/review/compare/0.5.0...0.6.0
+[0.5.0]: https://github.com/petabi/review/compare/0.4.2...0.5.0
+[0.4.2]: https://github.com/petabi/review/compare/0.4.1...0.4.2
+[0.4.1]: https://github.com/petabi/review/compare/0.4.0...0.4.1
+[0.4.0]: https://github.com/petabi/review/compare/0.3.9...0.4.0
