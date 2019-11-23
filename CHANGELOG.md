@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Enum values are stored as `String` type of raw data instead of their mapped unsigned integers.
+
+## [Unreleased]
+
 ### Added
 
 - Added new endpoints for `data_source` and `indicator` table.

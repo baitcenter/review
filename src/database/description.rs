@@ -284,6 +284,7 @@ pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
 }
 
 #[allow(clippy::cognitive_complexity)]
+#[allow(clippy::too_many_lines)]
 pub(crate) fn add_descriptions(
     pool: Data<database::Pool>,
     new_descriptions: Json<Vec<DescriptionUpdate>>,
@@ -672,8 +673,8 @@ macro_rules! load_descriptions_others {
                     .map(|t| {
                         let value = GetValueByType::$value_top_n(&t.value);
                         let count = match t.count {
-                            Some(count) => count as usize, // safe
-                            None => 0_usize,               // No chance
+                            Some(count) => count.to_usize().unwrap_or(0_usize),
+                            None => 0_usize, // No chance
                         };
                         (value, count)
                     })
@@ -684,8 +685,8 @@ macro_rules! load_descriptions_others {
             };
             let mode = GetValueByType::$value_mode(mode);
             $description = DescriptionLoad {
-                count: $column.count as usize,               // safe
-                unique_count: $column.unique_count as usize, // safe
+                count: $column.count.to_usize().unwrap_or(0_usize),
+                unique_count: $column.unique_count.to_usize().unwrap_or(0_usize),
                 mean: None,
                 s_deviation: None,
                 min: None,
@@ -699,6 +700,7 @@ macro_rules! load_descriptions_others {
     }};
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn get_description(
     pool: Data<database::Pool>,
     query: Query<DescriptionSelectQuery>,
@@ -765,8 +767,10 @@ pub(crate) fn get_description(
                                                     None => DescriptionElement::Int(0_i64), // No chance
                                                 };
                                                 let count = match t.count {
-                                                    Some(count) => count as usize, // safe
-                                                    None => 0_usize,               // No chance
+                                                    Some(count) => {
+                                                        count.to_usize().unwrap_or(0_usize)
+                                                    }
+                                                    None => 0_usize, // No chance
                                                 };
                                                 (value, count)
                                             })
@@ -788,8 +792,11 @@ pub(crate) fn get_description(
                                         None => None,
                                     };
                                     DescriptionLoad {
-                                        count: column.count as usize,               // safe
-                                        unique_count: column.unique_count as usize, // safe
+                                        count: column.count.to_usize().unwrap_or(0_usize),
+                                        unique_count: column
+                                            .unique_count
+                                            .to_usize()
+                                            .unwrap_or(0_usize),
                                         mean,
                                         s_deviation,
                                         min,
@@ -862,8 +869,10 @@ pub(crate) fn get_description(
                                                     None => 0_f64, // No chance
                                                 };
                                                 let count = match t.count {
-                                                    Some(count) => count as usize, // safe
-                                                    None => 0_usize,               // No chance
+                                                    Some(count) => {
+                                                        count.to_usize().unwrap_or(0_usize)
+                                                    }
+                                                    None => 0_usize, // No chance
                                                 };
                                                 (
                                                     DescriptionElement::FloatRange(
@@ -893,8 +902,11 @@ pub(crate) fn get_description(
                                         None
                                     };
                                     DescriptionLoad {
-                                        count: column.count as usize,               // safe
-                                        unique_count: column.unique_count as usize, // safe
+                                        count: column.count.to_usize().unwrap_or(0_usize),
+                                        unique_count: column
+                                            .unique_count
+                                            .to_usize()
+                                            .unwrap_or(0_usize),
                                         mean,
                                         s_deviation,
                                         min,

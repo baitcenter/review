@@ -33,6 +33,6 @@ r2d2 = "0.8"
 reqwest = "0.9"
 serde = { version = "1",  features = ["derive"] }
 serde_json = "1"
-structured = { git = "https://github.com/petabi/structured.git", rev = "7d10bba" }
+structured = { git = "https://github.com/petabi/structured.git", rev = "9815452" }
 tokio = "0.1"
 url = "2"
