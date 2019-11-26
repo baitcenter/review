@@ -192,8 +192,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 /******************************************************
-* CREATE TRIGGERS
-/******************************************************/
+ * CREATE TRIGGERS
+ ******************************************************/
 CREATE TRIGGER qualifier_update_trigger
   AFTER UPDATE ON cluster
   FOR EACH ROW
