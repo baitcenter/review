@@ -19,3 +19,11 @@ sql_function! {
         new_description: Nullable<Varchar>
     ) -> Integer;
 }
+
+sql_function! {
+    fn attempt_qualifier_id_update (
+            cluster_id: Varchar,
+            data_source: Varchar,
+            new_qualifier: Varchar
+        ) -> Integer;
+}

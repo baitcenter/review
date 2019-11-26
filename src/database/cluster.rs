@@ -339,88 +339,38 @@ pub(crate) async fn update_clusters(
 
 pub(crate) async fn update_qualifiers(
     pool: Data<Pool>,
-    qualifier_update: Json<Vec<QualifierUpdate>>,
-    etcd_server: Data<EtcdServer>,
+    qualifier_updates: Json<Vec<Value>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    use cluster::dsl;
-
-    let qualifier_update = qualifier_update.into_inner();
-    let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let timestamp = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0);
-        let status_id = match get_status_id(&pool, "reviewed") {
-            Ok(id) => id,
-            _ => 1,
-        };
-        let row = qualifier_update
+    let query_result: Result<i32, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+        let result: i32 = qualifier_updates
             .iter()
-            .map(|q| {
-                if let (Ok(qualifier_id), Ok(data_source_id)) = (
-                    get_qualifier_id(&pool, &q.qualifier),
-                    get_data_source_id(&pool, &q.data_source),
-                ) {
-                    let target = dsl::cluster.filter(
-                        dsl::cluster_id
-                            .eq(&q.cluster_id)
-                            .and(dsl::data_source_id.eq(data_source_id)),
-                    );
-                    diesel::update(target)
-                        .set((
-                            dsl::qualifier_id.eq(qualifier_id),
-                            dsl::status_id.eq(status_id),
-                            dsl::last_modification_time.eq(timestamp),
-                        ))
-                        .execute(&conn)
-                        .map_err(Into::into)
+            .filter_map(|q| {
+                let cluster_id = q.get("cluster_id").and_then(Value::as_str);
+                let data_source = q.get("data_source").and_then(Value::as_str);
+                let qualifier = q.get("qualifier").and_then(Value::as_str);
+
+                if let (Some(cluster_id), Some(data_source), Some(qualifier)) =
+                    (cluster_id, data_source, qualifier)
+                {
+                    diesel::select(attempt_qualifier_id_update(
+                        cluster_id,
+                        data_source,
+                        qualifier,
+                    ))
+                    .get_result::<i32>(&conn)
+                    .ok()
                 } else {
-                    Err(Error::RecordNotExist)
+                    None
                 }
             })
-            .filter_map(Result::ok)
-            .collect::<Vec<usize>>()
-            .iter()
             .sum();
 
-        if row == 0 {
-            Err(Error::Transaction)
-        } else {
-            Ok(row)
-        }
+        Ok(result)
     });
 
-    let etcd_server = etcd_server.into_inner();
     match query_result {
-        Ok(_) => {
-            let update_list = qualifier_update
-                .iter()
-                .filter_map(|d| {
-                    if d.qualifier == "benign" {
-                        Some(d.data_source.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
-            for data_source in update_list.iter() {
-                let etcd_value = format!(
-                    r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
-                    &etcd_server.docker_host_addr.clone(), data_source
-                );
-                let etcd_key = format!("benign_signatures_{}", data_source);
-                let data = format!(
-                    r#"{{"key": "{}", "value": "{}"}}"#,
-                    base64::encode(&etcd_key),
-                    base64::encode(&etcd_value)
-                );
-                reqwest::Client::new()
-                    .post(&etcd_server.etcd_url)
-                    .body(data)
-                    .send()
-                    .await
-                    .map(|_| ())
-                    .unwrap_or(());
-            }
-            Ok(HttpResponse::Ok().into())
-        }
+        Ok(0) => Ok(HttpResponse::BadRequest().into()),
+        Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),

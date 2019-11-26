@@ -100,7 +100,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/cluster/qualifier")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<QualifierUpdate>>::configure(|cfg| {
+            .data(Json::<Vec<Value>>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
