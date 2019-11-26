@@ -4,16 +4,15 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde_json::Value;
 
 use super::schema::indicator;
 use crate::database::*;
 
-pub(crate) fn add_indicator(
+pub(crate) async fn add_indicator(
     pool: Data<Pool>,
     indicators: Json<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use indicator::dsl;
 
     let name = indicators.get("name").and_then(Value::as_str);
@@ -24,9 +23,7 @@ pub(crate) fn add_indicator(
         .and_then(Value::as_str)
         .map(|d| get_data_source_id(&pool, d));
 
-    let result = if let (Some(name), Some(token), Some(Ok(data_source_id))) =
-        (name, token, data_source_id)
-    {
+    if let (Some(name), Some(token), Some(Ok(data_source_id))) = (name, token, data_source_id) {
         let insert_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
             diesel::insert_into(dsl::indicator)
                 .values((
@@ -47,15 +44,13 @@ pub(crate) fn add_indicator(
         }
     } else {
         Ok(HttpResponse::BadRequest().into())
-    };
-
-    future::result(result)
+    }
 }
 
-pub(crate) fn delete_indicator(
+pub(crate) async fn delete_indicator(
     pool: Data<Pool>,
     query: Query<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use indicator::dsl;
     let is_all = query
         .get("all")
@@ -68,7 +63,7 @@ pub(crate) fn delete_indicator(
     let name = query.get("name").and_then(Value::as_str);
 
     if let (false, None) | (true, Some(_)) = (is_all, name) {
-        return future::result(Ok(HttpResponse::BadRequest().into()));
+        return Ok(HttpResponse::BadRequest().into());
     }
 
     let delete_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
@@ -83,20 +78,19 @@ pub(crate) fn delete_indicator(
         }
     });
 
-    let result = match delete_result {
+    match delete_result {
         Ok(0) => Ok(HttpResponse::BadRequest().into()),
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-    future::result(result)
+    }
 }
 
-pub(crate) fn get_indicators(
+pub(crate) async fn get_indicators(
     pool: Data<Pool>,
     query: Query<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let indicator_schema =
         "(indicator INNER JOIN data_source ON indicator.data_source_id = data_source.id)";
     let select = vec![
@@ -161,14 +155,14 @@ pub(crate) fn get_indicators(
             .map_err(Into::into)
         });
 
-    future::result(GetQuery::build_response(&query, per_page, query_result))
+    GetQuery::build_response(&query, per_page, query_result)
 }
 
-pub(crate) fn update_indicator(
+pub(crate) async fn update_indicator(
     pool: Data<Pool>,
     name: Path<String>,
     new_indicator: Json<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let new_indicator = new_indicator.into_inner();
     let (new_name, new_data_source, new_description, new_token) = (
         new_indicator.get("name").and_then(Value::as_str),
@@ -192,7 +186,7 @@ pub(crate) fn update_indicator(
             .get_result::<i32>(&conn)
             .map_err(Into::into)
         });
-        let result = match query_result {
+        match query_result {
             Ok(1) => Ok(HttpResponse::Ok().into()),
             Ok(_) => Ok(HttpResponse::InternalServerError()
                 .header(http::header::CONTENT_TYPE, "application/json")
@@ -200,9 +194,8 @@ pub(crate) fn update_indicator(
             Err(e) => Ok(HttpResponse::InternalServerError()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .body(build_err_msg(&e))),
-        };
-        future::result(result)
+        }
     } else {
-        future::result(Ok(HttpResponse::BadRequest().into()))
+        Ok(HttpResponse::BadRequest().into())
     }
 }

@@ -4,7 +4,6 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 
 use super::schema::category;
@@ -22,10 +21,10 @@ pub(crate) struct NewCategory {
     pub(crate) category: String,
 }
 
-pub(crate) fn add_category(
+pub(crate) async fn add_category(
     pool: Data<Pool>,
     new_category: Query<NewCategory>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use category::dsl;
     let insert_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         diesel::insert_into(dsl::category)
@@ -34,21 +33,17 @@ pub(crate) fn add_category(
             .map_err(Into::into)
     });
 
-    let result = match insert_result {
+    match insert_result {
         Ok(category) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(category)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
-pub(crate) fn get_category_table(
-    pool: Data<Pool>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+pub(crate) async fn get_category_table(pool: Data<Pool>) -> Result<HttpResponse, actix_web::Error> {
     let query_result: Result<Vec<CategoryTable>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             category::dsl::category
@@ -56,16 +51,14 @@ pub(crate) fn get_category_table(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(category) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(category)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
 pub(crate) fn get_category_id(pool: &Data<Pool>, category: &str) -> Result<i32, Error> {
@@ -79,11 +72,11 @@ pub(crate) fn get_category_id(pool: &Data<Pool>, category: &str) -> Result<i32, 
     })
 }
 
-pub(crate) fn update_category(
+pub(crate) async fn update_category(
     pool: Data<Pool>,
     current_category: Path<String>,
     new_category: Json<NewCategory>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use category::dsl;
 
     let current_category = current_category.into_inner();
@@ -97,11 +90,10 @@ pub(crate) fn update_category(
         })
     });
 
-    let result = match update_result {
+    match update_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-    future::result(result)
+    }
 }

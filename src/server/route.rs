@@ -6,7 +6,7 @@ use actix_web::{
     },
     FromRequest, HttpResponse,
 };
-use futures::{Future, Stream};
+use futures::stream::StreamExt;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -18,48 +18,35 @@ struct EtcdKeyQuery {
     etcd_key: String,
 }
 
-fn send_suspicious_tokens_to_etcd(
-    body: Payload,
+async fn send_suspicious_tokens_to_etcd(
+    mut payload: Payload,
     etcd_key: Query<EtcdKeyQuery>,
     etcd_server: Data<EtcdServer>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
-    body.map_err(actix_web::Error::from)
-        .fold(BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            Ok::<_, actix_web::Error>(body)
-        })
-        .and_then(|body| {
-            let data = format!(
-                r#"{{"key": "{}", "value": "{}"}}"#,
-                base64::encode(&etcd_key.into_inner().etcd_key),
-                base64::encode(&body)
-            );
+) -> Result<HttpResponse, actix_web::Error> {
+    let mut body = BytesMut::new();
+    while let Some(item) = payload.next().await {
+        body.extend_from_slice(&item?);
+    }
 
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let req = reqwest::r#async::Client::new()
-                .post(&etcd_server.into_inner().etcd_url)
-                .body(data)
-                .send()
-                .and_then(reqwest::r#async::Response::error_for_status)
-                .then(move |response| tx.send(response))
-                .map(|_| ())
-                .map_err(|_| ());
-            if let Ok(mut runtime) = tokio::runtime::Runtime::new() {
-                runtime.spawn(req);
-                let response = rx.wait();
-                if let Ok(Ok(_)) = response {
-                    return Ok(HttpResponse::Ok().finish());
-                } else if let Ok(Err(e)) = response {
-                    return Ok(HttpResponse::InternalServerError()
-                        .header(http::header::CONTENT_TYPE, "application/json")
-                        .body(build_err_msg(&e)));
-                }
-            }
+    let data = format!(
+        r#"{{"key": "{}", "value": "{}"}}"#,
+        base64::encode(&etcd_key.into_inner().etcd_key),
+        base64::encode(&body)
+    );
 
-            Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(r#"{{"message": "Failed to update etcd"}}"#))
-        })
+    let response = reqwest::Client::new()
+        .post(&etcd_server.into_inner().etcd_url)
+        .body(data)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status);
+    if let Err(e) = response {
+        Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e)))
+    } else {
+        Ok(HttpResponse::Ok().finish())
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -67,14 +54,14 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     cfg.service(
         resource("/api/category")
             .guard(guard::Any(guard::Get()).or(guard::Post()))
-            .route(get().to_async(get_category_table))
+            .route(get().to(get_category_table))
             .data(Query::<NewCategory>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
             }))
-            .route(post().to_async(add_category)),
+            .route(post().to(add_category)),
     )
     .service(
         resource("/api/category/{category}")
@@ -89,12 +76,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_category)),
+            .route(put().to(update_category)),
     )
     .service(
         resource("/api/cluster")
             .guard(guard::Get())
-            .route(get().to_async(get_clusters)),
+            .route(get().to(get_clusters)),
     )
     .service(
         resource("/api/cluster")
@@ -107,7 +94,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_clusters)),
+            .route(put().to(update_clusters)),
     )
     .service(
         resource("/api/cluster/qualifier")
@@ -119,7 +106,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_qualifiers)),
+            .route(put().to(update_qualifiers)),
     )
     .service(
         resource("/api/cluster/{cluster_id}")
@@ -139,18 +126,18 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_cluster)),
+            .route(put().to(update_cluster)),
     )
     .service(
         resource("/api/data_source")
             .guard(guard::Any(guard::Get()).or(guard::Post()))
-            .route(get().to_async(get_data_source_table))
-            .route(post().to_async(add_data_source_endpoint)),
+            .route(get().to(get_data_source_table))
+            .route(post().to(add_data_source_endpoint)),
     )
     .service(
         resource("/api/description")
             .guard(guard::Get())
-            .route(get().to_async(get_description)),
+            .route(get().to(get_description)),
     )
     .service(
         resource("/api/description")
@@ -163,7 +150,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(add_descriptions)),
+            .route(put().to(add_descriptions)),
     )
     .service(
         resource("/api/description/round")
@@ -174,7 +161,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(get().to_async(get_rounds_by_cluster)),
+            .route(get().to(get_rounds_by_cluster)),
     )
     .service(
         resource("/api/etcd/suspicious_tokens")
@@ -186,7 +173,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(send_suspicious_tokens_to_etcd)),
+            .route(put().to(send_suspicious_tokens_to_etcd)),
     )
     .service(
         resource("/api/indicator")
@@ -199,12 +186,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(post().to_async(add_indicator)),
+            .route(post().to(add_indicator)),
     )
     .service(
         resource("/api/indicator")
             .guard(guard::Get())
-            .route(get().to_async(get_indicators)),
+            .route(get().to(get_indicators)),
     )
     .service(
         resource("/api/indicator")
@@ -215,7 +202,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(delete().to_async(delete_indicator)),
+            .route(delete().to(delete_indicator)),
     )
     .service(
         resource("/api/indicator/{name}")
@@ -229,12 +216,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_indicator)),
+            .route(put().to(update_indicator)),
     )
     .service(
         resource("/api/outlier")
             .guard(guard::Get())
-            .route(get().to_async(get_outliers)),
+            .route(get().to(get_outliers)),
     )
     .service(
         resource("/api/outlier")
@@ -247,7 +234,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(update_outliers)),
+            .route(put().to(update_outliers)),
     )
     .service(
         resource("/api/outlier")
@@ -265,12 +252,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(delete().to_async(delete_outliers)),
+            .route(delete().to(delete_outliers)),
     )
     .service(
         resource("/api/qualifier")
             .guard(guard::Get())
-            .route(get().to_async(get_qualifier_table)),
+            .route(get().to(get_qualifier_table)),
     )
     .service(
         resource("/api/raw_events")
@@ -281,11 +268,11 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
                         .into()
                 })
             }))
-            .route(put().to_async(add_raw_events)),
+            .route(put().to(add_raw_events)),
     )
     .service(
         resource("/api/status")
             .guard(guard::Get())
-            .route(get().to_async(get_status_table)),
+            .route(get().to(get_status_table)),
     );
 }

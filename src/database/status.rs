@@ -1,6 +1,5 @@
 use actix_web::{http, web::Data, HttpResponse};
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::Serialize;
 
 use super::schema::status;
@@ -24,9 +23,7 @@ pub(crate) fn get_status_id(pool: &Data<Pool>, status: &str) -> Result<i32, Erro
     })
 }
 
-pub(crate) fn get_status_table(
-    pool: Data<Pool>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+pub(crate) async fn get_status_table(pool: Data<Pool>) -> Result<HttpResponse, actix_web::Error> {
     let query_result: Result<Vec<StatusTable>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             status::dsl::status
@@ -34,14 +31,12 @@ pub(crate) fn get_status_table(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(status_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(status_table)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }

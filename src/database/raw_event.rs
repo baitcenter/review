@@ -5,7 +5,6 @@ use actix_web::{
 use bigdecimal::{BigDecimal, ToPrimitive};
 use diesel::prelude::*;
 use eventio::{kafka, Input};
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::thread;
@@ -41,11 +40,11 @@ struct UpdateRawEventId {
     is_cluster: bool,
 }
 
-pub(crate) fn add_raw_events(
+pub(crate) async fn add_raw_events(
     pool: Data<Pool>,
     query: Query<RawEventQuery>,
     kafka_url: Data<String>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let query = query.into_inner();
     if let (Ok(event_ids_from_clusters), Ok(event_ids_from_outliers), Ok(data_source_id)) = (
         get_event_ids_from_cluster(&pool, &query.data_source),
@@ -64,7 +63,7 @@ pub(crate) fn add_raw_events(
             usize::max_value(),
         ) {
             Ok(input) => input,
-            Err(_) => return future::result(Ok(HttpResponse::InternalServerError().into())),
+            Err(_) => return Ok(HttpResponse::InternalServerError().into()),
         };
         let in_thread = thread::spawn(move || match event_input.run() {
             Ok(_) => Ok(()),
@@ -107,7 +106,7 @@ pub(crate) fn add_raw_events(
                     }
                 }
                 if ack_tx.send(ev.loc).is_err() {
-                    return future::result(Ok(HttpResponse::InternalServerError().into()));
+                    return Ok(HttpResponse::InternalServerError().into());
                 }
                 if event_count >= query.max_event_count {
                     break;
@@ -147,11 +146,11 @@ pub(crate) fn add_raw_events(
         }
 
         if thread_result.is_err() {
-            return future::result(Ok(HttpResponse::InternalServerError().into()));
+            return Ok(HttpResponse::InternalServerError().into());
         }
     }
 
-    future::result(Ok(HttpResponse::Ok().into()))
+    Ok(HttpResponse::Ok().into())
 }
 
 pub(crate) fn get_empty_raw_event_id(pool: &Data<Pool>, data_source_id: i32) -> Result<i32, Error> {

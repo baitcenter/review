@@ -5,7 +5,6 @@ use actix_web::{
 };
 use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
@@ -285,10 +284,10 @@ pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
 
 #[allow(clippy::cognitive_complexity)]
 #[allow(clippy::too_many_lines)]
-pub(crate) fn add_descriptions(
+pub(crate) async fn add_descriptions(
     pool: Data<database::Pool>,
     new_descriptions: Json<Vec<DescriptionUpdate>>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let insert_descriptions: Vec<_> = new_descriptions.into_inner();
 
     let insert_result = pool.get().map_err(Into::into).and_then(|conn| {
@@ -544,20 +543,18 @@ pub(crate) fn add_descriptions(
         Ok(c_result)
     });
 
-    let result = match insert_result {
+    match insert_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
-pub(crate) fn get_rounds_by_cluster(
+pub(crate) async fn get_rounds_by_cluster(
     pool: Data<database::Pool>,
     query: Query<RoundSelectQuery>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl as c_d;
     use column_description::dsl as cd_d;
     use data_source::dsl as d_d;
@@ -577,16 +574,14 @@ pub(crate) fn get_rounds_by_cluster(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(round_response) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(round_response)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
 struct GetValueByType {}
@@ -701,10 +696,10 @@ macro_rules! load_descriptions_others {
 }
 
 #[allow(clippy::too_many_lines)]
-pub(crate) fn get_description(
+pub(crate) async fn get_description(
     pool: Data<database::Pool>,
     query: Query<DescriptionSelectQuery>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl as c_d;
     use column_description::dsl as cd_d;
     use data_source::dsl as d_d;
@@ -970,14 +965,12 @@ pub(crate) fn get_description(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(response) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(response)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }

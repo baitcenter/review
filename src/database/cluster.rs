@@ -7,7 +7,6 @@ use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{NaiveDateTime, Utc};
 use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -35,10 +34,10 @@ pub(crate) struct QualifierUpdate {
     qualifier: String,
 }
 
-pub(crate) fn get_clusters(
+pub(crate) async fn get_clusters(
     pool: Data<Pool>,
     query: Query<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let default_per_page = 10;
     let max_per_page = 100;
     let cluster_schema = "(((((cluster INNER JOIN status ON cluster.status_id = status.id) \
@@ -133,15 +132,15 @@ pub(crate) fn get_clusters(
             .map_err(Into::into)
         });
 
-    future::result(GetQuery::build_response(&query, per_page, query_result))
+    GetQuery::build_response(&query, per_page, query_result)
 }
 
-pub(crate) fn update_cluster(
+pub(crate) async fn update_cluster(
     pool: Data<Pool>,
     cluster_id: Path<String>,
     query: Query<Value>,
     new_cluster: Json<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let data_source = query.get("data_source").and_then(Value::as_str);
     let new_cluster = new_cluster.into_inner();
     let (new_cluster_id, new_category, new_qualifier) = (
@@ -168,23 +167,22 @@ pub(crate) fn update_cluster(
             .map_err(Into::into)
         });
 
-        let result = match query_result {
+        match query_result {
             Ok(1) => Ok(HttpResponse::Ok().into()),
             Ok(_) => Ok(HttpResponse::InternalServerError().into()),
             Err(e) => Ok(HttpResponse::InternalServerError()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .body(build_err_msg(&e))),
-        };
-        future::result(result)
+        }
     } else {
-        future::result(Ok(HttpResponse::BadRequest().into()))
+        Ok(HttpResponse::BadRequest().into())
     }
 }
 
-pub(crate) fn update_clusters(
+pub(crate) async fn update_clusters(
     pool: Data<Pool>,
     cluster_update: Json<Vec<ClusterUpdate>>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl;
 
     #[derive(Debug, Queryable, Serialize)]
@@ -331,21 +329,19 @@ pub(crate) fn update_clusters(
             })
     });
 
-    let result = match query_result {
+    match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
-pub(crate) fn update_qualifiers(
+pub(crate) async fn update_qualifiers(
     pool: Data<Pool>,
     qualifier_update: Json<Vec<QualifierUpdate>>,
     etcd_server: Data<EtcdServer>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl;
 
     let qualifier_update = qualifier_update.into_inner();
@@ -394,7 +390,7 @@ pub(crate) fn update_qualifiers(
     });
 
     let etcd_server = etcd_server.into_inner();
-    let result = match query_result {
+    match query_result {
         Ok(_) => {
             let update_list = qualifier_update
                 .iter()
@@ -406,22 +402,31 @@ pub(crate) fn update_qualifiers(
                     }
                 })
                 .collect::<HashSet<_>>();
-            update_list.iter().for_each(|data_source| {
+            for data_source in update_list.iter() {
                 let etcd_value = format!(
                     r#"http://{}/api/cluster/search?filter={{"qualifier": ["benign"], "data_source":["{}"]}}"#,
                     &etcd_server.docker_host_addr.clone(), data_source
                 );
                 let etcd_key = format!("benign_signatures_{}", data_source);
-                update_etcd(&etcd_server.etcd_url, &etcd_key, &etcd_value);
-            });
+                let data = format!(
+                    r#"{{"key": "{}", "value": "{}"}}"#,
+                    base64::encode(&etcd_key),
+                    base64::encode(&etcd_value)
+                );
+                reqwest::Client::new()
+                    .post(&etcd_server.etcd_url)
+                    .body(data)
+                    .send()
+                    .await
+                    .map(|_| ())
+                    .unwrap_or(());
+            }
             Ok(HttpResponse::Ok().into())
         }
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
 
 fn merge_cluster_examples(
@@ -444,27 +449,6 @@ fn merge_cluster_examples(
             Some(current_eg)
         }
     })
-}
-
-fn update_etcd(url: &str, key: &str, value: &str) {
-    let data = format!(
-        r#"{{"key": "{}", "value": "{}"}}"#,
-        base64::encode(key),
-        base64::encode(value)
-    );
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let req = reqwest::r#async::Client::new()
-        .post(url)
-        .body(data)
-        .send()
-        .and_then(reqwest::r#async::Response::error_for_status)
-        .then(move |response| tx.send(response))
-        .map(|_| ())
-        .map_err(|_| ());
-    if let Ok(mut runtime) = tokio::runtime::Runtime::new() {
-        runtime.spawn(req);
-        let _ = rx.wait();
-    }
 }
 
 #[derive(Debug, Deserialize)]

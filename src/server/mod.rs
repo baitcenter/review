@@ -1,5 +1,5 @@
-use actix::prelude::SystemRunner;
 use actix_files::Files;
+use actix_rt::SystemRunner;
 use actix_web::{middleware, App, HttpServer, Result};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -30,7 +30,7 @@ impl Server {
         etcd_url: String,
         docker_host_addr: String,
     ) -> Result<Self, Error> {
-        let runner = actix::System::new("REviewd");
+        let runner = actix_rt::System::new("REview");
 
         let manager = ConnectionManager::<PgConnection>::new(database_url);
         let pool =

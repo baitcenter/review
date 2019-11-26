@@ -1,6 +1,5 @@
 use actix_web::{http, web::Data, HttpResponse};
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 
 use super::schema::qualifier;
@@ -24,9 +23,9 @@ pub(crate) fn get_qualifier_id(pool: &Data<Pool>, qualifier: &str) -> Result<i32
     })
 }
 
-pub(crate) fn get_qualifier_table(
+pub(crate) async fn get_qualifier_table(
     pool: Data<Pool>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let query_result: Result<Vec<QualifierTable>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             qualifier::dsl::qualifier
@@ -34,14 +33,12 @@ pub(crate) fn get_qualifier_table(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(qualifier_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(qualifier_table)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }

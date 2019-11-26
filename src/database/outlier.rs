@@ -6,7 +6,6 @@ use actix_web::{
 use bigdecimal::{BigDecimal, FromPrimitive};
 use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -33,11 +32,11 @@ pub(crate) struct OutlierUpdate {
     event_ids: Vec<u64>,
 }
 
-pub(crate) fn delete_outliers(
+pub(crate) async fn delete_outliers(
     pool: Data<Pool>,
     outliers: Json<Vec<String>>,
     data_source: Query<DataSourceQuery>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl as c_dsl;
     use outlier::dsl as o_dsl;
 
@@ -119,13 +118,13 @@ pub(crate) fn delete_outliers(
         }
     }
 
-    future::result(Ok(HttpResponse::Ok().into()))
+    Ok(HttpResponse::Ok().into())
 }
 
-pub(crate) fn get_outliers(
+pub(crate) async fn get_outliers(
     pool: Data<Pool>,
     query: Query<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let default_per_page = 10;
     let max_per_page = 100;
     let outlier_schema =
@@ -193,13 +192,13 @@ pub(crate) fn get_outliers(
             .map_err(Into::into)
         });
 
-    future::result(GetQuery::build_response(&query, per_page, query_result))
+    GetQuery::build_response(&query, per_page, query_result)
 }
 
-pub(crate) fn update_outliers(
+pub(crate) async fn update_outliers(
     pool: Data<Pool>,
     outlier_update: Json<Vec<OutlierUpdate>>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     use outlier::dsl;
 
     let outlier_update = outlier_update.into_inner();
@@ -326,12 +325,10 @@ pub(crate) fn update_outliers(
             })
     });
 
-    let result = match query_result {
+    match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }

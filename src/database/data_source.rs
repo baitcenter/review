@@ -4,7 +4,6 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
-use futures::{future, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -24,22 +23,22 @@ struct DataSourceTable {
     data_type: String,
 }
 
-pub(crate) fn add_data_source_endpoint(
+pub(crate) async fn add_data_source_endpoint(
     pool: Data<Pool>,
     query: Query<Value>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let data_source = query.get("data_source").and_then(Value::as_str);
     let data_type = query.get("data_type").and_then(Value::as_str);
 
     let query_result = if let (Some(data_source), Some(data_type)) = (data_source, data_type) {
         add_data_source(&pool, data_source, data_type)
     } else {
-        return future::result(Ok(HttpResponse::BadRequest().into()));
+        return Ok(HttpResponse::BadRequest().into());
     };
 
     match query_result {
-        0 => future::result(Ok(HttpResponse::InternalServerError().into())),
-        _ => future::result(Ok(HttpResponse::Created().into())),
+        0 => Ok(HttpResponse::InternalServerError().into()),
+        _ => Ok(HttpResponse::Created().into()),
     }
 }
 
@@ -73,9 +72,9 @@ pub(crate) fn get_data_source_id(pool: &Data<Pool>, data_source: &str) -> Result
     })
 }
 
-pub(crate) fn get_data_source_table(
+pub(crate) async fn get_data_source_table(
     pool: Data<Pool>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let query_result: Result<Vec<DataSourceTable>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             data_source::dsl::data_source
@@ -83,14 +82,12 @@ pub(crate) fn get_data_source_table(
                 .map_err(Into::into)
         });
 
-    let result = match query_result {
+    match query_result {
         Ok(data_source_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(data_source_table)),
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
-    };
-
-    future::result(result)
+    }
 }
