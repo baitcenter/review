@@ -43,9 +43,9 @@ impl Server {
         let runner = actix_rt::System::new("REview");
 
         let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let pool = Pool::new(manager).map_err(|e| Error::PoolInitialization(e))?;
-        let conn = pool.get().map_err(|e| Error::DatabaseConnection(e))?;
-        embedded_migrations::run(&conn).map_err(|e| Error::DatabaseMigration(e))?;
+        let pool = Pool::new(manager).map_err(Error::PoolInitialization)?;
+        let conn = pool.get().map_err(Error::DatabaseConnection)?;
+        embedded_migrations::run(&conn).map_err(Error::DatabaseMigration)?;
         let etcd_server = EtcdServer {
             etcd_url,
             docker_host_addr,
@@ -67,7 +67,7 @@ impl Server {
                 .wrap(middleware::Logger::default())
         })
         .bind(reviewd_addr)
-        .map_err(|e| Error::Bind(e))?
+        .map_err(Error::Bind)?
         .start();
 
         Ok(Self { runner })
