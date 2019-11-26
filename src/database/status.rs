@@ -7,20 +7,9 @@ use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Identifiable, Queryable, Serialize)]
 #[table_name = "status"]
-pub(crate) struct StatusTable {
-    pub(crate) id: i32,
-    pub(crate) description: String,
-}
-
-pub(crate) fn get_status_id(pool: &Data<Pool>, status: &str) -> Result<i32, Error> {
-    use status::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::status
-            .select(dsl::id)
-            .filter(dsl::description.eq(status))
-            .first::<i32>(&conn)
-            .map_err(Into::into)
-    })
+struct StatusTable {
+    id: i32,
+    description: String,
 }
 
 pub(crate) async fn get_status_table(pool: Data<Pool>) -> Result<HttpResponse, actix_web::Error> {

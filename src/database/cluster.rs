@@ -9,11 +9,10 @@ use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::schema::cluster;
 use crate::database::*;
-use crate::server::EtcdServer;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ClusterUpdate {
@@ -25,13 +24,6 @@ pub(crate) struct ClusterUpdate {
     data_source_type: String,
     size: Option<usize>,
     event_ids: Option<Vec<u64>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct QualifierUpdate {
-    cluster_id: String,
-    data_source: String,
-    qualifier: String,
 }
 
 pub(crate) async fn get_clusters(

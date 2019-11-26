@@ -7,20 +7,9 @@ use crate::database::{build_err_msg, Error, Pool};
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[table_name = "qualifier"]
-pub(crate) struct QualifierTable {
-    pub(crate) id: i32,
-    pub(crate) description: String,
-}
-
-pub(crate) fn get_qualifier_id(pool: &Data<Pool>, qualifier: &str) -> Result<i32, Error> {
-    use qualifier::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::qualifier
-            .select(dsl::id)
-            .filter(dsl::description.eq(qualifier))
-            .first::<i32>(&conn)
-            .map_err(Into::into)
-    })
+struct QualifierTable {
+    id: i32,
+    description: String,
 }
 
 pub(crate) async fn get_qualifier_table(
