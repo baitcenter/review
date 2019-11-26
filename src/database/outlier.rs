@@ -195,6 +195,7 @@ pub(crate) async fn get_outliers(
     GetQuery::build_response(&query, per_page, query_result)
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn update_outliers(
     pool: Data<Pool>,
     outlier_update: Json<Vec<OutlierUpdate>>,

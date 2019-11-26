@@ -59,7 +59,7 @@ impl<'a> GetQuery<'a> {
                 let pagination = match (query.get("page"), query.get("per_page")) {
                     (Some(_), _) | (_, Some(_)) if !data.is_empty() => {
                         let total = data[0].count;
-                        let total_pages = (total as f64 / per_page as f64).ceil() as u64;
+                        let total_pages = (total + per_page - 1) / per_page;
                         Some((total, total_pages))
                     }
                     _ => None,

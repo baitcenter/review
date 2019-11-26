@@ -171,6 +171,7 @@ pub(crate) async fn update_cluster(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn update_clusters(
     pool: Data<Pool>,
     cluster_update: Json<Vec<ClusterUpdate>>,

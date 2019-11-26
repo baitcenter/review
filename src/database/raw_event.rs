@@ -40,6 +40,7 @@ struct UpdateRawEventId {
     is_cluster: bool,
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn add_raw_events(
     pool: Data<Pool>,
     query: Query<RawEventQuery>,
