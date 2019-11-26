@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::thread;
 
 use super::schema::{cluster, outlier, raw_event};
-use crate::database::{bytes_to_string, get_data_source_id, DatabaseError, Error, ErrorKind, Pool};
+use crate::database::{bytes_to_string, get_data_source_id, Error, Pool};
 
 #[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "raw_event"]
@@ -213,7 +213,7 @@ fn get_event_ids_from_cluster(
                     .collect()
             })
     } else {
-        Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
+        Err(Error::RecordNotExist)
     }
 }
 
@@ -249,6 +249,6 @@ fn get_event_ids_from_outlier(
                     .collect()
             })
     } else {
-        Err(ErrorKind::DatabaseTransactionError(DatabaseError::RecordNotExist).into())
+        Err(Error::RecordNotExist)
     }
 }

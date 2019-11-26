@@ -372,9 +372,7 @@ pub(crate) async fn update_qualifiers(
                         .execute(&conn)
                         .map_err(Into::into)
                 } else {
-                    Err(Error::from(ErrorKind::DatabaseTransactionError(
-                        DatabaseError::RecordNotExist,
-                    )))
+                    Err(Error::RecordNotExist)
                 }
             })
             .filter_map(Result::ok)
@@ -383,7 +381,7 @@ pub(crate) async fn update_qualifiers(
             .sum();
 
         if row == 0 {
-            Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
+            Err(Error::Transaction)
         } else {
             Ok(row)
         }

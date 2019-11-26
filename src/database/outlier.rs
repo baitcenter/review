@@ -308,7 +308,7 @@ pub(crate) async fn update_outliers(
                     .collect();
 
                 if replace_outliers.is_empty() {
-                    Err(ErrorKind::DatabaseTransactionError(DatabaseError::Other).into())
+                    Err(Error::Transaction)
                 } else {
                     diesel::insert_into(dsl::outlier)
                         .values(&replace_outliers)
