@@ -1,6 +1,5 @@
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
-use failure::Fail;
 use log::error;
 use serde_json::json;
 use thiserror::Error;
@@ -46,19 +45,14 @@ pub enum Error {
     Query(#[from] diesel::result::Error),
     #[error("connection error: {0}")]
     R2D2(#[from] r2d2::Error),
-    #[error("JSON deserialization error")]
+    #[error("JSON deserialization error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 }
 
-pub(crate) fn build_err_msg(fail: &dyn Fail) -> String {
-    error!("{}", fail);
-    let mut err_msg = fail.to_string();
-    for cause in fail.iter_causes() {
-        error!("\tcaused by: {}", cause);
-        err_msg.push_str(&format!("\n\tcaused by: {}", cause));
-    }
-
-    json!({"message": err_msg,
+pub(crate) fn build_err_msg(e: &dyn std::error::Error) -> String {
+    error!("{}", e);
+    json!({
+        "message": e.to_string(),
     })
     .to_string()
 }

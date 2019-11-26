@@ -5,16 +5,15 @@ extern crate diesel_migrations;
 
 pub mod app;
 mod database;
-mod error;
 mod server;
 
-use failure::Fail;
+use anyhow::Error;
 use log::error;
 use server::Server;
 
-pub fn log_error(fail: &dyn Fail) {
-    error!("{}", fail);
-    for cause in fail.iter_causes() {
+pub fn log_error(e: &Error) {
+    error!("{}", e);
+    for cause in e.chain() {
         error!("\tcaused by: {}", cause);
     }
 }

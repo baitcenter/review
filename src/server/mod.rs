@@ -10,13 +10,13 @@ mod route;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("could not bind server address")]
+    #[error("could not bind server address: {0}")]
     Bind(io::Error),
-    #[error("could not connect to database")]
+    #[error("could not connect to database: {0}")]
     DatabaseConnection(r2d2::Error),
-    #[error("could not initialize/migrate database")]
+    #[error("could not initialize/migrate database: {0}")]
     DatabaseMigration(diesel_migrations::RunMigrationsError),
-    #[error("could not create a database conenction pool")]
+    #[error("could not create a database conenction pool: {0}")]
     PoolInitialization(r2d2::Error),
 }
 
