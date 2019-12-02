@@ -4,6 +4,8 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
+use diesel::r2d2::ConnectionManager;
+use r2d2::PooledConnection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -62,14 +64,21 @@ pub(crate) fn add_data_source(pool: &Data<Pool>, data_source: &str, data_type: &
 }
 
 pub(crate) fn get_data_source_id(pool: &Data<Pool>, data_source: &str) -> Result<i32, Error> {
+    pool.get()
+        .map_err(Into::into)
+        .and_then(|conn| id(&conn, data_source))
+}
+
+pub(crate) fn id(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+    data_source: &str,
+) -> Result<i32, Error> {
     use data_source::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::data_source
-            .select(dsl::id)
-            .filter(dsl::topic_name.eq(data_source))
-            .first::<i32>(&conn)
-            .map_err(Into::into)
-    })
+    dsl::data_source
+        .select(dsl::id)
+        .filter(dsl::topic_name.eq(data_source))
+        .first::<i32>(conn)
+        .map_err(Into::into)
 }
 
 pub(crate) async fn get_data_source_table(

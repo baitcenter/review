@@ -1,16 +1,19 @@
 use actix_web::{
+    http,
     web::{Data, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, ToPrimitive};
 use diesel::prelude::*;
+use diesel::r2d2::ConnectionManager;
 use eventio::{kafka, Input};
+use r2d2::PooledConnection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::thread;
 
 use super::schema::{cluster, outlier, raw_event};
-use crate::database::{bytes_to_string, get_data_source_id, Error, Pool};
+use crate::database::{build_err_msg, bytes_to_string, data_source, Error, Pool};
 
 #[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "raw_event"]
@@ -47,10 +50,18 @@ pub(crate) async fn add_raw_events(
     kafka_url: Data<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let query = query.into_inner();
+    let conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(build_err_msg(&e)))
+        }
+    };
     if let (Ok(event_ids_from_clusters), Ok(event_ids_from_outliers), Ok(data_source_id)) = (
-        get_event_ids_from_cluster(&pool, &query.data_source),
-        get_event_ids_from_outlier(&pool, &query.data_source),
-        get_data_source_id(&pool, &query.data_source),
+        event_ids_from_cluster(&conn, &query.data_source),
+        event_ids_from_outlier(&conn, &query.data_source),
+        data_source::id(&conn, &query.data_source),
     ) {
         let (data_tx, data_rx) = crossbeam_channel::bounded(256);
         let (ack_tx, ack_rx) = crossbeam_channel::bounded(256);
@@ -117,33 +128,30 @@ pub(crate) async fn add_raw_events(
         let thread_result = in_thread.join();
 
         if !raw_events.is_empty() {
-            let _: Result<(), Error> = pool.get().map_err(Into::into).and_then(|conn| {
-                let _ = diesel::insert_into(raw_event::dsl::raw_event)
-                    .values(&raw_events)
-                    .execute(&*conn);
-                if let Ok(raw_events) = get_raw_events_by_data_source_id(&pool, data_source_id) {
-                    let raw_events = raw_events
-                        .into_iter()
-                        .map(|e| (e.1, e.0))
-                        .collect::<HashMap<String, i32>>();
-                    for u in update_lists {
-                        if let Some(raw_event_id) = raw_events.get(&u.data) {
-                            if u.is_cluster {
-                                use cluster::dsl;
-                                let _ = diesel::update(dsl::cluster.filter(dsl::id.eq(u.id)))
-                                    .set(dsl::raw_event_id.eq(raw_event_id))
-                                    .execute(&*conn);
-                            } else {
-                                use outlier::dsl;
-                                let _ = diesel::update(dsl::outlier.filter(dsl::id.eq(u.id)))
-                                    .set(dsl::raw_event_id.eq(raw_event_id))
-                                    .execute(&*conn);
-                            }
+            let _ = diesel::insert_into(raw_event::dsl::raw_event)
+                .values(&raw_events)
+                .execute(&conn);
+            if let Ok(raw_events) = events_by_data_source_id(&conn, data_source_id) {
+                let raw_events = raw_events
+                    .into_iter()
+                    .map(|e| (e.1, e.0))
+                    .collect::<HashMap<String, i32>>();
+                for u in update_lists {
+                    if let Some(raw_event_id) = raw_events.get(&u.data) {
+                        if u.is_cluster {
+                            use cluster::dsl;
+                            let _ = diesel::update(dsl::cluster.filter(dsl::id.eq(u.id)))
+                                .set(dsl::raw_event_id.eq(raw_event_id))
+                                .execute(&*conn);
+                        } else {
+                            use outlier::dsl;
+                            let _ = diesel::update(dsl::outlier.filter(dsl::id.eq(u.id)))
+                                .set(dsl::raw_event_id.eq(raw_event_id))
+                                .execute(&*conn);
                         }
                     }
                 }
-                Ok(())
-            });
+            }
         }
 
         if thread_result.is_err() {
@@ -155,54 +163,55 @@ pub(crate) async fn add_raw_events(
 }
 
 pub(crate) fn get_empty_raw_event_id(pool: &Data<Pool>, data_source_id: i32) -> Result<i32, Error> {
-    use raw_event::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::raw_event
-            .filter(
-                dsl::data_source_id
-                    .eq(data_source_id)
-                    .and(dsl::data.eq("-")),
-            )
-            .select(dsl::id)
-            .first::<i32>(&conn)
-            .map_err(Into::into)
-    })
+    pool.get()
+        .map_err(Into::into)
+        .and_then(|conn| empty_event_id(&conn, data_source_id))
 }
 
-pub(crate) fn get_raw_events_by_data_source_id(
-    pool: &Data<Pool>,
+fn empty_event_id(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+    data_source_id: i32,
+) -> Result<i32, Error> {
+    use raw_event::dsl;
+    dsl::raw_event
+        .filter(
+            dsl::data_source_id
+                .eq(data_source_id)
+                .and(dsl::data.eq("-")),
+        )
+        .select(dsl::id)
+        .first::<i32>(conn)
+        .map_err(Into::into)
+}
+
+fn events_by_data_source_id(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
     data_source_id: i32,
 ) -> Result<Vec<(i32, String)>, Error> {
     use raw_event::dsl;
-    pool.get().map_err(Into::into).and_then(|conn| {
-        dsl::raw_event
-            .filter(dsl::data_source_id.eq(data_source_id))
-            .select((dsl::id, dsl::data))
-            .load::<(i32, String)>(&conn)
-            .map_err(Into::into)
-    })
+    dsl::raw_event
+        .filter(dsl::data_source_id.eq(data_source_id))
+        .select((dsl::id, dsl::data))
+        .load::<(i32, String)>(conn)
+        .map_err(Into::into)
 }
 
-fn get_event_ids_from_cluster(
-    pool: &Data<Pool>,
+fn event_ids_from_cluster(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
     data_source: &str,
 ) -> Result<Vec<(i32, u64)>, Error> {
     use cluster::dsl;
-    if let Ok(data_source_id) = get_data_source_id(&pool, data_source) {
-        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
-        pool.get()
+    if let Ok(data_source_id) = data_source::id(conn, data_source) {
+        let raw_event_id = empty_event_id(conn, data_source_id).unwrap_or_default();
+        dsl::cluster
+            .filter(
+                dsl::data_source_id
+                    .eq(data_source_id)
+                    .and(dsl::raw_event_id.eq(raw_event_id)),
+            )
+            .select((dsl::id, dsl::event_ids))
+            .load::<(i32, Option<Vec<BigDecimal>>)>(conn)
             .map_err(Into::into)
-            .and_then(|conn| {
-                dsl::cluster
-                    .filter(
-                        dsl::data_source_id
-                            .eq(data_source_id)
-                            .and(dsl::raw_event_id.eq(raw_event_id)),
-                    )
-                    .select((dsl::id, dsl::event_ids))
-                    .load::<(i32, Option<Vec<BigDecimal>>)>(&conn)
-                    .map_err(Into::into)
-            })
             .map(|data| {
                 data.into_iter()
                     .filter_map(|d| {
@@ -218,26 +227,22 @@ fn get_event_ids_from_cluster(
     }
 }
 
-fn get_event_ids_from_outlier(
-    pool: &Data<Pool>,
+fn event_ids_from_outlier(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
     data_source: &str,
 ) -> Result<Vec<(i32, u64)>, Error> {
     use outlier::dsl;
-    if let Ok(data_source_id) = get_data_source_id(&pool, data_source) {
-        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
-        pool.get()
+    if let Ok(data_source_id) = data_source::id(conn, data_source) {
+        let raw_event_id = empty_event_id(conn, data_source_id).unwrap_or_default();
+        dsl::outlier
+            .filter(
+                dsl::data_source_id
+                    .eq(data_source_id)
+                    .and(dsl::raw_event_id.eq(raw_event_id)),
+            )
+            .select((dsl::id, dsl::event_ids))
+            .load::<(i32, Vec<BigDecimal>)>(conn)
             .map_err(Into::into)
-            .and_then(|conn| {
-                dsl::outlier
-                    .filter(
-                        dsl::data_source_id
-                            .eq(data_source_id)
-                            .and(dsl::raw_event_id.eq(raw_event_id)),
-                    )
-                    .select((dsl::id, dsl::event_ids))
-                    .load::<(i32, Vec<BigDecimal>)>(&conn)
-                    .map_err(Into::into)
-            })
             .map(|data| {
                 data.into_iter()
                     .filter_map(|d| {
