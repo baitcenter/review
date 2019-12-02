@@ -41,10 +41,15 @@ pub(crate) async fn delete_outliers(
     use outlier::dsl as o_dsl;
 
     let data_source = data_source.into_inner();
-    if let (Ok(data_source_id), Ok(conn)) = (
-        get_data_source_id(&pool, &data_source.data_source),
-        pool.get(),
-    ) {
+    let conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(build_err_msg(&e)))
+        }
+    };
+    if let Ok(data_source_id) = data_source::id(&conn, &data_source.data_source) {
         let outliers_from_database = o_dsl::outlier
             .filter(o_dsl::data_source_id.eq(data_source_id))
             .load::<OutliersTable>(&conn)
@@ -72,7 +77,7 @@ pub(crate) async fn delete_outliers(
             })
             .collect::<Vec<_>>();
 
-        let raw_event_id = get_empty_raw_event_id(&pool, data_source_id).unwrap_or_default();
+        let raw_event_id = empty_event_id(&conn, data_source_id).unwrap_or_default();
         let clusters_from_database = c_dsl::cluster
             .select((c_dsl::id, c_dsl::event_ids))
             .filter(
