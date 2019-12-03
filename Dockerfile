@@ -40,7 +40,7 @@ COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./diesel.toml ./diesel.toml
 
-RUN cargo install --path . && cargo clean
+RUN cargo install --locked --path . && cargo clean
 
 FROM ubuntu:19.10
 
