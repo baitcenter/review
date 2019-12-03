@@ -33,7 +33,11 @@ pub(crate) async fn add_data_source_endpoint(
     let data_type = query.get("data_type").and_then(Value::as_str);
 
     let query_result = if let (Some(data_source), Some(data_type)) = (data_source, data_type) {
-        add_data_source(&pool, data_source, data_type)
+        let new_data_source: Result<i32, Error> = pool
+            .get()
+            .map_err(Into::into)
+            .and_then(|conn| add(&conn, data_source, data_type));
+        new_data_source.unwrap_or(0)
     } else {
         return Ok(HttpResponse::BadRequest().into());
     };
@@ -44,23 +48,22 @@ pub(crate) async fn add_data_source_endpoint(
     }
 }
 
-pub(crate) fn add_data_source(pool: &Data<Pool>, data_source: &str, data_type: &str) -> i32 {
+pub(crate) fn add(
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+    data_source: &str,
+    data_type: &str,
+) -> Result<i32, Error> {
     use data_source::dsl;
-
-    let new_data_source: Result<DataSourceTable, Error> =
-        pool.get().map_err(Into::into).and_then(|conn| {
-            diesel::insert_into(dsl::data_source)
-                .values((
-                    dsl::topic_name.eq(data_source),
-                    dsl::data_type.eq(data_type),
-                ))
-                .on_conflict(dsl::topic_name)
-                .do_nothing()
-                .get_result(&conn)
-                .map_err(Into::into)
-        });
-
-    new_data_source.ok().map_or(0, |d| d.id)
+    let new_data_source: Result<DataSourceTable, Error> = diesel::insert_into(dsl::data_source)
+        .values((
+            dsl::topic_name.eq(data_source),
+            dsl::data_type.eq(data_type),
+        ))
+        .on_conflict(dsl::topic_name)
+        .do_nothing()
+        .get_result(conn)
+        .map_err(Into::into);
+    new_data_source.map(|d| d.id)
 }
 
 pub(crate) fn get_data_source_id(pool: &Data<Pool>, data_source: &str) -> Result<i32, Error> {

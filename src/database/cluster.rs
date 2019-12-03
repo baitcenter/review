@@ -247,7 +247,7 @@ pub(crate) async fn update_clusters(
                                         },
                                     );
                                 let data_source_id =
-                                    get_data_source_id(&pool, &c.data_source).unwrap_or_default();
+                                    data_source::id(&conn, &c.data_source).unwrap_or_default();
                                 if data_source_id == 0 {
                                     None
                                 } else {
@@ -277,12 +277,13 @@ pub(crate) async fn update_clusters(
                                     c.size.and_then(FromPrimitive::from_usize).unwrap_or_else(
                                         || FromPrimitive::from_usize(1).unwrap_or_default(),
                                     );
-                                let data_source_id = get_data_source_id(&pool, &c.data_source)
+                                let data_source_id = data_source::id(&conn, &c.data_source)
                                     .unwrap_or_else(|_| {
-                                        add_data_source(&pool, &c.data_source, &c.data_source_type)
+                                        data_source::add(&conn, &c.data_source, &c.data_source_type)
+                                            .unwrap_or(0)
                                     });
-                                let raw_event_id = get_empty_raw_event_id(&pool, data_source_id)
-                                    .unwrap_or_default();
+                                let raw_event_id =
+                                    empty_event_id(&conn, data_source_id).unwrap_or_default();
                                 if data_source_id == 0 || raw_event_id == 0 {
                                     None
                                 } else {

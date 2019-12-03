@@ -162,12 +162,6 @@ pub(crate) async fn add_raw_events(
     Ok(HttpResponse::Ok().into())
 }
 
-pub(crate) fn get_empty_raw_event_id(pool: &Data<Pool>, data_source_id: i32) -> Result<i32, Error> {
-    pool.get()
-        .map_err(Into::into)
-        .and_then(|conn| empty_event_id(&conn, data_source_id))
-}
-
 pub(crate) fn empty_event_id(
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
     data_source_id: i32,

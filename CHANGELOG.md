@@ -25,6 +25,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The `client` subcommand was obsoleted by REsolutions-frontend.
 - Removed `POST /api/cluster/` and `POST /api/cluster` endpoints.
 
+### Fixed
+
+- Each HTTP requests uses at most one database connection. This removes database
+  timeouts caused by connection exhaustion.
+
 ## [0.6.2] - 2019-11-08
 
 ### Added
