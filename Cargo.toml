@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 actix-files = "0.2.0-alpha.1"
-actix-rt = "1.0.0-alpha.1"
+actix-rt = "1.0.0-alpha.2"
 actix-web = "2.0.0-alpha.1"
 anyhow = "1"
 base64 = "0.11"
