@@ -146,6 +146,10 @@ impl<'a> QueryFragment<Pg> for GetQuery<'a> {
         }
         out.push_sql(") as a, (SELECT *, COUNT(*) OVER() FROM ");
         out.push_sql(self.schema);
+        if let Some(where_clause) = &self.where_clause {
+            out.push_sql(" WHERE ");
+            out.push_sql(&where_clause);
+        }
         out.push_sql(" LIMIT 1) b");
         Ok(())
     }
