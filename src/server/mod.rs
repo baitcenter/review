@@ -68,7 +68,7 @@ impl Server {
         })
         .bind(reviewd_addr)
         .map_err(Error::Bind)?
-        .start();
+        .run();
 
         Ok(Self { runner })
     }

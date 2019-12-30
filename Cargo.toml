@@ -10,9 +10,9 @@ edition = "2018"
 publish = false
 
 [dependencies]
-actix-files = "0.2.0-alpha.2"
-actix-rt = "1.0.0-alpha.2"
-actix-web = "2.0.0-alpha.1"
+actix-files = "0.2"
+actix-rt = "1"
+actix-web = "2"
 anyhow = "1"
 base64 = "0.11"
 # the version of bigdecimal must be the same as diesel (https://github.com/diesel-rs/diesel/issues/1753)
@@ -30,7 +30,7 @@ futures = "0.3"
 log = "0.4"
 num-traits = "0.2"
 r2d2 = "0.8"
-reqwest = "0.10.0-alpha.2"
+reqwest = "0.10"
 serde = { version = "1",  features = ["derive"] }
 serde_json = "1"
 structured = { git = "https://github.com/petabi/structured.git", rev = "9815452" }
