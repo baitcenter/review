@@ -4,6 +4,11 @@ This file documents all notable changes to this project. The format of this file
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added `event` and `kafka_metadata` tables.
+
 ## [0.6.3] - 2019-12-30
 
 ### Added
@@ -218,6 +223,7 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
+[Unreleased]: https://github.com/petabi/review/compare/0.6.3...master
 [0.6.3]: https://github.com/petabi/review/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/petabi/review/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/petabi/review/compare/0.6.0...0.6.1

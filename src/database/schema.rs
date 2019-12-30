@@ -109,6 +109,15 @@ table! {
 }
 
 table! {
+    event (id) {
+        id -> Int4,
+        message_id -> Numeric,
+        data_source_id -> Int4,
+        raw_event -> Nullable<Text>,
+    }
+}
+
+table! {
     indicator (id) {
         id -> Int4,
         name -> Text,
@@ -116,6 +125,16 @@ table! {
         token -> Jsonb,
         data_source_id -> Int4,
         last_modification_time -> Nullable<Timestamp>,
+    }
+}
+
+table! {
+    kafka_metadata (id) {
+        id -> Int4,
+        data_source_id -> Int4,
+        partition -> Int4,
+        offsets -> Int8,
+        message_ids -> Numrange,
     }
 }
 
@@ -226,7 +245,9 @@ joinable!(description_float -> column_description (description_id));
 joinable!(description_int -> column_description (description_id));
 joinable!(description_ipaddr -> column_description (description_id));
 joinable!(description_text -> column_description (description_id));
+joinable!(event -> data_source (data_source_id));
 joinable!(indicator -> data_source (data_source_id));
+joinable!(kafka_metadata -> data_source (data_source_id));
 joinable!(outlier -> data_source (data_source_id));
 joinable!(outlier -> raw_event (raw_event_id));
 joinable!(raw_event -> data_source (data_source_id));
@@ -249,7 +270,9 @@ allow_tables_to_appear_in_same_query!(
     description_int,
     description_ipaddr,
     description_text,
+    event,
     indicator,
+    kafka_metadata,
     outlier,
     qualifier,
     raw_event,
