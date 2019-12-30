@@ -1,6 +1,5 @@
 use actix_files::Files;
-use actix_rt::SystemRunner;
-use actix_web::{middleware, App, HttpServer, Result};
+use actix_web::{dev::Server, middleware, App, HttpServer, Result};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use std::io;
@@ -28,52 +27,39 @@ pub(crate) struct EtcdServer {
     pub(crate) docker_host_addr: String,
 }
 
-pub struct Server {
-    runner: SystemRunner,
-}
+pub fn run(
+    database_url: &str,
+    reviewd_addr: &std::net::SocketAddr,
+    kafka_url: String,
+    etcd_url: String,
+    docker_host_addr: String,
+) -> Result<Server, Error> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = Pool::new(manager).map_err(Error::PoolInitialization)?;
+    let conn = pool.get().map_err(Error::DatabaseConnection)?;
+    embedded_migrations::run(&conn).map_err(Error::DatabaseMigration)?;
+    let etcd_server = EtcdServer {
+        etcd_url,
+        docker_host_addr,
+    };
 
-impl Server {
-    pub fn new(
-        database_url: &str,
-        reviewd_addr: &std::net::SocketAddr,
-        kafka_url: String,
-        etcd_url: String,
-        docker_host_addr: String,
-    ) -> Result<Self, Error> {
-        let runner = actix_rt::System::new("REview");
-
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let pool = Pool::new(manager).map_err(Error::PoolInitialization)?;
-        let conn = pool.get().map_err(Error::DatabaseConnection)?;
-        embedded_migrations::run(&conn).map_err(Error::DatabaseMigration)?;
-        let etcd_server = EtcdServer {
-            etcd_url,
-            docker_host_addr,
-        };
-
-        let frontend_path = if let Ok(path) = std::env::var("FRONTEND_DIR") {
-            path
-        } else {
-            eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
-            ".".to_string()
-        };
-        HttpServer::new(move || {
-            App::new()
-                .data(pool.clone())
-                .data(kafka_url.clone())
-                .data(etcd_server.clone())
-                .configure(route::init_app)
-                .service(Files::new("/", frontend_path.as_str()).index_file("index.html"))
-                .wrap(middleware::Logger::default())
-        })
-        .bind(reviewd_addr)
-        .map_err(Error::Bind)?
-        .run();
-
-        Ok(Self { runner })
-    }
-
-    pub fn run(self) -> Result<(), std::io::Error> {
-        self.runner.run()
-    }
+    let frontend_path = if let Ok(path) = std::env::var("FRONTEND_DIR") {
+        path
+    } else {
+        eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
+        ".".to_string()
+    };
+    let server = HttpServer::new(move || {
+        App::new()
+            .data(pool.clone())
+            .data(kafka_url.clone())
+            .data(etcd_server.clone())
+            .configure(route::init_app)
+            .service(Files::new("/", frontend_path.as_str()).index_file("index.html"))
+            .wrap(middleware::Logger::default())
+    })
+    .bind(reviewd_addr)
+    .map_err(Error::Bind)?
+    .run();
+    Ok(server)
 }

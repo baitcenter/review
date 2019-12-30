@@ -9,7 +9,6 @@ mod server;
 
 use anyhow::Error;
 use log::error;
-use server::Server;
 
 pub fn log_error(e: &Error) {
     error!("{}", e);

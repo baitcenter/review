@@ -1,3 +1,5 @@
+use crate::server;
+use actix_web::dev::Server;
 use anyhow::{Context, Result};
 use clap::{App, Arg};
 
@@ -8,7 +10,7 @@ fn create_app() -> App<'static, 'static> {
         .arg(Arg::with_name("subcommand")) // TODO: Remove in 0.8.0.
 }
 
-pub fn init() -> Result<()> {
+pub fn init() -> Result<Server> {
     let matches = create_app().get_matches();
     if matches.value_of("subcommand").is_some() {
         eprintln!("Warning: A subcommand is deprecated. Please run review without subcommand.");
@@ -26,16 +28,12 @@ pub fn init() -> Result<()> {
         .parse::<std::net::SocketAddr>()
         .with_context(|| format!("invalid IP address/port for review: {}", reviewd_addr))?;
 
-    let runner = super::Server::new(
+    Ok(server::run(
         &database_url,
         &reviewd_addr,
         kafka_url,
         etcd_url,
         docker_host_addr,
     )
-    .context("failed to create server")?;
-
-    runner.run().context("failed to run server")?;
-
-    Ok(())
+    .context("failed to create server")?)
 }
