@@ -18,13 +18,11 @@ pub(crate) async fn add_indicator(
     let name = indicators.get("name").and_then(Value::as_str);
     let token: Option<&Value> = indicators.get("token");
     let description = indicators.get("description").and_then(Value::as_str);
-    let data_source_id = indicators
-        .get("data_source")
-        .and_then(Value::as_str)
-        .map(|d| get_data_source_id(&pool, d));
+    let data_source = indicators.get("data_source").and_then(Value::as_str);
 
-    if let (Some(name), Some(token), Some(Ok(data_source_id))) = (name, token, data_source_id) {
+    if let (Some(name), Some(token), Some(data_source)) = (name, token, data_source) {
         let insert_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+            let data_source_id = get_data_source_id(&conn, &data_source)?;
             diesel::insert_into(dsl::indicator)
                 .values((
                     dsl::name.eq(name),

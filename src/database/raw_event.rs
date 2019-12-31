@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::thread;
 
 use super::schema::{cluster, outlier, raw_event};
-use crate::database::{build_err_msg, bytes_to_string, data_source, Error, Pool};
+use crate::database::{build_err_msg, bytes_to_string, get_data_source_id, Error, Pool};
 
 #[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "raw_event"]
@@ -61,7 +61,7 @@ pub(crate) async fn add_raw_events(
     if let (Ok(event_ids_from_clusters), Ok(event_ids_from_outliers), Ok(data_source_id)) = (
         event_ids_from_cluster(&conn, &query.data_source),
         event_ids_from_outlier(&conn, &query.data_source),
-        data_source::id(&conn, &query.data_source),
+        get_data_source_id(&conn, &query.data_source),
     ) {
         let (data_tx, data_rx) = crossbeam_channel::bounded(256);
         let (ack_tx, ack_rx) = crossbeam_channel::bounded(256);
@@ -195,7 +195,7 @@ fn event_ids_from_cluster(
     data_source: &str,
 ) -> Result<Vec<(i32, u64)>, Error> {
     use cluster::dsl;
-    if let Ok(data_source_id) = data_source::id(conn, data_source) {
+    if let Ok(data_source_id) = get_data_source_id(conn, data_source) {
         let raw_event_id = empty_event_id(conn, data_source_id).unwrap_or_default();
         dsl::cluster
             .filter(
@@ -226,7 +226,7 @@ fn event_ids_from_outlier(
     data_source: &str,
 ) -> Result<Vec<(i32, u64)>, Error> {
     use outlier::dsl;
-    if let Ok(data_source_id) = data_source::id(conn, data_source) {
+    if let Ok(data_source_id) = get_data_source_id(conn, data_source) {
         let raw_event_id = empty_event_id(conn, data_source_id).unwrap_or_default();
         dsl::outlier
             .filter(

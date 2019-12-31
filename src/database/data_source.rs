@@ -4,13 +4,11 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
-use r2d2::PooledConnection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::schema::data_source;
-use crate::database::{build_err_msg, Error, Pool};
+use crate::database::{build_err_msg, Conn, Error, Pool};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DataSourceQuery {
@@ -48,11 +46,7 @@ pub(crate) async fn add_data_source_endpoint(
     }
 }
 
-pub(crate) fn add(
-    conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    data_source: &str,
-    data_type: &str,
-) -> Result<i32, Error> {
+pub(crate) fn add(conn: &Conn, data_source: &str, data_type: &str) -> Result<i32, Error> {
     use data_source::dsl;
     let new_data_source: Result<DataSourceTable, Error> = diesel::insert_into(dsl::data_source)
         .values((
@@ -66,16 +60,7 @@ pub(crate) fn add(
     new_data_source.map(|d| d.id)
 }
 
-pub(crate) fn get_data_source_id(pool: &Data<Pool>, data_source: &str) -> Result<i32, Error> {
-    pool.get()
-        .map_err(Into::into)
-        .and_then(|conn| id(&conn, data_source))
-}
-
-pub(crate) fn id(
-    conn: &PooledConnection<ConnectionManager<PgConnection>>,
-    data_source: &str,
-) -> Result<i32, Error> {
+pub(crate) fn get_data_source_id(conn: &Conn, data_source: &str) -> Result<i32, Error> {
     use data_source::dsl;
     dsl::data_source
         .select(dsl::id)

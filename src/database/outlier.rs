@@ -49,7 +49,7 @@ pub(crate) async fn delete_outliers(
                 .body(build_err_msg(&e)))
         }
     };
-    if let Ok(data_source_id) = data_source::id(&conn, &data_source.data_source) {
+    if let Ok(data_source_id) = get_data_source_id(&conn, &data_source.data_source) {
         let outliers_from_database = o_dsl::outlier
             .filter(o_dsl::data_source_id.eq(data_source_id))
             .load::<OutliersTable>(&conn)
@@ -207,18 +207,18 @@ pub(crate) async fn update_outliers(
 ) -> Result<HttpResponse, actix_web::Error> {
     use outlier::dsl;
 
-    let outlier_update = outlier_update.into_inner();
-    let mut query = dsl::outlier.into_boxed();
-    for outlier in &outlier_update {
-        if let Ok(data_source_id) = get_data_source_id(&pool, &outlier.data_source) {
-            query = query.or_filter(
-                dsl::raw_event
-                    .eq(bytes_to_string(&outlier.outlier))
-                    .and(dsl::data_source_id.eq(data_source_id)),
-            );
-        }
-    }
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+        let outlier_update = outlier_update.into_inner();
+        let mut query = dsl::outlier.into_boxed();
+        for outlier in &outlier_update {
+            if let Ok(data_source_id) = get_data_source_id(&conn, &outlier.data_source) {
+                query = query.or_filter(
+                    dsl::raw_event
+                        .eq(bytes_to_string(&outlier.outlier))
+                        .and(dsl::data_source_id.eq(data_source_id)),
+                );
+            }
+        }
         query
             .load::<OutliersTable>(&conn)
             .map_err(Into::into)
@@ -262,7 +262,7 @@ pub(crate) async fn update_outliers(
                                 event_ids
                             };
                             let data_source_id =
-                                data_source::id(&conn, &o.data_source).unwrap_or_default();
+                                get_data_source_id(&conn, &o.data_source).unwrap_or_default();
                             if data_source_id == 0 {
                                 None
                             } else {
@@ -292,7 +292,7 @@ pub(crate) async fn update_outliers(
                                 .unwrap_or_else(|| {
                                     FromPrimitive::from_usize(1).unwrap_or_default()
                                 });
-                            let data_source_id = data_source::id(&conn, &o.data_source)
+                            let data_source_id = get_data_source_id(&conn, &o.data_source)
                                 .unwrap_or_else(|_| {
                                     data_source::add(&conn, &o.data_source, &o.data_source_type)
                                         .unwrap_or(0)

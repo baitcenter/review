@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
 use serde_json::json;
 use thiserror::Error;
@@ -30,6 +30,7 @@ pub(crate) use self::raw_event::*;
 pub(crate) use self::status::*;
 
 pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+pub(crate) type Conn = PooledConnection<ConnectionManager<PgConnection>>;
 
 #[derive(Debug, Error)]
 pub enum Error {

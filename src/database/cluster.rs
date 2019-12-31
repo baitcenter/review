@@ -186,18 +186,18 @@ pub(crate) async fn update_clusters(
         raw_event_id: i32,
         size: BigDecimal,
     }
-    let cluster_update = cluster_update.into_inner();
-    let mut query = dsl::cluster.into_boxed();
-    for cluster in &cluster_update {
-        if let Ok(data_source_id) = get_data_source_id(&pool, &cluster.data_source) {
-            query = query.or_filter(
-                dsl::cluster_id
-                    .eq(&cluster.cluster_id)
-                    .and(dsl::data_source_id.eq(data_source_id)),
-            );
-        }
-    }
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+        let cluster_update = cluster_update.into_inner();
+        let mut query = dsl::cluster.into_boxed();
+        for cluster in &cluster_update {
+            if let Ok(data_source_id) = get_data_source_id(&conn, &cluster.data_source) {
+                query = query.or_filter(
+                    dsl::cluster_id
+                        .eq(&cluster.cluster_id)
+                        .and(dsl::data_source_id.eq(data_source_id)),
+                );
+            }
+        }
         query
             .select((
                 dsl::cluster_id,
@@ -247,7 +247,7 @@ pub(crate) async fn update_clusters(
                                         },
                                     );
                                 let data_source_id =
-                                    data_source::id(&conn, &c.data_source).unwrap_or_default();
+                                    get_data_source_id(&conn, &c.data_source).unwrap_or_default();
                                 if data_source_id == 0 {
                                     None
                                 } else {
@@ -277,7 +277,7 @@ pub(crate) async fn update_clusters(
                                     c.size.and_then(FromPrimitive::from_usize).unwrap_or_else(
                                         || FromPrimitive::from_usize(1).unwrap_or_default(),
                                     );
-                                let data_source_id = data_source::id(&conn, &c.data_source)
+                                let data_source_id = get_data_source_id(&conn, &c.data_source)
                                     .unwrap_or_else(|_| {
                                         data_source::add(&conn, &c.data_source, &c.data_source_type)
                                             .unwrap_or(0)
