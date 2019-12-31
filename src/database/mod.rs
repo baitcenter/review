@@ -8,6 +8,7 @@ mod category;
 mod cluster;
 mod data_source;
 mod description;
+mod event;
 mod function;
 mod indicator;
 mod outlier;
@@ -21,6 +22,7 @@ pub(crate) use self::category::*;
 pub(crate) use self::cluster::*;
 pub(crate) use self::data_source::*;
 pub(crate) use self::description::*;
+pub(crate) use self::event::*;
 pub(crate) use self::function::*;
 pub(crate) use self::indicator::*;
 pub(crate) use self::outlier::*;
@@ -29,8 +31,8 @@ pub(crate) use self::query::*;
 pub(crate) use self::raw_event::*;
 pub(crate) use self::status::*;
 
-pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub(crate) type Conn = PooledConnection<ConnectionManager<PgConnection>>;
+pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Debug, Error)]
 pub enum Error {

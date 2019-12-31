@@ -206,7 +206,7 @@ pub(crate) async fn update_outliers(
     outlier_update: Json<Vec<OutlierUpdate>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use outlier::dsl;
-
+    let mut deleted_events = Vec::<Event>::new();
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         let outlier_update = outlier_update.into_inner();
         let mut query = dsl::outlier.into_boxed();
@@ -254,18 +254,30 @@ pub(crate) async fn update_outliers(
                                 .collect::<Vec<BigDecimal>>();
                             event_ids.extend(outlier.event_ids.clone());
                             // only store most recent 25 event_ids per outlier
-                            let event_ids = if event_ids.len() > 25 {
+                            let (event_ids, deleted_event_ids) = if event_ids.len() > 25 {
                                 event_ids.sort();
-                                let (_, event_ids) = event_ids.split_at(event_ids.len() - 25);
-                                event_ids.to_vec()
+                                let (deleted_event_ids, event_ids) =
+                                    event_ids.split_at(event_ids.len() - 25);
+                                (event_ids.to_vec(), Some(deleted_event_ids.to_vec()))
                             } else {
-                                event_ids
+                                (event_ids, None)
                             };
                             let data_source_id =
                                 get_data_source_id(&conn, &o.data_source).unwrap_or_default();
                             if data_source_id == 0 {
                                 None
                             } else {
+                                if let Some(event_ids) = deleted_event_ids {
+                                    let events = event_ids
+                                        .into_iter()
+                                        .map(|event_id| Event {
+                                            message_id: event_id,
+                                            raw_event: None,
+                                            data_source_id,
+                                        })
+                                        .collect::<Vec<_>>();
+                                    deleted_events.extend(events);
+                                }
                                 Some((
                                     dsl::raw_event.eq(outlier.raw_event.clone()),
                                     dsl::data_source_id.eq(data_source_id),
@@ -314,6 +326,7 @@ pub(crate) async fn update_outliers(
                     })
                     .collect();
 
+                update_events(&conn, &outlier_update, &deleted_events);
                 if replace_outliers.is_empty() {
                     Err(Error::Transaction)
                 } else {
@@ -337,5 +350,42 @@ pub(crate) async fn update_outliers(
         Err(e) => Ok(HttpResponse::InternalServerError()
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(build_err_msg(&e))),
+    }
+}
+
+fn update_events(conn: &Conn, outlier_update: &[OutlierUpdate], deleted_events: &[Event]) {
+    let new_events = outlier_update
+        .iter()
+        .filter_map(|outlier| {
+            if let Ok(data_source_id) = get_data_source_id(conn, &outlier.data_source) {
+                Some(
+                    outlier
+                        .event_ids
+                        .iter()
+                        .filter_map(|event_id| {
+                            FromPrimitive::from_u64(*event_id).map(|event_id| Event {
+                                message_id: event_id,
+                                raw_event: None,
+                                data_source_id,
+                            })
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    if !new_events.is_empty() {
+        if let Err(e) = add_events(&conn, &new_events) {
+            log::error!("An error occurs while inserting events: {}", e);
+        }
+    }
+    if !deleted_events.is_empty() {
+        if let Err(e) = delete_events(&conn, &deleted_events) {
+            log::error!("An error occurs while deleting events: {}", e);
+        }
     }
 }
