@@ -27,3 +27,16 @@ sql_function! {
             new_qualifier: Varchar
         ) -> Integer;
 }
+
+sql_function! {
+    fn lookup_events_with_no_raw_event (
+        data_source_id: Integer
+    ) -> Numeric;
+}
+
+sql_function! {
+    fn lookup_kafka_metadata (
+        data_source_id: Integer,
+        messae_id: Numeric
+    ) -> Nullable<Jsonb>;
+}
