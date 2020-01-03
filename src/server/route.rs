@@ -254,6 +254,23 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(put().to(update_indicator)),
     )
     .service(
+        resource("/api/kafka_metadata")
+            .guard(guard::Get())
+            .route(get().to(get_kafka_metadata)),
+    )
+    .service(
+        resource("/api/kafka_metadata")
+            .guard(guard::Put())
+            .data(Json::<Vec<KafkaMetadata>>::configure(|cfg| {
+                // increase max size of payload from 32kb to 1024kb
+                cfg.limit(1_048_576).error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::Created().finish())
+                        .into()
+                })
+            }))
+            .route(put().to(add_kafka_metadata)),
+    )
+    .service(
         resource("/api/outlier")
             .guard(guard::Get())
             .route(get().to(get_outliers)),
