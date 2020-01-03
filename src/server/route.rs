@@ -199,6 +199,18 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(get().to(get_events_with_no_raw_event)),
     )
     .service(
+        resource("/api/event/search")
+            .guard(guard::Get())
+            .data(Json::<Vec<GetEvent>>::configure(|cfg| {
+                // increase max size of payload from 32kb to 1024kb
+                cfg.limit(1_048_576).error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::Created().finish())
+                        .into()
+                })
+            }))
+            .route(get().to(get_events)),
+    )
+    .service(
         resource("/api/indicator")
             .guard(guard::Post())
             .guard(guard::Header("content-type", "application/json"))

@@ -7,6 +7,7 @@ tags:
 - name: "outlier"
 - name: "category"
 - name: "data_source"
+- name: "event"
 - name: "indicator"
 - name: "qualifier"
 - name: "status"
@@ -390,7 +391,35 @@ paths:
           description: "Internal server error"
           schema:
             $ref: "#/definitions/ErrorResponse"
-  
+  /api/event/search:
+    get:
+      tags: [event]
+      summary: "Get clusters"
+      description: "This endpoint searches for events using message_id and data_source, and returns a list of events which has the value of raw_event."
+      parameters: 
+        - in: "body"
+          name: "properties"
+          description: "A list of pairs of message_id and data_source. If the number of pairs is greater than 100, HTTP 400 will be returned."
+          required: true
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/EventSearchBody"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Event"
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
   /api/indicator:
     get:
       tags: [indicator]
@@ -837,6 +866,29 @@ definitions:
       last_event_id:
         type: "string"
         description: "id of last event belonging to this cluster"
+  Event:
+    type: "object"
+    properties:
+      message_id:
+        type: "integer"
+        format: uint64
+        description: "message_id for this event"
+      data_source:
+        type: "string"
+        description: "kafka topic name"
+      raw_event:
+        type: "string"
+        description: "raw_event for this event"
+  EventSearchBody:
+    type: "object"
+    properties:
+      message_id:
+        type: "integer"
+        format: uint64
+        description: "message_id for this event"
+      data_source:
+        type: "string"
+        description: "kafka topic name"
   Indicator:
     type: "object"
     properties:

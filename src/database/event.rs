@@ -3,14 +3,15 @@ use actix_web::{
     web::{Data, Json, Query},
     HttpResponse,
 };
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, FromPrimitive};
 use diesel::{pg::upsert::excluded, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::schema::event;
 use crate::database::{
-    build_err_msg, kafka_metadata_lookup, lookup_events_with_no_raw_event, Conn, Error, Pool,
+    build_err_msg, get_data_source_id, kafka_metadata_lookup, lookup_events_with_no_raw_event,
+    Conn, Error, Pool,
 };
 
 #[derive(Debug, Insertable, Serialize, Deserialize)]
@@ -50,6 +51,63 @@ pub(crate) fn delete_events(conn: &Conn, events: &[Event]) -> Result<usize, Erro
             })
             .sum())
     })
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct GetEvent {
+    message_id: u64,
+    data_source: String,
+    raw_event: Option<String>,
+}
+pub(crate) async fn get_events(
+    pool: Data<Pool>,
+    events: Json<Vec<GetEvent>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    use event::dsl;
+
+    let events = events.into_inner();
+    // Accept only HTTP requests that request less than 100 raw_events
+    if events.len() > 100 {
+        Ok(HttpResponse::BadRequest().into())
+    } else {
+        let query_result: Result<Vec<_>, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+            conn.build_transaction().read_only().run(|| {
+                Ok(events
+                    .into_iter()
+                    .filter_map(|event| {
+                        let message_id: BigDecimal = FromPrimitive::from_u64(event.message_id)?;
+                        let data_source_id = get_data_source_id(&conn, &event.data_source).ok()?;
+                        let result = dsl::event
+                            .filter(
+                                dsl::data_source_id
+                                    .eq(data_source_id)
+                                    .and(dsl::message_id.eq(message_id)),
+                            )
+                            .select(dsl::raw_event)
+                            .get_result::<Option<String>>(&conn);
+
+                        match result {
+                            Ok(Some(raw_event)) => Some(GetEvent {
+                                message_id: event.message_id,
+                                data_source: event.data_source,
+                                raw_event: Some(raw_event),
+                            }),
+                            _ => None,
+                        }
+                    })
+                    .collect::<Vec<_>>())
+            })
+        });
+
+        match query_result {
+            Ok(data) => Ok(HttpResponse::Ok()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .json(data)),
+            Err(e) => Ok(HttpResponse::InternalServerError()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(build_err_msg(&e))),
+        }
+    }
 }
 
 pub(crate) async fn get_events_with_no_raw_event(
