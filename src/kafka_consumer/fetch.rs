@@ -133,9 +133,7 @@ pub(crate) async fn fetch_raw_events(
                                                         .ok()
                                                     })
                                                     .collect::<Vec<_>>();
-                                                if !msg.is_empty() {
-                                                    fwd_msgs.extend(msg);
-                                                }
+                                                fwd_msgs.extend(msg);
                                             }
                                         }
                                     }
