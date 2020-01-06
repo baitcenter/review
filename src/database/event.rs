@@ -14,7 +14,7 @@ use crate::database::{
     Conn, Error, Pool,
 };
 
-#[derive(Debug, Insertable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, Serialize, Deserialize)]
 #[table_name = "event"]
 pub(crate) struct Event {
     pub(crate) message_id: BigDecimal,

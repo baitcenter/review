@@ -2,12 +2,12 @@ use diesel::sql_types::*;
 
 sql_function! {
     fn attempt_cluster_update (
-            cluster_id: Varchar,
-            data_source: Varchar,
-            new_category: Nullable<Varchar>,
-            new_cluster_id: Nullable<Varchar>,
-            new_qualifier: Nullable<Varchar>
-        ) -> Integer;
+        cluster_id: Varchar,
+        data_source: Varchar,
+        new_category: Nullable<Varchar>,
+        new_cluster_id: Nullable<Varchar>,
+        new_qualifier: Nullable<Varchar>
+    ) -> Integer;
 }
 
 sql_function! {
@@ -22,10 +22,10 @@ sql_function! {
 
 sql_function! {
     fn attempt_qualifier_id_update (
-            cluster_id: Varchar,
-            data_source: Varchar,
-            new_qualifier: Varchar
-        ) -> Integer;
+        cluster_id: Varchar,
+        data_source: Varchar,
+        new_qualifier: Varchar
+    ) -> Integer;
 }
 
 sql_function! {

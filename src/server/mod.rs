@@ -5,6 +5,8 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use std::io;
 use thiserror::Error;
 
+use crate::kafka_consumer;
+
 mod route;
 
 #[derive(Debug, Error)]
@@ -49,6 +51,21 @@ pub fn run(
         eprintln!("Warning: FRONTEND_DIR is not set. Will use the current directory.");
         ".".to_string()
     };
+    let config = kafka_consumer::KafkaConfig::new(
+        kafka_url.clone(),
+        reviewd_addr.to_string(),
+        std::env::var("TASK_TIME_INTERVAL")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok()),
+        std::env::var("MAX_OFFSET_COUNT")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok()),
+    );
+    std::thread::spawn(move || {
+        let _ = tokio::runtime::Runtime::new()
+            .expect("Unable to create Tokio runtime")
+            .block_on(kafka_consumer::KafkaConfig::periodically_fetch_kafka_message(config));
+    });
     let server = HttpServer::new(move || {
         App::new()
             .data(pool.clone())

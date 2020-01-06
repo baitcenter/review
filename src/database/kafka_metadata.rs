@@ -12,13 +12,13 @@ use std::ops::Bound;
 use super::schema::kafka_metadata;
 use crate::database::{build_err_msg, lookup_kafka_metadata, Conn, Error, Pool};
 
-#[derive(Debug, Insertable, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, Queryable, Serialize, Deserialize)]
 #[table_name = "kafka_metadata"]
 pub(crate) struct KafkaMetadata {
-    data_source_id: i32,
-    message_ids: (Bound<BigDecimal>, Bound<BigDecimal>),
-    offsets: i64,
-    partition: i32,
+    pub(crate) data_source_id: i32,
+    pub(crate) message_ids: (Bound<BigDecimal>, Bound<BigDecimal>),
+    pub(crate) offsets: i64,
+    pub(crate) partition: i32,
 }
 
 pub(crate) async fn add_kafka_metadata(

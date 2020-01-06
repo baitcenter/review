@@ -15,12 +15,12 @@ pub(crate) struct DataSourceQuery {
     pub(crate) data_source: String,
 }
 
-#[derive(Debug, Identifiable, Queryable, Serialize)]
+#[derive(Debug, Identifiable, Queryable, Deserialize, Serialize)]
 #[table_name = "data_source"]
-struct DataSourceTable {
-    id: i32,
-    topic_name: String,
-    data_type: String,
+pub(crate) struct DataSource {
+    pub(crate) id: i32,
+    pub(crate) topic_name: String,
+    pub(crate) data_type: String,
 }
 
 pub(crate) async fn add_data_source_endpoint(
@@ -48,7 +48,7 @@ pub(crate) async fn add_data_source_endpoint(
 
 pub(crate) fn add(conn: &Conn, data_source: &str, data_type: &str) -> Result<i32, Error> {
     use data_source::dsl;
-    let new_data_source: Result<DataSourceTable, Error> = diesel::insert_into(dsl::data_source)
+    let new_data_source: Result<DataSource, Error> = diesel::insert_into(dsl::data_source)
         .values((
             dsl::topic_name.eq(data_source),
             dsl::data_type.eq(data_type),
@@ -72,10 +72,10 @@ pub(crate) fn get_data_source_id(conn: &Conn, data_source: &str) -> Result<i32, 
 pub(crate) async fn get_data_source_table(
     pool: Data<Pool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let query_result: Result<Vec<DataSourceTable>, Error> =
+    let query_result: Result<Vec<DataSource>, Error> =
         pool.get().map_err(Into::into).and_then(|conn| {
             data_source::dsl::data_source
-                .load::<DataSourceTable>(&conn)
+                .load::<DataSource>(&conn)
                 .map_err(Into::into)
         });
 
