@@ -1,5 +1,5 @@
 use actix_files::Files;
-use actix_web::{dev::Server, middleware, App, HttpServer, Result};
+use actix_web::{dev::Server, middleware, web::JsonConfig, App, HttpServer, Result};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use std::io;
@@ -68,6 +68,7 @@ pub fn run(
     });
     let server = HttpServer::new(move || {
         App::new()
+            .data(JsonConfig::default().limit(1_048_576))
             .data(pool.clone())
             .data(kafka_url.clone())
             .data(etcd_server.clone())

@@ -88,8 +88,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<ClusterUpdate>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
+                cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
@@ -144,8 +143,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<DescriptionInsert>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
+                cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
@@ -179,9 +177,8 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/event")
             .guard(guard::Put())
             .data(Json::<Vec<Event>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::Created().finish())
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
             }))
@@ -202,9 +199,8 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/event/search")
             .guard(guard::Get())
             .data(Json::<Vec<GetEvent>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::Created().finish())
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
             }))
@@ -215,8 +211,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .guard(guard::Post())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Value>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
+                cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
@@ -262,9 +257,8 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/kafka_metadata")
             .guard(guard::Put())
             .data(Json::<Vec<KafkaMetadata>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::Created().finish())
+                cfg.error_handler(|err, _| {
+                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
             }))
@@ -280,8 +274,7 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
             .data(Json::<Vec<OutlierUpdate>>::configure(|cfg| {
-                // increase max size of payload from 32kb to 1024kb
-                cfg.limit(1_048_576).error_handler(|err, _| {
+                cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
                         .into()
                 })
