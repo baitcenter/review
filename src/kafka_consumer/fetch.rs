@@ -194,27 +194,20 @@ async fn send_http_put_request<T>(data: &[T], api_url: &str) -> Result<(), ()>
 where
     T: 'static + Clone + Send + Serialize + Sync,
 {
-    let chunked_data = data.chunks(40).map(|x| x.to_vec()).collect::<Vec<_>>();
-    let reqs = chunked_data
-        .into_iter()
-        .map(|data| {
-            async move {
-                reqwest::Client::new()
-                    .put(api_url)
-                    .json(&data)
-                    .send()
-                    .await
-                    .and_then(reqwest::Response::error_for_status)
-            }
-        })
+    let client = reqwest::Client::new();
+    let reqs = data
+        .chunks(40)
+        .map(|chunk| client.put(api_url).json(chunk).send())
         .collect::<Vec<_>>();
 
-    match futures::future::join_all(reqs)
+    if futures::future::join_all(reqs)
         .await
         .into_iter()
-        .find_map(Result::err)
+        .map(|r| r.and_then(reqwest::Response::error_for_status))
+        .any(|r| r.is_err())
     {
-        Some(_) => Err(()),
-        None => Ok(()),
+        Err(())
+    } else {
+        Ok(())
     }
 }
