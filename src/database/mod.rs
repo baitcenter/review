@@ -1,5 +1,7 @@
+use actix_web::web::{BytesMut, Payload};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
+use futures::StreamExt;
 use log::error;
 use serde_json::json;
 use thiserror::Error;
@@ -64,4 +66,12 @@ pub(crate) fn build_err_msg(e: &dyn std::error::Error) -> String {
 
 pub(crate) fn bytes_to_string(bytes: &[u8]) -> String {
     bytes.iter().map(|b| char::from(*b)).collect()
+}
+
+pub(crate) async fn load_payload(mut payload: Payload) -> Result<BytesMut, actix_web::Error> {
+    let mut bytes = BytesMut::new();
+    while let Some(chunk) = payload.next().await {
+        bytes.extend_from_slice(&chunk?);
+    }
+    Ok(bytes)
 }

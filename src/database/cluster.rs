@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Path, Query},
+    web::{Data, Json, Path, Payload, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
@@ -183,13 +183,14 @@ struct Cluster {
 #[allow(clippy::too_many_lines)]
 pub(crate) async fn update_clusters(
     pool: Data<Pool>,
-    cluster_update: Json<Vec<ClusterUpdate>>,
+    payload: Payload,
 ) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl;
 
+    let bytes = load_payload(payload).await?;
+    let cluster_update: Vec<ClusterUpdate> = serde_json::from_slice(&bytes)?;
     let mut deleted_events = Vec::<Event>::new();
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let cluster_update = cluster_update.into_inner();
         get_current_clusters(&conn, &cluster_update).and_then(|cluster_list| {
             let replace_clusters: Vec<_> = cluster_update
                 .iter()
@@ -410,8 +411,10 @@ fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate], deleted_events: 
 
 pub(crate) async fn update_qualifiers(
     pool: Data<Pool>,
-    qualifier_updates: Json<Vec<Value>>,
+    payload: Payload,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let bytes = load_payload(payload).await?;
+    let qualifier_updates: Vec<Value> = serde_json::from_slice(&bytes)?;
     let query_result: Result<i32, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         let result: i32 = qualifier_updates
             .iter()

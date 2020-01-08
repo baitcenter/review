@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Query},
+    web::{Data, Json, Payload, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 
 use super::schema::event;
 use crate::database::{
-    build_err_msg, get_data_source_id, kafka_metadata_lookup, lookup_events_with_no_raw_event,
-    Conn, Error, Pool,
+    build_err_msg, get_data_source_id, kafka_metadata_lookup, load_payload,
+    lookup_events_with_no_raw_event, Conn, Error, Pool,
 };
 
 #[derive(Debug, Clone, Insertable, Serialize, Deserialize)]
@@ -169,12 +169,14 @@ pub(crate) async fn get_events_with_no_raw_event(
 
 pub(crate) async fn update_events(
     pool: Data<Pool>,
-    events: Json<Vec<Event>>,
+    payload: Payload,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let events = events.into_inner();
-        add_events(&conn, &events)
-    });
+    let bytes = load_payload(payload).await?;
+    let events: Vec<Event> = serde_json::from_slice(&bytes)?;
+    let query_result: Result<usize, Error> = pool
+        .get()
+        .map_err(Into::into)
+        .and_then(|conn| add_events(&conn, &events));
 
     match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),

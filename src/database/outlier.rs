@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Query},
+    web::{Data, Payload, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
@@ -34,12 +34,14 @@ pub(crate) struct OutlierUpdate {
 
 pub(crate) async fn delete_outliers(
     pool: Data<Pool>,
-    outliers: Json<Vec<String>>,
+    payload: Payload,
     data_source: Query<DataSourceQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl as c_dsl;
     use outlier::dsl as o_dsl;
 
+    let bytes = load_payload(payload).await?;
+    let outliers: Vec<String> = serde_json::from_slice(&bytes)?;
     let data_source = data_source.into_inner();
     let conn = match pool.get() {
         Ok(conn) => conn,
@@ -203,12 +205,13 @@ pub(crate) async fn get_outliers(
 #[allow(clippy::too_many_lines)]
 pub(crate) async fn update_outliers(
     pool: Data<Pool>,
-    outlier_update: Json<Vec<OutlierUpdate>>,
+    payload: Payload,
 ) -> Result<HttpResponse, actix_web::Error> {
     use outlier::dsl;
+    let bytes = load_payload(payload).await?;
+    let outlier_update: Vec<OutlierUpdate> = serde_json::from_slice(&bytes)?;
     let mut deleted_events = Vec::<Event>::new();
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let outlier_update = outlier_update.into_inner();
         let mut query = dsl::outlier.into_boxed();
         for outlier in &outlier_update {
             if let Ok(data_source_id) = get_data_source_id(&conn, &outlier.data_source) {

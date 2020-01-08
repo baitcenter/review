@@ -87,24 +87,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/cluster")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<ClusterUpdate>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(put().to(update_clusters)),
     )
     .service(
         resource("/api/cluster/qualifier")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<Value>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(put().to(update_qualifiers)),
     )
     .service(
@@ -176,12 +164,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/event")
             .guard(guard::Put())
-            .data(Json::<Vec<Event>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(put().to(update_events)),
     )
     .service(
@@ -273,24 +255,12 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/outlier")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<OutlierUpdate>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(put().to(update_outliers)),
     )
     .service(
         resource("/api/outlier")
             .guard(guard::Delete())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<String>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .data(Query::<DataSourceQuery>::configure(|cfg| {
                 cfg.error_handler(|err, _| {
                     error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
