@@ -17,7 +17,7 @@ use crate::database::*;
 #[table_name = "outlier"]
 struct OutliersTable {
     id: i32,
-    raw_event: String,
+    raw_event: Vec<u8>,
     data_source_id: i32,
     event_ids: Vec<BigDecimal>,
     raw_event_id: i32,
@@ -41,7 +41,7 @@ pub(crate) async fn delete_outliers(
     use outlier::dsl as o_dsl;
 
     let bytes = load_payload(payload).await?;
-    let outliers: Vec<String> = serde_json::from_slice(&bytes)?;
+    let outliers: Vec<Vec<u8>> = serde_json::from_slice(&bytes)?;
     let data_source = data_source.into_inner();
     let conn = match pool.get() {
         Ok(conn) => conn,
@@ -217,7 +217,7 @@ pub(crate) async fn update_outliers(
             if let Ok(data_source_id) = get_data_source_id(&conn, &outlier.data_source) {
                 query = query.or_filter(
                     dsl::raw_event
-                        .eq(bytes_to_string(&outlier.outlier))
+                        .eq(&outlier.outlier)
                         .and(dsl::data_source_id.eq(data_source_id)),
                 );
             }
@@ -232,7 +232,7 @@ pub(crate) async fn update_outliers(
                         use std::str::FromStr;
                         if let Some(outlier) = outlier_list
                             .iter()
-                            .find(|outlier| bytes_to_string(&o.outlier) == outlier.raw_event)
+                            .find(|outlier| o.outlier == outlier.raw_event)
                         {
                             let o_size = FromPrimitive::from_usize(o.event_ids.len()).map_or_else(
                                 || outlier.size.clone(),
@@ -318,7 +318,7 @@ pub(crate) async fn update_outliers(
                                 None
                             } else {
                                 Some((
-                                    dsl::raw_event.eq(bytes_to_string(&o.outlier)),
+                                    dsl::raw_event.eq(o.outlier.clone()),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::raw_event_id.eq(raw_event_id),

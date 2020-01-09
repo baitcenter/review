@@ -156,11 +156,10 @@ pub(crate) async fn fetch_raw_events(
                         .filter_map(|message_id| {
                             let raw = entries.get(message_id)?;
                             let message_id = bigdecimal::FromPrimitive::from_u64(*message_id)?;
-                            let raw_event = Some(bytes_to_string(raw));
 
                             Some(Event {
                                 message_id,
-                                raw_event,
+                                raw_event: Some(raw.to_vec()),
                                 data_source_id,
                             })
                         })
@@ -175,10 +174,6 @@ pub(crate) async fn fetch_raw_events(
     }
 
     Ok(())
-}
-
-fn bytes_to_string(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| char::from(*b)).collect()
 }
 
 pub(crate) async fn send_http_get_request(api_url: &str) -> Result<String, reqwest::Error> {

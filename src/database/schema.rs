@@ -113,7 +113,7 @@ table! {
         id -> Int4,
         message_id -> Numeric,
         data_source_id -> Int4,
-        raw_event -> Nullable<Text>,
+        raw_event -> Nullable<Bytea>,
     }
 }
 
@@ -141,7 +141,7 @@ table! {
 table! {
     outlier (id) {
         id -> Int4,
-        raw_event -> Text,
+        raw_event -> Bytea,
         data_source_id -> Int4,
         event_ids -> Array<Numeric>,
         raw_event_id -> Int4,

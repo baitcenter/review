@@ -18,6 +18,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
       value is 900 (15 minutes).
 
+### Changed
+- The data type of `raw_event` column has been changed from `TEXT` to `BYTEA`
+- When fetching outliers from Outlier table, `outlier` is displayed as String of
+    hex values. Please fetch events corresponding to `event_ids` to see
+    human-readable string.
+
+### Fixed
+- Fixed an issue where inserting outliers containing NULL(0x00) character fails
+
 ## [0.6.3] - 2019-12-30
 
 ### Added

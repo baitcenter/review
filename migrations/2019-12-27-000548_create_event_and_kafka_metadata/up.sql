@@ -2,7 +2,7 @@ CREATE TABLE event (
   id SERIAL PRIMARY KEY,
   message_id NUMERIC(20, 0) NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
-  raw_event TEXT,
+  raw_event BYTEA,
   UNIQUE (message_id, data_source_id)
 );
 

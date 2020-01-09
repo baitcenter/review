@@ -52,7 +52,7 @@ CREATE TABLE cluster (
 
 CREATE TABLE outlier (
   id SERIAL PRIMARY KEY,
-  raw_event TEXT NOT NULL,
+  raw_event BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   event_ids NUMERIC(20, 0)[] NOT NULL,
   raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
