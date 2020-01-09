@@ -271,7 +271,10 @@ pub(crate) async fn update_clusters(
                         let data_source_id = get_data_source_id(&conn, &c.data_source)
                             .unwrap_or_else(|_| {
                                 data_source::add(&conn, &c.data_source, &c.data_source_type)
-                                    .unwrap_or(0)
+                                    .unwrap_or_else(|_| {
+                                        get_data_source_id(&conn, &c.data_source)
+                                            .unwrap_or_default()
+                                    })
                             });
                         let raw_event_id =
                             empty_event_id(&conn, data_source_id).unwrap_or_default();

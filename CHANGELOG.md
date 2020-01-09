@@ -28,7 +28,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Fixed an issue where inserting outliers containing NULL(0x00) character fails
+- Inserting outliers containing NULL(0x00) character fails.
+- May not insert cluster when `data_source::add` function is called
+  simultaneously.
 
 ## [0.6.3] - 2019-12-30
 
