@@ -7,24 +7,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
 - Added `event` and `kafka_metadata` tables.
 - Added a new endpoint `GET /api/event/search` to fetch raw_events from event
   table.
 - Added periodic tasks to fetch kafka metadata and raw events that work with the
   environment below. `raw_events` corresponding to `event_ids` in `cluster`
   and `outlier` tables are stored in `event` table by these periodic tasks.
-    - `MAX_OFFSET_COUNT`: Maximum number of offsets for each kafka topic to
-      fetch per task. Default value is 1000.
-    - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
-      value is 900 (15 minutes).
+  - `MAX_OFFSET_COUNT`: Maximum number of offsets for each kafka topic to
+    fetch per task. Default value is 1000.
+  - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
+    value is 900 (15 minutes).
 
 ### Changed
+
 - The data type of `raw_event` column has been changed from `TEXT` to `BYTEA`
 - When fetching outliers from Outlier table, `outlier` is displayed as String of
     hex values. Please fetch events corresponding to `event_ids` to see
     human-readable string.
 
 ### Fixed
+
 - Fixed an issue where inserting outliers containing NULL(0x00) character fails
 
 ## [0.6.3] - 2019-12-30
@@ -82,7 +85,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Field names of clusters/outliers in response body are in alphabetical order
     like below:
 
-  ```
+  ```json
   {
       "category": "Non-Specified Alert",
       "cluster_id": "f-14-f",
@@ -129,7 +132,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Each cluster `examples` is a pair of a single `raw_event` and a list of
   `event_ids` like below:
 
-```
+```json
 "examples": {
             "raw_event": "something",
             "event_ids": [
@@ -192,7 +195,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - return examples with property names.
 
 v0.4.0
-```
+
+```json
         "cluster_id": "get http www",
         "detector_id": 2,
         "qualifier_id": 2,
@@ -200,7 +204,8 @@ v0.4.0
 ```
 
 v0.4.1
-```
+
+```json
         "cluster_id": "get http www",
         "detector_id": 2,
         "qualifier": "unknown",
