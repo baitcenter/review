@@ -17,7 +17,7 @@ pub(crate) async fn fetch_kafka_metadata(
     max_offset_count: usize,
 ) -> Result<(), String> {
     let mut consumer = Consumer::from_hosts(vec![kafka_url])
-        .with_group("REviewd2".into()) // Remember to update this to "REviewd" when raw_event.rs in reviewd is removed
+        .with_group("REviewd".into())
         .with_fallback_offset(FetchOffset::Earliest)
         .with_fetch_max_bytes_per_partition(10_000_000)
         .with_offset_storage(GroupOffsetStorage::Kafka)
