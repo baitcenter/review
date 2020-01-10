@@ -10,13 +10,6 @@ CREATE TABLE data_source (
   data_type TEXT NOT NULL,
   UNIQUE (topic_name)
 );
-
-CREATE TABLE raw_event (
-  id SERIAL PRIMARY KEY,
-  data TEXT NOT NULL,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id)
-);
-
 CREATE TABLE qualifier (
   id INTEGER PRIMARY KEY,
   description TEXT NOT NULL
@@ -39,7 +32,6 @@ CREATE TABLE cluster (
   category_id INTEGER NOT NULL DEFAULT 1 REFERENCES category(id),
   detector_id INTEGER NOT NULL,
   event_ids NUMERIC(20, 0)[],
-  raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
   qualifier_id INTEGER NOT NULL DEFAULT 2 REFERENCES qualifier(id),
   status_id INTEGER NOT NULL DEFAULT 2 REFERENCES Status(id),
   signature TEXT NOT NULL,
@@ -55,7 +47,6 @@ CREATE TABLE outlier (
   raw_event BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   event_ids NUMERIC(20, 0)[] NOT NULL,
-  raw_event_id INTEGER NOT NULL REFERENCES raw_event(id),
   size NUMERIC(20, 0) NOT NULL,
   UNIQUE (raw_event, data_source_id)
 );
@@ -192,21 +183,3 @@ CREATE TABLE top_n_datetime (
   count BIGINT,
   UNIQUE(description_id, ranking)
 );
-
-CREATE FUNCTION insert_empty_raw_event()
-RETURNS TRIGGER AS 
-$$
-BEGIN
-  INSERT INTO raw_event 
-    (data, data_source_id)
-  VALUES
-    ('-', NEW.id);
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER after_data_source_insertion_trigger
-  AFTER INSERT
-  ON data_source
-  FOR EACH ROW
-  EXECUTE PROCEDURE insert_empty_raw_event();

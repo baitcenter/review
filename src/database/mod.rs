@@ -17,7 +17,6 @@ mod kafka_metadata;
 mod outlier;
 mod qualifier;
 mod query;
-mod raw_event;
 mod schema;
 mod status;
 
@@ -32,7 +31,6 @@ pub(crate) use self::kafka_metadata::*;
 pub(crate) use self::outlier::*;
 pub(crate) use self::qualifier::*;
 pub(crate) use self::query::*;
-pub(crate) use self::raw_event::*;
 pub(crate) use self::status::*;
 
 pub(crate) type Conn = PooledConnection<ConnectionManager<PgConnection>>;
@@ -40,8 +38,6 @@ pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("record does not exist")]
-    RecordNotExist,
     #[error("transaction error")]
     Transaction,
     #[error("diesel connection error: {0}")]

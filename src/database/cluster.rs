@@ -20,11 +20,10 @@ pub(crate) async fn get_clusters(
 ) -> Result<HttpResponse, actix_web::Error> {
     let default_per_page = 10;
     let max_per_page = 100;
-    let cluster_schema = "(((((cluster INNER JOIN status ON cluster.status_id = status.id) \
+    let cluster_schema = "((((cluster INNER JOIN status ON cluster.status_id = status.id) \
                           INNER JOIN qualifier ON cluster.qualifier_id = qualifier.id) \
                           INNER JOIN category ON cluster.category_id = category.id) \
-                          INNER JOIN data_source ON cluster.data_source_id = data_source.id) \
-                          INNER JOIN raw_event ON cluster.raw_event_id = raw_event.id)";
+                          INNER JOIN data_source ON cluster.data_source_id = data_source.id)";
     let select = query
         .get("select")
         .and_then(Value::as_str)
@@ -42,7 +41,6 @@ pub(crate) async fn get_clusters(
                     "data_source" => Some("data_source.topic_name as data_source"),
                     "size" => Some("cluster.size"),
                     "score" => Some("cluster.score"),
-                    "raw_event" => Some("raw_event.data as raw_event"),
                     "event_ids" => Some("cluster.event_ids"),
                     "last_modification_time" => Some("cluster.last_modification_time"),
                     _ => None,
@@ -62,7 +60,6 @@ pub(crate) async fn get_clusters(
                 "cluster.size",
                 "cluster.score",
                 "cluster.last_modification_time",
-                "raw_event.data as raw_event",
                 "cluster.event_ids",
             ]
         });
@@ -86,7 +83,6 @@ pub(crate) async fn get_clusters(
             "data_source" => Some("data_source.topic_name"),
             "size" => Some("cluster.size"),
             "score" => Some("cluster.score"),
-            "raw_event" => Some("raw_event.data"),
             "event_ids" => Some("cluster.event_ids"),
             "last_modification_time" => Some("cluster.last_modification_time"),
             _ => None,
@@ -176,7 +172,6 @@ struct Cluster {
     cluster_id: Option<String>,
     signature: String,
     event_ids: Option<Vec<BigDecimal>>,
-    raw_event_id: i32,
     size: BigDecimal,
 }
 
@@ -246,7 +241,6 @@ pub(crate) async fn update_clusters(
                                 dsl::cluster_id.eq(c.cluster_id.clone()),
                                 dsl::detector_id.eq(c.detector_id),
                                 dsl::event_ids.eq(event_ids),
-                                dsl::raw_event_id.eq(cluster.raw_event_id),
                                 dsl::signature.eq(sig),
                                 dsl::size.eq(cluster_size),
                                 dsl::score.eq(c.score),
@@ -276,16 +270,13 @@ pub(crate) async fn update_clusters(
                                             .unwrap_or_default()
                                     })
                             });
-                        let raw_event_id =
-                            empty_event_id(&conn, data_source_id).unwrap_or_default();
-                        if data_source_id == 0 || raw_event_id == 0 {
+                        if data_source_id == 0 {
                             None
                         } else {
                             Some((
                                 dsl::cluster_id.eq(c.cluster_id.clone()),
                                 dsl::detector_id.eq(c.detector_id),
                                 dsl::event_ids.eq(event_ids),
-                                dsl::raw_event_id.eq(raw_event_id),
                                 dsl::signature.eq(sig),
                                 dsl::size.eq(cluster_size),
                                 dsl::score.eq(c.score),
@@ -343,13 +334,7 @@ fn get_current_clusters(
         }
     }
     query
-        .select((
-            dsl::cluster_id,
-            dsl::signature,
-            dsl::event_ids,
-            dsl::raw_event_id,
-            dsl::size,
-        ))
+        .select((dsl::cluster_id, dsl::signature, dsl::event_ids, dsl::size))
         .load::<Cluster>(conn)
         .map_err(Into::into)
 }

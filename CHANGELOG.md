@@ -22,15 +22,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The data type of `raw_event` column has been changed from `TEXT` to `BYTEA`
-- When fetching outliers from Outlier table, `outlier` is displayed as String of
-    hex values. Please fetch events corresponding to `event_ids` to see
-    human-readable string.
+- There are changes in the values returned when fetching clusters and outliers.
+  Please fetch events corresponding to `event_ids` to display human-readable
+  raw_events.
+  - `raw_event` in cluster is no longer displayed.
+  - `outlier` in outlier is displayed as String of hex values.
 
 ### Fixed
 
 - Inserting outliers containing NULL(0x00) character fails.
 - May not insert cluster when `data_source::add` function is called
   simultaneously.
+
+### Removed
+
+- `raw_event` table
 
 ## [0.6.3] - 2019-12-30
 

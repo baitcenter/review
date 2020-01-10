@@ -1,6 +1,3 @@
-DROP TRIGGER after_data_source_insertion_trigger on data_source;
-DROP FUNCTION insert_empty_raw_event();
-
 DROP TABLE top_n_datetime;
 DROP TABLE top_n_ipaddr;
 DROP TABLE top_n_text;
@@ -20,6 +17,5 @@ DROP TABLE outlier;
 DROP TABLE cluster;
 DROP TABLE status;
 DROP TABLE qualifier;
-DROP TABLE raw_event;
 DROP TABLE data_source;
 DROP TABLE category;

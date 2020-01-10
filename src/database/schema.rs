@@ -12,7 +12,6 @@ table! {
         category_id -> Int4,
         detector_id -> Int4,
         event_ids -> Nullable<Array<Numeric>>,
-        raw_event_id -> Int4,
         qualifier_id -> Int4,
         status_id -> Int4,
         signature -> Text,
@@ -144,7 +143,6 @@ table! {
         raw_event -> Bytea,
         data_source_id -> Int4,
         event_ids -> Array<Numeric>,
-        raw_event_id -> Int4,
         size -> Numeric,
     }
 }
@@ -153,14 +151,6 @@ table! {
     qualifier (id) {
         id -> Int4,
         description -> Text,
-    }
-}
-
-table! {
-    raw_event (id) {
-        id -> Int4,
-        data -> Text,
-        data_source_id -> Int4,
     }
 }
 
@@ -235,7 +225,6 @@ table! {
 joinable!(cluster -> category (category_id));
 joinable!(cluster -> data_source (data_source_id));
 joinable!(cluster -> qualifier (qualifier_id));
-joinable!(cluster -> raw_event (raw_event_id));
 joinable!(cluster -> status (status_id));
 joinable!(column_description -> cluster (cluster_id));
 joinable!(column_description -> description_element_type (type_id));
@@ -249,8 +238,6 @@ joinable!(event -> data_source (data_source_id));
 joinable!(indicator -> data_source (data_source_id));
 joinable!(kafka_metadata -> data_source (data_source_id));
 joinable!(outlier -> data_source (data_source_id));
-joinable!(outlier -> raw_event (raw_event_id));
-joinable!(raw_event -> data_source (data_source_id));
 joinable!(top_n_datetime -> column_description (description_id));
 joinable!(top_n_enum -> column_description (description_id));
 joinable!(top_n_float -> column_description (description_id));
@@ -275,7 +262,6 @@ allow_tables_to_appear_in_same_query!(
     kafka_metadata,
     outlier,
     qualifier,
-    raw_event,
     status,
     top_n_datetime,
     top_n_enum,

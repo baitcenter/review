@@ -46,7 +46,6 @@ paths:
               - `data_source`
               - `size`
               - `score`
-              - `raw_event`
               - `event_ids`
               - `last_modification_time`
           type: "string"
@@ -737,9 +736,6 @@ definitions:
       qualifier:
         type: "string"
         description: "qualifier for this cluster"
-      raw_event:
-        type: "string"
-        description: "raw_event"
       score:
         type: "number"
         format: "double"
@@ -967,7 +963,7 @@ definitions:
         description: "list of event ids for this outlier"
       outlier:
         type: "string"
-        description: "raw event for this outlier"
+        description: "raw event in hex values for this outlier"
       size:
         type: "integer"
         format: "uint64"

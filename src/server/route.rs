@@ -275,17 +275,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(get().to(get_qualifier_table)),
     )
     .service(
-        resource("/api/raw_events")
-            .guard(guard::Put())
-            .data(Query::<RawEventQuery>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
-            .route(put().to(add_raw_events)),
-    )
-    .service(
         resource("/api/status")
             .guard(guard::Get())
             .route(get().to(get_status_table)),
