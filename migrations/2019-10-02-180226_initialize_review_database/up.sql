@@ -45,10 +45,11 @@ CREATE TABLE cluster (
 CREATE TABLE outlier (
   id SERIAL PRIMARY KEY,
   raw_event BYTEA NOT NULL,
+  hashed_raw_event BYTEA NOT NULL,
   data_source_id INTEGER NOT NULL REFERENCES data_source(id),
   event_ids NUMERIC(20, 0)[] NOT NULL,
   size NUMERIC(20, 0) NOT NULL,
-  UNIQUE (raw_event, data_source_id)
+  UNIQUE (hashed_raw_event, data_source_id)
 );
 
 CREATE TABLE indicator (

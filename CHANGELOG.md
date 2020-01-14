@@ -8,12 +8,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Added `event` and `kafka_metadata` tables.
-- Added a new endpoint `GET /api/event/search` to fetch raw_events from event
-  table.
-- Added periodic tasks to fetch kafka metadata and raw events that work with the
-  environment below. `raw_events` corresponding to `event_ids` in `cluster`
-  and `outlier` tables are stored in `event` table by these periodic tasks.
+- `event` and `kafka_metadata` tables.
+- `hashed_raw_event` column in `outlier` table.
+- A new endpoint `GET /api/event/search` to fetch raw_events from event table.
+- Periodic tasks to fetch kafka metadata and raw events that work with the
+  environment below. `raw_events` corresponding to `event_ids` in `cluster` and
+  `outlier` tables are stored in `event` table by these periodic tasks.
   - `MAX_OFFSET_COUNT`: Maximum number of offsets for each kafka topic to
     fetch per task. Default value is 1000.
   - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
