@@ -473,7 +473,7 @@ paths:
     post:
       tags: [indicator]
       summary: "Create a new indicator"
-      description: "This endpoint is for clients to create a new indicator."
+      description: "This endpoint is for clients to create a new indicator. The token of new indicator must be array of array of strings in JSON format."
       consumes:
       - "application/json"
       produces:
@@ -523,7 +523,7 @@ paths:
     put:
       tags: [indicator]
       summary: "Update indicator_name, data_source, description, and/or token for the specified indicator_name"
-      description: "This endpoint is aimed to update indicator_name, data_source, description, and/or token of an indicator."
+      description: "This endpoint is aimed to update indicator_name, data_source, description, and/or token of an indicator. The new token must be array of array of string in JSON format."
       consumes:
       - "application/json"
       produces:

@@ -4,7 +4,8 @@ use actix_web::{
     HttpResponse,
 };
 use diesel::prelude::*;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::collections::HashSet;
 
 use super::schema::indicator;
 use crate::database::*;
@@ -21,6 +22,14 @@ pub(crate) async fn add_indicator(
     let data_source = indicators.get("data_source").and_then(Value::as_str);
 
     if let (Some(name), Some(token), Some(data_source)) = (name, token, data_source) {
+        if serde_json::from_value::<HashSet<Vec<String>>>(token.clone()).is_err() {
+            let message = json!({
+                "message": "Invalid indicator",
+            });
+            return Ok(HttpResponse::BadRequest()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(message));
+        }
         let insert_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
             let data_source_id = get_data_source_id(&conn, &data_source)?;
             diesel::insert_into(dsl::indicator)
@@ -168,7 +177,16 @@ pub(crate) async fn update_indicator(
         new_indicator.get("description").and_then(Value::as_str),
         new_indicator.get("token"),
     );
-
+    if let Some(token) = new_token {
+        if serde_json::from_value::<HashSet<Vec<String>>>(token.clone()).is_err() {
+            let message = json!({
+                "message": "Invalid indicator",
+            });
+            return Ok(HttpResponse::BadRequest()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(message));
+        }
+    }
     if let (Some(_), _, _, _) | (_, Some(_), _, _) | (_, _, Some(_), _) | (_, _, _, Some(_)) =
         (new_name, new_data_source, new_description, new_token)
     {
