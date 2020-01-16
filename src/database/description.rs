@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Query},
+    web::{Data, Payload, Query},
     HttpResponse,
 };
 use chrono::{NaiveDate, NaiveDateTime};
@@ -17,7 +17,7 @@ use super::schema::{
     description_enum, description_float, description_int, description_ipaddr, description_text,
     top_n_binary, top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
-use crate::database::{self, build_err_msg};
+use crate::database::{self, build_err_msg, load_payload};
 
 #[derive(Clone, Debug, Default, Serialize)]
 struct DescriptionLoad {
@@ -420,9 +420,10 @@ pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
 #[allow(clippy::too_many_lines)]
 pub(crate) async fn add_descriptions(
     pool: Data<database::Pool>,
-    new_descriptions: Json<Vec<DescriptionInsert>>,
+    payload: Payload,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let insert_descriptions: Vec<_> = new_descriptions.into_inner();
+    let bytes = load_payload(payload).await?;
+    let insert_descriptions: Vec<DescriptionInsert> = serde_json::from_slice(&bytes)?;
 
     let insert_result = pool.get().map_err(Into::into).and_then(|conn| {
         let mut result: Vec<Result<usize, database::Error>> = Vec::new();

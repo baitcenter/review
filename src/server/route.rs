@@ -130,12 +130,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/description")
             .guard(guard::Put())
             .guard(guard::Header("content-type", "application/json"))
-            .data(Json::<Vec<DescriptionInsert>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(put().to(add_descriptions)),
     )
     .service(
