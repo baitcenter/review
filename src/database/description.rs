@@ -13,9 +13,9 @@ use std::str::FromStr;
 use structured::{Description, DescriptionElement};
 
 use super::schema::{
-    self, cluster, column_description, data_source, description_datetime, description_enum,
-    description_float, description_int, description_ipaddr, description_text, top_n_datetime,
-    top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
+    self, cluster, column_description, data_source, description_binary, description_datetime,
+    description_enum, description_float, description_int, description_ipaddr, description_text,
+    top_n_binary, top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
 use crate::database::{self, build_err_msg};
 
@@ -154,6 +154,20 @@ struct DescriptionsTextInsert {
     pub mode: Option<String>,
 }
 
+#[derive(Debug, Queryable)]
+struct DescriptionsBinaryTable {
+    pub id: i32,
+    pub description_id: i32,
+    pub mode: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "description_binary"]
+struct DescriptionsBinaryInsert {
+    pub description_id: i32,
+    pub mode: Option<Vec<u8>>,
+}
+
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
 #[derive(Debug, Queryable)]
 struct DescriptionsIpaddrTable {
@@ -256,6 +270,24 @@ struct TopNTextInsert {
     pub description_id: i32,
     pub ranking: Option<i64>,
     pub value: Option<String>,
+    pub count: Option<i64>,
+}
+
+#[derive(Debug, Queryable)]
+struct TopNBinaryTable {
+    pub id: i32,
+    pub description_id: i32,
+    pub ranking: Option<i64>,
+    pub value: Option<Vec<u8>>,
+    pub count: Option<i64>,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "top_n_binary"]
+struct TopNBinaryInsert {
+    pub description_id: i32,
+    pub ranking: Option<i64>,
+    pub value: Option<Vec<u8>>,
     pub count: Option<i64>,
 }
 
@@ -403,6 +435,8 @@ pub(crate) async fn add_descriptions(
         let mut top_n_data_enum = Vec::<TopNEnumInsert>::new();
         let mut desc_data_text = Vec::<DescriptionsTextInsert>::new();
         let mut top_n_data_text = Vec::<TopNTextInsert>::new();
+        let mut desc_data_binary = Vec::<DescriptionsBinaryInsert>::new();
+        let mut top_n_data_binary = Vec::<TopNBinaryInsert>::new();
         let mut desc_data_ipaddr = Vec::<DescriptionsIpaddrInsert>::new();
         let mut top_n_data_ipaddr = Vec::<TopNIpaddrInsert>::new();
         let mut desc_data_datetime = Vec::<DescriptionsDatetimeInsert>::new();
@@ -436,6 +470,7 @@ pub(crate) async fn add_descriptions(
                     Some(DescriptionElement::Text(_)) => 4_i32,
                     Some(DescriptionElement::IpAddr(_)) => 5_i32,
                     Some(DescriptionElement::DateTime(_)) => 6_i32,
+                    Some(DescriptionElement::Binary(_)) => 7_i32,
                     _ => continue,
                 };
 
@@ -581,6 +616,20 @@ pub(crate) async fn add_descriptions(
                             TopNTextInsert
                         );
                     }
+                    Some(DescriptionElement::Binary(md)) => {
+                        desc_data_binary.push(DescriptionsBinaryInsert {
+                            description_id: tmp_serial_id,
+                            mode: Some(md.to_vec()),
+                        });
+                        push_top_n_others!(
+                            column_description,
+                            DescriptionElement::Binary,
+                            clone,
+                            tmp_serial_id,
+                            top_n_data_binary,
+                            TopNBinaryInsert
+                        );
+                    }
                     Some(DescriptionElement::IpAddr(md)) => {
                         desc_data_ipaddr.push(DescriptionsIpaddrInsert {
                             description_id: tmp_serial_id,
@@ -666,6 +715,7 @@ pub(crate) async fn add_descriptions(
                 change_to_db_id!(serial_id, db_id, desc_data_enum);
                 change_to_db_id!(serial_id, db_id, desc_data_float);
                 change_to_db_id!(serial_id, db_id, desc_data_text);
+                change_to_db_id!(serial_id, db_id, desc_data_binary);
                 change_to_db_id!(serial_id, db_id, desc_data_ipaddr);
                 change_to_db_id!(serial_id, db_id, desc_data_datetime);
 
@@ -673,6 +723,7 @@ pub(crate) async fn add_descriptions(
                 change_to_db_id!(serial_id, db_id, top_n_data_enum);
                 change_to_db_id!(serial_id, db_id, top_n_data_float);
                 change_to_db_id!(serial_id, db_id, top_n_data_text);
+                change_to_db_id!(serial_id, db_id, top_n_data_binary);
                 change_to_db_id!(serial_id, db_id, top_n_data_ipaddr);
                 change_to_db_id!(serial_id, db_id, top_n_data_datetime);
 
@@ -707,6 +758,14 @@ pub(crate) async fn add_descriptions(
                     top_n_text,
                     desc_data_text,
                     top_n_data_text
+                );
+                insert_rows_to_db!(
+                    result,
+                    &conn,
+                    description_binary,
+                    top_n_binary,
+                    desc_data_binary,
+                    top_n_data_binary
                 );
                 insert_rows_to_db!(
                     result,
@@ -797,6 +856,13 @@ impl GetValueByType {
         }
     }
 
+    pub fn top_n_binary(value: &Option<Vec<u8>>) -> DescriptionElement {
+        match value {
+            Some(value) => DescriptionElement::Binary(value.to_vec()),
+            None => DescriptionElement::Binary(String::from("N/A").into()), // No chance
+        }
+    }
+
     pub fn top_n_ipaddr(value: &Option<String>) -> DescriptionElement {
         match value {
             Some(value) => DescriptionElement::IpAddr(IpAddr::V4(
@@ -823,6 +889,13 @@ impl GetValueByType {
     pub fn mode_text(value: Option<String>) -> Option<DescriptionElement> {
         match value {
             Some(m) => Some(DescriptionElement::Text(m)),
+            None => None,
+        }
+    }
+
+    pub fn mode_binary(value: Option<Vec<u8>>) -> Option<DescriptionElement> {
+        match value {
+            Some(m) => Some(DescriptionElement::Binary(m)),
             None => None,
         }
     }
@@ -1151,6 +1224,21 @@ pub(crate) async fn get_description(
                                     description,
                                     top_n_datetime,
                                     mode_datetime
+                                );
+                                description
+                            }
+                            7 => {
+                                let description;
+                                load_descriptions_others!(
+                                    description_binary,
+                                    top_n_binary,
+                                    Vec<u8>,
+                                    TopNBinaryTable,
+                                    &conn,
+                                    column,
+                                    description,
+                                    top_n_binary,
+                                    mode_binary
                                 );
                                 description
                             }

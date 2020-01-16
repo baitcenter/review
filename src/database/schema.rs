@@ -44,6 +44,14 @@ table! {
 }
 
 table! {
+    description_binary (id) {
+        id -> Int4,
+        description_id -> Int4,
+        mode -> Nullable<Bytea>,
+    }
+}
+
+table! {
     description_datetime (id) {
         id -> Int4,
         description_id -> Int4,
@@ -163,6 +171,16 @@ table! {
 }
 
 table! {
+    top_n_binary (id) {
+        id -> Int4,
+        description_id -> Int4,
+        ranking -> Nullable<Int8>,
+        value -> Nullable<Bytea>,
+        count -> Nullable<Int8>,
+    }
+}
+
+table! {
     top_n_datetime (id) {
         id -> Int4,
         description_id -> Int4,
@@ -229,6 +247,7 @@ joinable!(cluster -> qualifier (qualifier_id));
 joinable!(cluster -> status (status_id));
 joinable!(column_description -> cluster (cluster_id));
 joinable!(column_description -> description_element_type (type_id));
+joinable!(description_binary -> column_description (description_id));
 joinable!(description_datetime -> column_description (description_id));
 joinable!(description_enum -> column_description (description_id));
 joinable!(description_float -> column_description (description_id));
@@ -239,6 +258,7 @@ joinable!(event -> data_source (data_source_id));
 joinable!(indicator -> data_source (data_source_id));
 joinable!(kafka_metadata -> data_source (data_source_id));
 joinable!(outlier -> data_source (data_source_id));
+joinable!(top_n_binary -> column_description (description_id));
 joinable!(top_n_datetime -> column_description (description_id));
 joinable!(top_n_enum -> column_description (description_id));
 joinable!(top_n_float -> column_description (description_id));
@@ -251,6 +271,7 @@ allow_tables_to_appear_in_same_query!(
     cluster,
     column_description,
     data_source,
+    description_binary,
     description_datetime,
     description_element_type,
     description_enum,
@@ -264,6 +285,7 @@ allow_tables_to_appear_in_same_query!(
     outlier,
     qualifier,
     status,
+    top_n_binary,
     top_n_datetime,
     top_n_enum,
     top_n_float,
