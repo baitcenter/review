@@ -40,6 +40,7 @@ impl KafkaConfig {
             self.interval.unwrap_or_else(|| 900),
             max_offset_count
         );
+        interval.tick().await;
         loop {
             interval.tick().await;
             match fetch::send_http_get_request(&api_url).await {
