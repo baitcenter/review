@@ -95,3 +95,55 @@ BEGIN
   RETURN json_blob;
 END;
 $$ LANGUAGE plpgsql;
+
+
+/******************************************************
+ * ATTEMPT_EVENT_IDS_UPDATE
+ *
+ * Remove unnecessary event_ids from cluster, outlier, 
+ * and event tables.
+ ******************************************************/
+CREATE OR REPLACE FUNCTION attempt_event_ids_update(
+  event_num NUMERIC(20, 0)
+)
+RETURNS VOID AS 
+$$
+DECLARE
+  _id INTEGER;
+  _data_source_id INTEGER;
+  _event_ids NUMERIC(20, 0)[];
+  _event_id NUMERIC(20, 0);
+BEGIN
+  FOR _id, _data_source_id, _event_ids IN
+    SELECT cluster.id, cluster.data_source_id, cluster.event_ids 
+    FROM cluster
+    WHERE array_length(cluster.event_ids, 1) > $1
+  LOOP
+    LOOP
+      EXECUTE 'SELECT MIN(i) FROM UNNEST($1) i' INTO _event_id USING _event_ids;
+      _event_ids := array_remove(_event_ids, event_id);
+      DELETE FROM event WHERE event.message_id = _event_id AND event.data_source_id = _data_source_id;
+      IF array_length(_event_ids, 1) = $1 THEN
+        EXIT;
+      END IF;
+    END LOOP;
+    UPDATE cluster SET event_ids = _event_ids WHERE cluster.id = _id;
+  END LOOP;
+
+  FOR _id, _data_source_id, _event_ids IN
+    SELECT outlier.id, outlier.data_source_id, outlier.event_ids 
+    FROM outlier
+    WHERE array_length(outlier.event_ids, 1) > $1
+  LOOP
+    LOOP
+      EXECUTE 'SELECT MIN(i) FROM UNNEST($1) i' INTO _event_id USING _event_ids;
+      _event_ids := array_remove(_event_ids, event_id);
+      DELETE FROM event WHERE event.message_id = _event_id AND event.data_source_id = _data_source_id;
+      IF array_length(_event_ids, 1) = $1 THEN
+        EXIT;
+      END IF;
+    END LOOP;
+    UPDATE outlier SET event_ids = _event_ids WHERE outlier.id = _id;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
