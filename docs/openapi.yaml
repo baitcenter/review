@@ -1,6 +1,6 @@
 swagger: "2.0"
 info:
-  version: "0.6.2"
+  version: "0.7.0"
   title: "REviewd API"
 tags:
 - name: "cluster"
@@ -8,6 +8,7 @@ tags:
 - name: "category"
 - name: "data_source"
 - name: "event"
+- name: "event_id"
 - name: "indicator"
 - name: "qualifier"
 - name: "status"
@@ -415,6 +416,42 @@ paths:
               $ref: "#/definitions/Event"
         400:
           description: "Bad Request"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /api/event_id:
+    get:
+      tags: [event_id]
+      summary: "Get the value of maximum number of event_ids"
+      description: "Retrieve the value of maximum number of event_ids per cluster/outlier"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            $ref: "#/definitions/MaxEventIdNum"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    put:
+      tags: [event_id]
+      summary: "Update the value of maximum number of event_ids"
+      description: "Update the value of maximum number of event_ids per cluster/outlier. If the new value is smaller than the old value, REview will update event_ids of each cluster and outlier whose size of event_ids is greater than the new value."
+      parameters:
+        - name: "max_event_id_num"
+          in: "query"
+          description: |
+            New value of maximum number of event_ids
+          type: "integer"
+      produces:
+      - "text/plain"
+      - "application/json"
+      responses:
+        200:
+          description: "OK"
         500:
           description: "Internal server error"
           schema:
@@ -949,6 +986,13 @@ definitions:
           type: "array"
           items:
             type: "string"
+  MaxEventIdNum:
+    type: "object"
+    properties:
+      max_event_id_num:
+        type: "integer"
+        format: "uint64"
+        description: "the value of maximum number of event_ids"
   Outlier:
     type: "object"
     properties:

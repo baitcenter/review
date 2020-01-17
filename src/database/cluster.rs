@@ -10,6 +10,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use super::schema::cluster;
 use crate::database::*;
@@ -179,6 +180,7 @@ struct Cluster {
 pub(crate) async fn update_clusters(
     pool: Data<Pool>,
     payload: Payload,
+    max_event_id_num: Data<Mutex<usize>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl;
 
@@ -203,8 +205,21 @@ pub(crate) async fn update_clusters(
                             Some(sig) => sig.clone(),
                             None => cluster.signature.clone(),
                         };
-                        let (event_ids, deleted_event_ids) =
-                            merge_cluster_examples(cluster.event_ids.clone(), c.event_ids.clone());
+                        let max_event_id_num = match max_event_id_num.lock() {
+                            Ok(num) => *num,
+                            Err(e) => {
+                                error!(
+                                    "Failed to aquire lock: {}. Use default max_event_id_number 25",
+                                    e
+                                );
+                                25
+                            }
+                        };
+                        let (event_ids, deleted_event_ids) = merge_cluster_examples(
+                            cluster.event_ids.clone(),
+                            c.event_ids.clone(),
+                            max_event_id_num,
+                        );
                         let cluster_size = c.size.and_then(FromPrimitive::from_usize).map_or_else(
                             || cluster.size.clone(),
                             |new_size: BigDecimal| {
@@ -342,8 +357,8 @@ fn get_current_clusters(
 fn merge_cluster_examples(
     current_examples: Option<Vec<BigDecimal>>,
     new_examples: Option<Vec<u64>>,
+    max_event_id_num: usize,
 ) -> (Option<Vec<BigDecimal>>, Option<Vec<BigDecimal>>) {
-    let max_example_num: usize = 25;
     new_examples.map_or((current_examples.clone(), None), |new_examples| {
         let new_examples = new_examples
             .into_iter()
@@ -351,9 +366,9 @@ fn merge_cluster_examples(
             .collect::<Vec<_>>();
         let mut current_eg = current_examples.unwrap_or_default();
         current_eg.extend(new_examples);
-        if current_eg.len() > max_example_num {
+        if current_eg.len() > max_event_id_num {
             current_eg.sort();
-            let (delete_eg, current_eg) = current_eg.split_at(current_eg.len() - max_example_num);
+            let (delete_eg, current_eg) = current_eg.split_at(current_eg.len() - max_event_id_num);
             (Some(current_eg.to_vec()), Some(delete_eg.to_vec()))
         } else {
             (Some(current_eg), None)

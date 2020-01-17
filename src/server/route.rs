@@ -183,6 +183,16 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(get().to(get_events)),
     )
     .service(
+        resource("/api/event_id")
+            .guard(guard::Get())
+            .route(get().to(get_max_event_id_num)),
+    )
+    .service(
+        resource("/api/event_id")
+            .guard(guard::Put())
+            .route(put().to(update_max_event_id_num)),
+    )
+    .service(
         resource("/api/indicator")
             .guard(guard::Post())
             .guard(guard::Header("content-type", "application/json"))

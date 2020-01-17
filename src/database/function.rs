@@ -11,6 +11,12 @@ sql_function! {
 }
 
 sql_function! {
+    fn attempt_event_ids_update (
+        max_event_id_num: Numeric
+    );
+}
+
+sql_function! {
     fn attempt_indicator_update (
         indicator_name: Varchar,
         new_indicator_name: Nullable<Varchar>,

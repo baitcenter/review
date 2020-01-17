@@ -9,6 +9,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::sync::Mutex;
 
 use super::schema::outlier;
 use crate::database::*;
@@ -179,10 +180,21 @@ pub(crate) async fn get_outliers(
 pub(crate) async fn update_outliers(
     pool: Data<Pool>,
     payload: Payload,
+    max_event_id_num: Data<Mutex<usize>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use outlier::dsl;
     let bytes = load_payload(payload).await?;
     let outlier_update: Vec<OutlierUpdate> = serde_json::from_slice(&bytes)?;
+    let max_event_id_num = match max_event_id_num.lock() {
+        Ok(num) => *num,
+        Err(e) => {
+            error!(
+                "Failed to acquire lock: {}. Use the default max_event_id_number 25",
+                e
+            );
+            25
+        }
+    };
     let mut deleted_events = Vec::<Event>::new();
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         let mut query = dsl::outlier.into_boxed();
@@ -235,15 +247,15 @@ pub(crate) async fn update_outliers(
                                 .filter_map(|e| FromPrimitive::from_u64(*e))
                                 .collect::<Vec<BigDecimal>>();
                             event_ids.extend(outlier.event_ids.clone());
-                            // only store most recent 25 event_ids per outlier
-                            let (event_ids, deleted_event_ids) = if event_ids.len() > 25 {
-                                event_ids.sort();
-                                let (deleted_event_ids, event_ids) =
-                                    event_ids.split_at(event_ids.len() - 25);
-                                (event_ids.to_vec(), Some(deleted_event_ids.to_vec()))
-                            } else {
-                                (event_ids, None)
-                            };
+                            let (event_ids, deleted_event_ids) =
+                                if event_ids.len() > max_event_id_num {
+                                    event_ids.sort();
+                                    let (deleted_event_ids, event_ids) =
+                                        event_ids.split_at(event_ids.len() - max_event_id_num);
+                                    (event_ids.to_vec(), Some(deleted_event_ids.to_vec()))
+                                } else {
+                                    (event_ids, None)
+                                };
                             let data_source_id =
                                 get_data_source_id(&conn, &o.data_source).unwrap_or_default();
                             if data_source_id == 0 {
@@ -269,15 +281,15 @@ pub(crate) async fn update_outliers(
                                 ))
                             }
                         } else {
-                            // only store most recent 25 event_ids per outlier
                             let mut event_ids = o
                                 .event_ids
                                 .iter()
                                 .filter_map(|e| FromPrimitive::from_u64(*e))
                                 .collect::<Vec<BigDecimal>>();
-                            let event_ids = if event_ids.len() > 25 {
+                            let event_ids = if event_ids.len() > max_event_id_num {
                                 event_ids.sort();
-                                let (_, event_ids) = event_ids.split_at(o.event_ids.len() - 25);
+                                let (_, event_ids) =
+                                    event_ids.split_at(o.event_ids.len() - max_event_id_num);
                                 event_ids.to_vec()
                             } else {
                                 event_ids

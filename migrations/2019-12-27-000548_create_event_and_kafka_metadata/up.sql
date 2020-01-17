@@ -60,7 +60,8 @@ FROM event
 WHERE
   event.message_id BETWEEN lower_message_id AND upper_message_id
   AND event.data_source_id = $1
-  AND event.raw_event IS NULL;
+  AND event.raw_event IS NULL
+LIMIT 10000;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -104,7 +105,7 @@ $$ LANGUAGE plpgsql;
  * and event tables.
  ******************************************************/
 CREATE OR REPLACE FUNCTION attempt_event_ids_update(
-  event_num NUMERIC(20, 0)
+  max_event_id_num NUMERIC(20, 0)
 )
 RETURNS VOID AS 
 $$

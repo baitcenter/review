@@ -18,6 +18,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     fetch per task. Default value is 1000.
   - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
     value is 900 (15 minutes).
+- A new environment variable `MAX_EVENT_ID_NUM` to configuare the maximum number
+  of `event_ids` per cluster and outlier
 
 ### Changed
 
