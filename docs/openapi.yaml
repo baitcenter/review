@@ -12,7 +12,6 @@ tags:
 - name: "indicator"
 - name: "qualifier"
 - name: "status"
-- name: "etcd"
 - name: "description"
 schemes:
 - "http"
@@ -618,38 +617,6 @@ paths:
             type: "array"
             items:
               $ref: "#/definitions/Status"
-        500:
-          description: "Internal server error"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
-  /api/etcd/suspicious_token:
-    put:
-      tags: [etcd]
-      summary: "Update the value of specific etcd key"
-      description: "This endpoint is aimed to update the value, suspicious tokens, of specific etcd key."
-      consumes:
-      - "application/json"
-      produces:
-      - "text/plain"
-      parameters:
-      - name: "etcd_key"
-        in: "query"
-        description: "The name of the etcd key. The value of the etcd key will be updated."
-        required: true
-        type: "string"
-      - name: "suspicious tokens"
-        in: "body"
-        description: "Sequences of strings in JSON format. REview uses the content of body as a new value of etcd key without checking it."
-        required: true
-        schema:
-          type: "array"
-          items:
-            type: "array"
-            items:
-              type: "string"
-      responses:
-        200:
-          description: "OK"
         500:
           description: "Internal server error"
           schema:

@@ -12,14 +12,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `hashed_raw_event` column in `outlier` table.
 - A new endpoint `GET /api/event/search` to fetch raw_events from event table.
 - Periodic tasks to fetch kafka metadata and raw events that work with the
-  environment below. `raw_events` corresponding to `event_ids` in `cluster` and
-  `outlier` tables are stored in `event` table by these periodic tasks.
-  - `MAX_OFFSET_COUNT`: Maximum number of offsets for each kafka topic to
-    fetch per task. Default value is 1000.
-  - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default
-    value is 900 (15 minutes).
-- A new environment variable `MAX_EVENT_ID_NUM` to configuare the maximum number
-  of `event_ids` per cluster and outlier
+  environment variables below. `raw_events` corresponding to `event_ids` in
+  `cluster` and `outlier` tables are stored in `event` table by these periodic
+  tasks.
+  - `MAX_OFFSET_COUNT`: Maximum number of offsets for each kafka topic to fetch
+    per task. Default value is 1000.
+  - `TASK_TIME_INTERVAL`: Periodic task interval (in seconds). Default value is
+    900 (15 minutes).
+- A new environment variable `MAX_EVENT_ID_NUM` to configure the maximum number
+  of `event_ids` per cluster and outlier.
 
 ### Changed
 
@@ -29,6 +30,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   raw_events.
   - `raw_event` in cluster is no longer displayed.
   - `outlier` in outlier is displayed as String of hex values.
+- No longer need `DOCKER_HOST_IP` and `ETCD_ADDR` environment variables.
 
 ### Fixed
 
@@ -39,6 +41,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Removed
 
 - `raw_event` table
+- `PUT /api/etcd/suspicious_token` endpoint
 
 ## [0.6.3] - 2019-12-30
 
