@@ -1095,7 +1095,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
  - <code>data_source:&lt;boolean&gt;</code> When set to <code>true</code>, <code>data_source</code> will be returned
  - <code>size:&lt;boolean&gt;</code> When set to <code>true</code>, <code>size</code> will be returned
  - <code>score:&lt;boolean&gt;</code> When set to <code>true</code>, <code>score</code> will be returned
- - <code>examples:&lt;boolean&gt;</code> When set to <code>true</code>, <code>examples</code> will be returned
+ - <code>event_ids:&lt;boolean&gt;</code> When set to <code>true</code>, <code>event_ids</code> will be returned
  - <code>last_modification_time:&lt;boolean&gt;</code> When set to <code>true</code>, <code>last_modification_time</code> will be returned</p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
@@ -3329,6 +3329,25 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p>integer</p>
 </div></div></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>select</strong><br>
+<em>optional</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>A JSON encoded value of the properties which will be returned if data is available in database. Available selects:
+ - <code>outlier:&lt;boolean&gt;</code> When set to <code>true</code>, <code>outlier</code> will be returned
+ - <code>data_source:&lt;boolean&gt;</code> When set to <code>true</code>, <code>data_source</code> will be returned
+ - <code>size:&lt;boolean&gt;</code> When set to <code>true</code>, <code>size</code> will be returned
+ - <code>event_ids:&lt;boolean&gt;</code> When set to <code>true</code>, <code>event_ids</code> will be returned</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
+</div></div></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -5130,7 +5149,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-01-17 15:56:08 -0800
+Last updated 2020-01-21 12:10:32 -0800
 </div>
 </div>
 </body>

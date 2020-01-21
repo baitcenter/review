@@ -74,7 +74,7 @@ paths:
               - `data_source:<boolean>` When set to `true`, `data_source` will be returned
               - `size:<boolean>` When set to `true`, `size` will be returned
               - `score:<boolean>` When set to `true`, `score` will be returned
-              - `examples:<boolean>` When set to `true`, `examples` will be returned
+              - `event_ids:<boolean>` When set to `true`, `event_ids` will be returned
               - `last_modification_time:<boolean>` When set to `true`, `last_modification_time` will be returned
           type: "string"  
       produces:
@@ -212,6 +212,15 @@ paths:
         in: "query"
         description: Specify the number of records to return in one request, specified as an integer from 1 to 100.
         type: integer
+      - name: "select"
+        in: "query"
+        description: |
+          A JSON encoded value of the properties which will be returned if data is available in database. Available selects:
+            - `outlier:<boolean>` When set to `true`, `outlier` will be returned
+            - `data_source:<boolean>` When set to `true`, `data_source` will be returned
+            - `size:<boolean>` When set to `true`, `size` will be returned
+            - `event_ids:<boolean>` When set to `true`, `event_ids` will be returned
+        type: "string"
       produces:
         - "application/json"
         - "text/plain"

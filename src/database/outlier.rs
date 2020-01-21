@@ -9,6 +9,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use super::schema::outlier;
@@ -110,12 +111,31 @@ pub(crate) async fn get_outliers(
     let max_per_page = 100;
     let outlier_schema =
         "(outlier INNER JOIN data_source ON outlier.data_source_id = data_source.id)";
-    let select = vec![
-        "outlier.raw_event as outlier",
-        "data_source.topic_name as data_source",
-        "outlier.size",
-        "outlier.event_ids",
-    ];
+    let select = query
+        .get("select")
+        .and_then(Value::as_str)
+        .and_then(|s| serde_json::from_str::<HashMap<String, bool>>(s).ok())
+        .map(|s| {
+            s.iter()
+                .filter(|s| *s.1)
+                .filter_map(|s| match s.0.to_lowercase().as_str() {
+                    "outlier" => Some("outlier.raw_event as outlier"),
+                    "data_source" => Some("data_source.topic_name as data_source"),
+                    "size" => Some("outlier.size"),
+                    "event_ids" => Some("outlier.event_ids"),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            vec![
+                "outlier.raw_event as outlier",
+                "data_source.topic_name as data_source",
+                "outlier.size",
+                "outlier.event_ids",
+            ]
+        });
     let filter = query
         .get("filter")
         .and_then(Value::as_str)
