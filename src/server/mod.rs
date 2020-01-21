@@ -57,11 +57,13 @@ pub fn run(
             .ok()
             .and_then(|v| v.parse::<usize>().ok()),
     );
-    std::thread::spawn(move || {
-        let _ = tokio::runtime::Runtime::new()
-            .expect("Unable to create Tokio runtime")
-            .block_on(kafka_consumer::KafkaConfig::periodically_fetch_kafka_message(config));
-    });
+    if config.interval() != Some(0) {
+        std::thread::spawn(move || {
+            let _ = tokio::runtime::Runtime::new()
+                .expect("Unable to create Tokio runtime")
+                .block_on(kafka_consumer::KafkaConfig::periodically_fetch_kafka_message(config));
+        });
+    }
     let max_event_id_num = std::env::var("MAX_EVENT_ID_NUM")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())

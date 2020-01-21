@@ -30,6 +30,10 @@ impl KafkaConfig {
         }
     }
 
+    pub(crate) fn interval(&self) -> Option<u64> {
+        self.interval
+    }
+
     pub(crate) async fn periodically_fetch_kafka_message(self) -> Result<(), std::io::Error> {
         let mut interval =
             time::interval(Duration::from_secs(self.interval.unwrap_or_else(|| 900)));
