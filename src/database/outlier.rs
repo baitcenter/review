@@ -8,7 +8,6 @@ use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -20,7 +19,6 @@ use crate::database::*;
 struct Outlier {
     id: i32,
     raw_event: Vec<u8>,
-    hashed_raw_event: Vec<u8>,
     data_source_id: i32,
     event_ids: Vec<BigDecimal>,
     size: BigDecimal,
@@ -218,14 +216,11 @@ pub(crate) async fn update_outliers(
     let mut deleted_events = Vec::<Event>::new();
     let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         let mut query = dsl::outlier.into_boxed();
-        let mut hasher = Sha256::new();
         for outlier in &outlier_update {
             if let Ok(data_source_id) = get_data_source_id(&conn, &outlier.data_source) {
-                hasher.input(&outlier.outlier);
-                let hashed_raw_event = hasher.result_reset().to_vec();
                 query = query.or_filter(
-                    dsl::hashed_raw_event
-                        .eq(hashed_raw_event)
+                    dsl::raw_event
+                        .eq(&outlier.outlier)
                         .and(dsl::data_source_id.eq(data_source_id)),
                 );
             }
@@ -234,16 +229,13 @@ pub(crate) async fn update_outliers(
             .load::<Outlier>(&conn)
             .map_err(Into::into)
             .and_then(|outlier_list| {
-                let mut hasher = Sha256::new();
                 let replace_outliers: Vec<_> = outlier_update
                     .iter()
                     .filter_map(|o| {
                         use std::str::FromStr;
-                        hasher.input(&o.outlier);
-                        let hashed_raw_event = hasher.result_reset().to_vec();
                         if let Some(outlier) = outlier_list
                             .iter()
-                            .find(|outlier| hashed_raw_event == outlier.hashed_raw_event)
+                            .find(|outlier| o.outlier == outlier.raw_event)
                         {
                             let o_size = FromPrimitive::from_usize(o.event_ids.len()).map_or_else(
                                 || outlier.size.clone(),
@@ -293,8 +285,8 @@ pub(crate) async fn update_outliers(
                                     deleted_events.extend(events);
                                 }
                                 Some((
+                                    dsl::id.eq(Some(outlier.id)),
                                     dsl::raw_event.eq(outlier.raw_event.clone()),
-                                    dsl::hashed_raw_event.eq(hashed_raw_event),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::size.eq(o_size),
@@ -330,8 +322,8 @@ pub(crate) async fn update_outliers(
                                 None
                             } else {
                                 Some((
+                                    dsl::id.eq(None),
                                     dsl::raw_event.eq(o.outlier.clone()),
-                                    dsl::hashed_raw_event.eq(hashed_raw_event),
                                     dsl::data_source_id.eq(data_source_id),
                                     dsl::event_ids.eq(event_ids),
                                     dsl::size.eq(size),
@@ -347,7 +339,7 @@ pub(crate) async fn update_outliers(
                 } else {
                     diesel::insert_into(dsl::outlier)
                         .values(&replace_outliers)
-                        .on_conflict((dsl::hashed_raw_event, dsl::data_source_id))
+                        .on_conflict(dsl::id)
                         .do_update()
                         .set((
                             dsl::event_ids.eq(excluded(dsl::event_ids)),

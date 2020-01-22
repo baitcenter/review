@@ -149,7 +149,6 @@ table! {
     outlier (id) {
         id -> Int4,
         raw_event -> Bytea,
-        hashed_raw_event -> Bytea,
         data_source_id -> Int4,
         event_ids -> Array<Numeric>,
         size -> Numeric,
