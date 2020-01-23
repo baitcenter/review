@@ -29,7 +29,6 @@ num-traits = "0.2"
 r2d2 = "0.8"
 reqwest = { version = "0.10", features = ["json"]} 
 rmp-serde = "0.14"
-sha2 = "0.8"
 serde = { version = "1",  features = ["derive"] }
 serde_json = "1"
 structured = { git = "https://github.com/petabi/structured.git", rev = "25f8fd6c" }

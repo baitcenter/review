@@ -4,7 +4,6 @@ use actix_web::{
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
-use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -229,7 +228,7 @@ pub(crate) async fn update_outliers(
             .load::<Outlier>(&conn)
             .map_err(Into::into)
             .and_then(|outlier_list| {
-                let replace_outliers: Vec<_> = outlier_update
+                let new_outliers = outlier_update
                     .iter()
                     .filter_map(|o| {
                         use std::str::FromStr;
@@ -268,30 +267,24 @@ pub(crate) async fn update_outliers(
                                 } else {
                                     (event_ids, None)
                                 };
-                            let data_source_id =
-                                get_data_source_id(&conn, &o.data_source).unwrap_or_default();
-                            if data_source_id == 0 {
-                                None
-                            } else {
-                                if let Some(event_ids) = deleted_event_ids {
-                                    let events = event_ids
-                                        .into_iter()
-                                        .map(|event_id| Event {
-                                            message_id: event_id,
-                                            raw_event: None,
-                                            data_source_id,
-                                        })
-                                        .collect::<Vec<_>>();
-                                    deleted_events.extend(events);
-                                }
-                                Some((
-                                    dsl::id.eq(Some(outlier.id)),
-                                    dsl::raw_event.eq(outlier.raw_event.clone()),
-                                    dsl::data_source_id.eq(data_source_id),
-                                    dsl::event_ids.eq(event_ids),
-                                    dsl::size.eq(o_size),
-                                ))
+                            if let Some(event_ids) = deleted_event_ids {
+                                let events = event_ids
+                                    .into_iter()
+                                    .map(|event_id| Event {
+                                        message_id: event_id,
+                                        raw_event: None,
+                                        data_source_id: outlier.data_source_id,
+                                    })
+                                    .collect::<Vec<_>>();
+                                deleted_events.extend(events);
                             }
+                            Some(Outlier {
+                                id: outlier.id,
+                                raw_event: outlier.raw_event.clone(),
+                                data_source_id: outlier.data_source_id,
+                                event_ids,
+                                size: o_size,
+                            })
                         } else {
                             let mut event_ids = o
                                 .event_ids
@@ -321,33 +314,56 @@ pub(crate) async fn update_outliers(
                             if data_source_id == 0 {
                                 None
                             } else {
-                                Some((
-                                    dsl::id.eq(None),
-                                    dsl::raw_event.eq(o.outlier.clone()),
-                                    dsl::data_source_id.eq(data_source_id),
-                                    dsl::event_ids.eq(event_ids),
-                                    dsl::size.eq(size),
-                                ))
+                                Some(Outlier {
+                                    id: 0,
+                                    raw_event: o.outlier.clone(),
+                                    data_source_id,
+                                    event_ids,
+                                    size,
+                                })
                             }
                         }
                     })
-                    .collect();
+                    .collect::<Vec<_>>();
 
                 update_events(&conn, &outlier_update, &deleted_events);
-                if replace_outliers.is_empty() {
-                    Err(Error::Transaction)
-                } else {
-                    diesel::insert_into(dsl::outlier)
-                        .values(&replace_outliers)
-                        .on_conflict(dsl::id)
-                        .do_update()
-                        .set((
-                            dsl::event_ids.eq(excluded(dsl::event_ids)),
-                            dsl::size.eq(excluded(dsl::size)),
-                        ))
-                        .execute(&*conn)
-                        .map_err(Into::into)
-                }
+                conn.transaction::<usize, Error, _>(|| {
+                    Ok(new_outliers
+                        .iter()
+                        .filter_map(|outlier| {
+                            if outlier.id == 0 {
+                                let result = diesel::insert_into(dsl::outlier)
+                                    .values((
+                                        dsl::raw_event.eq(&outlier.raw_event),
+                                        dsl::data_source_id.eq(outlier.data_source_id),
+                                        dsl::event_ids.eq(&outlier.event_ids),
+                                        dsl::size.eq(&outlier.size),
+                                    ))
+                                    .execute(&conn);
+                                if let Err(e) = result {
+                                    error!("An error occurs while inserting outliers: {}", e);
+                                    None
+                                } else {
+                                    Some(1)
+                                }
+                            } else {
+                                let result = diesel::update(dsl::outlier)
+                                    .filter(dsl::id.eq(outlier.id))
+                                    .set((
+                                        dsl::event_ids.eq(&outlier.event_ids),
+                                        dsl::size.eq(&outlier.size),
+                                    ))
+                                    .execute(&conn);
+                                if let Err(e) = result {
+                                    error!("An error occurs while updating outliers: {}", e);
+                                    None
+                                } else {
+                                    Some(1)
+                                }
+                            }
+                        })
+                        .sum())
+                })
             })
     });
 

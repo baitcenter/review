@@ -9,7 +9,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `event` and `kafka_metadata` tables.
-- `hashed_raw_event` column in `outlier` table.
 - A new endpoint `GET /api/event/search` to fetch raw_events from event table.
 - Periodic tasks to fetch kafka metadata and raw events that work with the
   environment variables below. `raw_events` corresponding to `event_ids` in

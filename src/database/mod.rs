@@ -40,8 +40,6 @@ pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("transaction error")]
-    Transaction,
     #[error("diesel connection error: {0}")]
     Connection(#[from] diesel::ConnectionError),
     #[error("migration error: {0}")]
