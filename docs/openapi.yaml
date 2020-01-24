@@ -402,17 +402,21 @@ paths:
   /api/event/search:
     get:
       tags: [event]
-      summary: "Get clusters"
-      description: "This endpoint searches for events using message_id and data_source, and returns a list of events which has the value of raw_event."
-      parameters: 
-        - in: "body"
-          name: "properties"
-          description: "A list of pairs of message_id and data_source. If the number of pairs is greater than 100, HTTP 400 will be returned."
+      summary: "Get events"
+      description: "This endpoint searches for events using message_id and data_source, and returns a list of events which has the value of raw_event. The maximum number of events to return is 100."
+      parameters:
+        - name: "data_source"
+          in: "query"
+          description: "name of the Kafka topic name"
           required: true
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/EventSearchBody"
+          type: "string"
+        - name: "filter"
+          in: "query"
+          description: |
+            A JSON encoded value of the filters. Available filter:
+              - `message_ids:[u64]` array of message_id
+          required: true
+          type: "string"
       produces:
       - "application/json"
       responses:
@@ -888,16 +892,6 @@ definitions:
       raw_event:
         type: "string"
         description: "raw_event for this event"
-  EventSearchBody:
-    type: "object"
-    properties:
-      message_id:
-        type: "integer"
-        format: uint64
-        description: "message_id for this event"
-      data_source:
-        type: "string"
-        description: "kafka topic name"
   Indicator:
     type: "object"
     properties:

@@ -462,7 +462,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_api_description_get">Get descriptions</a></li>
 <li><a href="#_api_description_put">Create new descriptions</a></li>
 <li><a href="#_api_description_round_get">Get rounds of description for a selected cluster</a></li>
-<li><a href="#_api_event_search_get">Get clusters</a></li>
+<li><a href="#_api_event_search_get">Get events</a></li>
 <li><a href="#_api_event_id_get">Get the value of maximum number of event_ids</a></li>
 <li><a href="#_api_event_id_put">Update the value of maximum number of event_ids</a></li>
 <li><a href="#_api_indicator_post">Create a new indicator</a></li>
@@ -492,7 +492,6 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_descriptiontopn">DescriptionTopN</a></li>
 <li><a href="#_errorresponse">ErrorResponse</a></li>
 <li><a href="#_event">Event</a></li>
-<li><a href="#_eventsearchbody">EventSearchBody</a></li>
 <li><a href="#_indicator">Indicator</a></li>
 <li><a href="#_indicatorcreatebody">IndicatorCreateBody</a></li>
 <li><a href="#_indicatorupdatebody">IndicatorUpdateBody</a></li>
@@ -2243,7 +2242,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 </div>
 <div class="sect2">
-<h3 id="_api_event_search_get">Get clusters</h3>
+<h3 id="_api_event_search_get">Get events</h3>
 <div class="literalblock">
 <div class="content">
 <pre>GET /api/event/search</pre>
@@ -2252,7 +2251,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="sect3">
 <h4 id="_description_13">Description</h4>
 <div class="paragraph">
-<p>This endpoint searches for events using message_id and data_source, and returns a list of events which has the value of raw_event.</p>
+<p>This endpoint searches for events using message_id and data_source, and returns a list of events which has the value of raw_event. The maximum number of events to return is 100.</p>
 </div>
 </div>
 <div class="sect3">
@@ -2275,17 +2274,33 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p><strong>Body</strong></p>
+<p><strong>Query</strong></p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p><strong>properties</strong><br>
+<p><strong>data_source</strong><br>
 <em>required</em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>A list of pairs of message_id and data_source. If the number of pairs is greater than 100, HTTP 400 will be returned.</p>
+<p>name of the Kafka topic name</p>
 </div></div></td>
 <td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>&lt; <a href="#_eventsearchbody">EventSearchBody</a> &gt; array</p>
+<p>string</p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>Query</strong></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p><strong>filter</strong><br>
+<em>required</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>A JSON encoded value of the filters. Available filter:
+ - <code>message_ids:[u64]</code> array of message_id</p>
+</div></div></td>
+<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
+<p>string</p>
 </div></div></td>
 </tr>
 </tbody>
@@ -4585,49 +4600,6 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </table>
 </div>
 <div class="sect2">
-<h3 id="_eventsearchbody">EventSearchBody</h3>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 16.6666%;">
-<col style="width: 61.1111%;">
-<col style="width: 22.2223%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-middle">Name</th>
-<th class="tableblock halign-left valign-middle">Description</th>
-<th class="tableblock halign-left valign-middle">Schema</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p><strong>data_source</strong><br>
-<em>optional</em></p>
-</div></div></td>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>kafka topic name</p>
-</div></div></td>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>string</p>
-</div></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p><strong>message_id</strong><br>
-<em>optional</em></p>
-</div></div></td>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>message_id for this event</p>
-</div></div></td>
-<td class="tableblock halign-left valign-middle"><div class="content"><div class="paragraph">
-<p>integer (uint64)</p>
-</div></div></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="sect2">
 <h3 id="_indicator">Indicator</h3>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
@@ -5149,7 +5121,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-01-21 12:10:32 -0800
+Last updated 2020-01-24 07:41:09 -0800
 </div>
 </div>
 </body>

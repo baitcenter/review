@@ -1,6 +1,6 @@
 use actix_web::{
     http,
-    web::{Data, Json, Payload, Query},
+    web::{Data, Payload, Query},
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
@@ -54,59 +54,96 @@ pub(crate) fn delete_events(conn: &Conn, events: &[Event]) -> Result<usize, Erro
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct GetEvent {
+struct GetEvent {
     message_id: u64,
-    data_source: String,
     raw_event: Option<String>,
 }
 pub(crate) async fn get_events(
     pool: Data<Pool>,
-    events: Json<Vec<GetEvent>>,
+    query: Query<Value>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use event::dsl;
 
-    let events = events.into_inner();
-    // Accept only HTTP requests that request less than 100 raw_events
-    if events.len() > 100 {
-        Ok(HttpResponse::BadRequest().into())
-    } else {
-        let query_result: Result<Vec<_>, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-            conn.build_transaction().read_only().run(|| {
-                Ok(events
-                    .into_iter()
-                    .filter_map(|event| {
-                        let message_id: BigDecimal = FromPrimitive::from_u64(event.message_id)?;
-                        let data_source_id = get_data_source_id(&conn, &event.data_source).ok()?;
-                        let result = dsl::event
-                            .filter(
-                                dsl::data_source_id
-                                    .eq(data_source_id)
-                                    .and(dsl::message_id.eq(message_id)),
-                            )
-                            .select(dsl::raw_event)
-                            .get_result::<Option<Vec<u8>>>(&conn);
-
-                        match result {
-                            Ok(Some(raw_event)) => Some(GetEvent {
-                                message_id: event.message_id,
-                                data_source: event.data_source,
-                                raw_event: Some(bytes_to_string(&raw_event)),
-                            }),
-                            _ => None,
-                        }
+    let data_source = query.get("data_source").and_then(Value::as_str);
+    let filter = query
+        .get("filter")
+        .and_then(Value::as_str)
+        .and_then(|f| serde_json::from_str::<Value>(f).ok());
+    let message_ids = if let Some(filter) = filter {
+        filter
+            .get("message_ids")
+            .and_then(Value::as_array)
+            .map(|f| {
+                f.iter()
+                    .filter_map(|f| {
+                        let message_id = f.as_u64()?;
+                        FromPrimitive::from_u64(message_id)
                     })
-                    .collect::<Vec<_>>())
+                    .collect::<Vec<_>>()
             })
-        });
+    } else {
+        None
+    };
+    if let (Some(data_source), Some(message_ids)) = (data_source, message_ids) {
+        if message_ids.len() <= 100 {
+            let query_result: Result<Vec<_>, Error> =
+                pool.get().map_err(Into::into).and_then(|conn| {
+                    if let Ok(data_source_id) = get_data_source_id(&conn, data_source) {
+                        conn.transaction::<Vec<GetEvent>, Error, _>(|| {
+                            Ok(message_ids
+                                .into_iter()
+                                .filter_map(|id| {
+                                    let message_id: BigDecimal = FromPrimitive::from_u64(id)?;
+                                    let result = dsl::event
+                                        .filter(
+                                            dsl::data_source_id
+                                                .eq(data_source_id)
+                                                .and(dsl::message_id.eq(message_id)),
+                                        )
+                                        .select(dsl::raw_event)
+                                        .get_result::<Option<Vec<u8>>>(&conn);
 
-        match query_result {
-            Ok(data) => Ok(HttpResponse::Ok()
+                                    match result {
+                                        Ok(Some(raw_event)) => Some(GetEvent {
+                                            message_id: id,
+                                            raw_event: Some(bytes_to_string(&raw_event)),
+                                        }),
+                                        _ => None,
+                                    }
+                                })
+                                .collect::<Vec<_>>())
+                        })
+                    } else {
+                        // if data_source is not found, return a response with empty body
+                        Ok(Vec::new())
+                    }
+                });
+
+            match query_result {
+                Ok(data) => Ok(HttpResponse::Ok()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .json(data)),
+                Err(e) => Ok(HttpResponse::InternalServerError()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(build_err_msg(&e))),
+            }
+        } else {
+            let message = json!({
+                "message": "The number of message_id must be less than or equal to 100.",
+            })
+            .to_string();
+            Ok(HttpResponse::BadRequest()
                 .header(http::header::CONTENT_TYPE, "application/json")
-                .json(data)),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+                .body(message))
         }
+    } else {
+        let message = json!({
+            "message": "Missing required query parameters.",
+        })
+        .to_string();
+        Ok(HttpResponse::BadRequest()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(message))
     }
 }
 

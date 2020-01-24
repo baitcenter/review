@@ -120,12 +120,6 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
     .service(
         resource("/api/event/search")
             .guard(guard::Get())
-            .data(Json::<Vec<GetEvent>>::configure(|cfg| {
-                cfg.error_handler(|err, _| {
-                    error::InternalError::from_response(err, HttpResponse::BadRequest().finish())
-                        .into()
-                })
-            }))
             .route(get().to(get_events)),
     )
     .service(
