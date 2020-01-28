@@ -60,10 +60,6 @@ pub(crate) fn build_err_msg(e: &dyn std::error::Error) -> String {
     .to_string()
 }
 
-pub(crate) fn bytes_to_string(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| char::from(*b)).collect()
-}
-
 pub(crate) async fn load_payload(mut payload: Payload) -> Result<BytesMut, actix_web::Error> {
     let mut bytes = BytesMut::new();
     while let Some(chunk) = payload.next().await {

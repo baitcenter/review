@@ -890,7 +890,10 @@ definitions:
         type: "string"
         description: "kafka topic name"
       raw_event:
-        type: "string"
+        type: "array"
+        items:
+          type: integer
+          format: "uint8"
         description: "raw_event for this event"
   Indicator:
     type: "object"

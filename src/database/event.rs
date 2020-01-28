@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 use super::schema::event;
 use crate::database::{
-    build_err_msg, bytes_to_string, get_data_source_id, kafka_metadata_lookup, load_payload,
+    build_err_msg, get_data_source_id, kafka_metadata_lookup, load_payload,
     lookup_events_with_no_raw_event, Conn, Error, Pool,
 };
 
@@ -56,7 +56,7 @@ pub(crate) fn delete_events(conn: &Conn, events: &[Event]) -> Result<usize, Erro
 #[derive(Debug, Deserialize, Serialize)]
 struct GetEvent {
     message_id: u64,
-    raw_event: Option<String>,
+    raw_event: Option<Vec<u8>>,
 }
 pub(crate) async fn get_events(
     pool: Data<Pool>,
@@ -106,7 +106,7 @@ pub(crate) async fn get_events(
                                     match result {
                                         Ok(Some(raw_event)) => Some(GetEvent {
                                             message_id: id,
-                                            raw_event: Some(bytes_to_string(&raw_event)),
+                                            raw_event: Some(raw_event),
                                         }),
                                         _ => None,
                                     }
