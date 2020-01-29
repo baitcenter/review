@@ -1,6 +1,6 @@
 [package]
 name = "review"
-version = "0.6.3"
+version = "0.7.0"
 authors = ["Petabi Inc"]
 edition = "2018"
 publish = false

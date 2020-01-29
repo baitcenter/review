@@ -4,7 +4,7 @@ This file documents all notable changes to this project. The format of this file
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2020-01-28
 
 ### Added
 
@@ -21,11 +21,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     initiated.
 - A new environment variable `MAX_EVENT_ID_NUM` to configure the maximum number
   of `event_ids` per cluster and outlier.
-- `select` query to outlier table.
+- `select` query to `GET /api/outlier`.
 
 ### Changed
 
-- The data type of `raw_event` column has been changed from `TEXT` to `BYTEA`
+- The data type of `raw_event` column has been changed from `TEXT` to `BYTEA`.
+  `bytea_output` in Postgres server configuration must be its default setting of
+  `hex`.
 - There are changes in the values returned when fetching clusters and outliers.
   Please fetch events corresponding to `event_ids` to display human-readable
   raw_events.
@@ -261,7 +263,7 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
-[Unreleased]: https://github.com/petabi/review/compare/0.6.3...master
+[0.7.0]: https://github.com/petabi/review/compare/0.6.3...0.7.0
 [0.6.3]: https://github.com/petabi/review/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/petabi/review/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/petabi/review/compare/0.6.0...0.6.1
