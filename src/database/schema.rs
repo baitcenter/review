@@ -170,6 +170,21 @@ table! {
 }
 
 table! {
+    template (id) {
+        id -> Int4,
+        name -> Text,
+        event_type -> Text,
+        method -> Text,
+        algorithm -> Nullable<Text>,
+        min_token_length -> Nullable<Int8>,
+        eps -> Nullable<Float8>,
+        format -> Nullable<Jsonb>,
+        dimension_default -> Nullable<Int8>,
+        dimensions -> Nullable<Array<Int8>>,
+    }
+}
+
+table! {
     top_n_binary (id) {
         id -> Int4,
         description_id -> Int4,
@@ -284,6 +299,7 @@ allow_tables_to_appear_in_same_query!(
     outlier,
     qualifier,
     status,
+    template,
     top_n_binary,
     top_n_datetime,
     top_n_enum,

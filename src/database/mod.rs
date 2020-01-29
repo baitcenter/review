@@ -20,6 +20,7 @@ mod qualifier;
 mod query;
 mod schema;
 mod status;
+mod template;
 
 pub(crate) use self::category::*;
 pub(crate) use self::cluster::*;
@@ -34,6 +35,7 @@ pub(crate) use self::outlier::*;
 pub(crate) use self::qualifier::*;
 pub(crate) use self::query::*;
 pub(crate) use self::status::*;
+pub(crate) use self::template::*;
 
 pub(crate) type Conn = PooledConnection<ConnectionManager<PgConnection>>;
 pub(crate) type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;

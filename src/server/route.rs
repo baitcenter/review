@@ -222,5 +222,16 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/status")
             .guard(guard::Get())
             .route(get().to(get_status_table)),
+    )
+    .service(
+        resource("/api/template")
+            .guard(guard::Get())
+            .route(get().to(get_template)),
+    )
+    .service(
+        resource("/api/template")
+            .guard(guard::Post())
+            .guard(guard::Header("content-type", "application/json"))
+            .route(post().to(add_template)),
     );
 }

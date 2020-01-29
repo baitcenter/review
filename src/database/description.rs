@@ -32,11 +32,11 @@ struct DescriptionLoad {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub(crate) struct DescriptionInsert {
-    pub cluster_id: String,          // NOT cluster_id but id of cluster table
-    pub first_event_id: Option<u64>, // String in other places
-    pub last_event_id: Option<u64>,  // String in other places
-    pub descriptions: Vec<Description>,
+struct DescriptionInsert {
+    cluster_id: String,          // NOT cluster_id but id of cluster table
+    first_event_id: Option<u64>, // String in other places
+    last_event_id: Option<u64>,  // String in other places
+    descriptions: Vec<Description>,
 }
 
 #[derive(Debug, Queryable)]
@@ -56,13 +56,13 @@ struct ColumnDescriptionsTable {
 #[table_name = "column_description"]
 struct ColumnDescriptionsInsert {
     // for inserting into db
-    pub cluster_id: i32,
-    pub first_event_id: String,
-    pub last_event_id: String,
-    pub column_index: i32,
-    pub type_id: i32,
-    pub count: i64,
-    pub unique_count: i64,
+    cluster_id: i32,
+    first_event_id: String,
+    last_event_id: String,
+    column_index: i32,
+    type_id: i32,
+    count: i64,
+    unique_count: i64,
 }
 
 #[derive(Debug)]
@@ -94,12 +94,12 @@ struct DescriptionsIntTable {
 #[table_name = "description_int"]
 struct DescriptionsIntInsert {
     // for inserting into db
-    pub description_id: i32,
-    pub min: Option<i64>,
-    pub max: Option<i64>,
-    pub mean: Option<f64>,
-    pub s_deviation: Option<f64>,
-    pub mode: Option<i64>,
+    description_id: i32,
+    min: Option<i64>,
+    max: Option<i64>,
+    mean: Option<f64>,
+    s_deviation: Option<f64>,
+    mode: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -112,8 +112,8 @@ struct DescriptionsEnumTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_enum"]
 struct DescriptionsEnumInsert {
-    pub description_id: i32,
-    pub mode: Option<String>,
+    description_id: i32,
+    mode: Option<String>,
 }
 
 #[derive(Debug, Queryable)]
@@ -131,13 +131,13 @@ struct DescriptionsFloatTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_float"]
 struct DescriptionsFloatInsert {
-    pub description_id: i32,
-    pub min: Option<f64>,
-    pub max: Option<f64>,
-    pub mean: Option<f64>,
-    pub s_deviation: Option<f64>,
-    pub mode_smallest: Option<f64>,
-    pub mode_largest: Option<f64>,
+    description_id: i32,
+    min: Option<f64>,
+    max: Option<f64>,
+    mean: Option<f64>,
+    s_deviation: Option<f64>,
+    mode_smallest: Option<f64>,
+    mode_largest: Option<f64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -150,8 +150,8 @@ struct DescriptionsTextTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_text"]
 struct DescriptionsTextInsert {
-    pub description_id: i32,
-    pub mode: Option<String>,
+    description_id: i32,
+    mode: Option<String>,
 }
 
 #[derive(Debug, Queryable)]
@@ -164,8 +164,8 @@ struct DescriptionsBinaryTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_binary"]
 struct DescriptionsBinaryInsert {
-    pub description_id: i32,
-    pub mode: Option<Vec<u8>>,
+    description_id: i32,
+    mode: Option<Vec<u8>>,
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
@@ -179,8 +179,8 @@ struct DescriptionsIpaddrTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_ipaddr"]
 struct DescriptionsIpaddrInsert {
-    pub description_id: i32,
-    pub mode: Option<String>,
+    description_id: i32,
+    mode: Option<String>,
 }
 
 #[derive(Debug, Queryable)]
@@ -193,8 +193,8 @@ struct DescriptionsDatetimeTable {
 #[derive(Debug, Insertable)]
 #[table_name = "description_datetime"]
 struct DescriptionsDatetimeInsert {
-    pub description_id: i32,
-    pub mode: Option<NaiveDateTime>,
+    description_id: i32,
+    mode: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Queryable)]
@@ -211,10 +211,10 @@ struct TopNIntTable {
 #[table_name = "top_n_int"]
 struct TopNIntInsert {
     // for inserting into db
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<i64>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<i64>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -229,10 +229,10 @@ struct TopNEnumTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_enum"]
 struct TopNEnumInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<String>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<String>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -248,11 +248,11 @@ struct TopNFloatTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_float"]
 struct TopNFloatInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value_smallest: Option<f64>,
-    pub value_largest: Option<f64>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value_smallest: Option<f64>,
+    value_largest: Option<f64>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -267,10 +267,10 @@ struct TopNTextTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_text"]
 struct TopNTextInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<String>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<String>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -285,10 +285,10 @@ struct TopNBinaryTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_binary"]
 struct TopNBinaryInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<Vec<u8>>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<Vec<u8>>,
+    count: Option<i64>,
 }
 
 // TODO: Instead of String, how about using cidr? But, need to figure out how.
@@ -304,10 +304,10 @@ struct TopNIpaddrTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_ipaddr"]
 struct TopNIpaddrInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<String>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<String>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -322,16 +322,16 @@ struct TopNDatetimeTable {
 #[derive(Debug, Insertable)]
 #[table_name = "top_n_datetime"]
 struct TopNDatetimeInsert {
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<NaiveDateTime>,
-    pub count: Option<i64>,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<NaiveDateTime>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct RoundSelectQuery {
-    pub(crate) cluster_id: String,
-    pub(crate) data_source: String,
+    cluster_id: String,
+    data_source: String,
 }
 
 #[derive(Debug, Queryable, Serialize)]
@@ -342,10 +342,10 @@ struct RoundResponse {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DescriptionSelectQuery {
-    pub cluster_id: String,
-    pub data_source: String,
-    pub first_event_id: String,
-    pub last_event_id: String,
+    cluster_id: String,
+    data_source: String,
+    first_event_id: String,
+    last_event_id: String,
 }
 
 #[derive(Debug, Queryable)]

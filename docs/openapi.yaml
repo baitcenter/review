@@ -13,6 +13,7 @@ tags:
 - name: "qualifier"
 - name: "status"
 - name: "description"
+- name: "template"
 schemes:
 - "http"
 paths:
@@ -714,7 +715,53 @@ paths:
         500:
           description: "Internal server error"
           schema:
-            $ref: "#/definitions/ErrorResponse"               
+            $ref: "#/definitions/ErrorResponse"
+  /api/template:
+    get:
+      tags: [template]
+      summary: "Get a template or all templates"
+      description: "This endpoint returns a specified template or all in database."
+      produces:
+        - "application/json"
+        - "text/plain"
+      parameters:
+        - name: "name"
+          type: "string"
+          in: "query"
+          description: "Return a template with this name. If not given, return all templates."
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Template"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      tags: [template]
+      summary: "Create a new template"
+      description: "This endpoint is for clients to create a new template in database."
+      consumes:
+      - "application/json"
+      produces:
+      - "text/plain"
+      parameters:
+        - name: "template"
+          in: "body"
+          required: true
+          schema:
+            $ref: "#/definitions/TemplateCreateBody"
+          description: "New values of template"
+      responses:
+        200:
+          description: "Created template successfully"
+        500:
+          description: "Internal server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
 definitions:
   Category:
     type: "object"
@@ -1057,6 +1104,101 @@ definitions:
       description:
         type: "string"
         description: "status name"
+  Template:
+    type: "object"
+    properties:
+      name:
+        type: "string"
+        description: "distinct template name"
+      event_type:
+        type: "string"
+        description: "one of event types: Csv, Email, Log, Packet"
+      method:
+        type: "string"
+        description: "one of methods: Distribution, Multidimension, Prefix"
+      algorithm:
+        type: "string"
+        description: "machine learning algorithm"
+      min_token_length:
+        type: "integer"
+        format: "uint32"
+        description: "minimum token length for clustering packets"
+      eps:
+        type: "number"
+        format: "double"
+        description: "EPS used in multidimensional clustering"
+      format:
+        type: "string"
+        description: |
+          A JSON encoded value of an array of formats for CSV columns. A format includes:
+            - `data_type:<string>` data type of a column
+            - `weight:<double>` weight value regarding multidimensional clustering
+            - `format:<string>` format for parsing
+      dimension_default:
+        type: "integer"
+        format: "int64"
+        description: "default enum dimension of CSV columns"
+      dimensions:
+        type: "array"
+        items:
+          type: "integer"
+          format: "int64"
+        description: "dimensions of CSV columns"
+  TemplateCreateBody:
+    type: "object"
+    required:
+    - "name"
+    - "event_type"
+    - "method"
+    properties:
+      name:
+        type: "string"
+        description: "distinct template name"
+      event_type:
+        type: "string"
+        description: "one of event types: Csv, Email, Log, Packet"
+      method:
+        type: "string"
+        description: "one of methods: Distribution, Multidimension, Prefix"
+      algorithm:
+        type: "string"
+        description: "machine learning algorithm"
+      min_token_length:
+        type: "integer"
+        format: "uint32"
+        description: "minimum token length for clustering packets"
+      eps:
+        type: "number"
+        format: "double"
+        description: "EPS used in multidimensional clustering"
+      format:
+        type: "array"
+        items:
+          $ref: "#/definitions/FormatForTemplate"
+        description: "formats of CSV columns"
+      dimension_default:
+        type: "integer"
+        format: "uint32"
+        description: "default enum dimension of CSV columns"
+      dimensions:
+        type: "array"
+        items:
+          type: "integer"
+          format: "uint32"
+        description: "dimensions of CSV columns"
+  FormatForTemplate:
+    type: "object"
+    properties:
+      data_type:
+        type: "string"
+        description: "data type of a column"
+      weight:
+        type: "number"
+        format: "double"
+        description: "weight value for multidimensional clustering"
+      format:
+        type: "string"
+        description: "format for parsing"
   ErrorResponse:
     description: "Represents an error."
     type: "object"
