@@ -116,7 +116,7 @@ pub(crate) async fn get_outliers(
             s.iter()
                 .filter(|s| *s.1)
                 .filter_map(|s| match s.0.to_lowercase().as_str() {
-                    "outlier" => Some("outlier.raw_event as outlier"),
+                    "outlier" => Some("right((outlier.raw_event)::TEXT, -2) as outlier"),
                     "data_source" => Some("data_source.topic_name as data_source"),
                     "size" => Some("outlier.size"),
                     "event_ids" => Some("outlier.event_ids"),
@@ -127,7 +127,7 @@ pub(crate) async fn get_outliers(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| {
             vec![
-                "outlier.raw_event as outlier",
+                "right((outlier.raw_event)::TEXT, -2) as outlier",
                 "data_source.topic_name as data_source",
                 "outlier.size",
                 "outlier.event_ids",
