@@ -10,6 +10,18 @@ fn create_app() -> App<'static, 'static> {
         .arg(Arg::with_name("subcommand")) // TODO: Remove in 0.8.0.
 }
 
+/// Creates and runs an Actix server.
+///
+/// # Errors
+///
+/// Returns an error if any of the following environment variables is invalid or
+/// not set:
+///
+/// * `DATABASE_URL`
+/// * `KAFKA_URL`
+/// * `REVIEWD_ADDR`
+///
+/// or when it fails to run start an Actix server.
 pub fn init() -> Result<Server> {
     let matches = create_app().get_matches();
     if matches.value_of("subcommand").is_some() {
