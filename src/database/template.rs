@@ -32,7 +32,7 @@ pub(crate) struct TemplateSelectQuery {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct Format {
     data_type: String,
-    weight: Option<f64>,
+    weight: f64,
     format: Option<String>,
 }
 
