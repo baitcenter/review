@@ -4,15 +4,12 @@ use actix_web::{
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
-use chrono::{NaiveDateTime, Utc};
-use diesel::pg::upsert::excluded;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use super::schema::cluster;
 use crate::database::*;
 
 pub(crate) async fn get_clusters(
@@ -168,161 +165,64 @@ pub(crate) struct ClusterUpdate {
     event_ids: Option<Vec<u64>>,
 }
 
-#[derive(Debug, Queryable, Serialize)]
-struct Cluster {
-    cluster_id: Option<String>,
-    signature: String,
-    event_ids: Option<Vec<BigDecimal>>,
-    size: BigDecimal,
-}
-
-#[allow(clippy::too_many_lines)]
 pub(crate) async fn update_clusters(
     pool: Data<Pool>,
     payload: Payload,
     max_event_id_num: Data<Mutex<usize>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    use cluster::dsl;
-
     let bytes = load_payload(payload).await?;
     let cluster_update: Vec<ClusterUpdate> = serde_json::from_slice(&bytes)?;
-    let mut deleted_events = Vec::<Event>::new();
-    let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        get_current_clusters(&conn, &cluster_update).and_then(|cluster_list| {
-            let replace_clusters: Vec<_> = cluster_update
-                .iter()
+    let max_event_id_num: BigDecimal = match max_event_id_num.lock() {
+        Ok(num) => FromPrimitive::from_usize(*num).expect("should be fine"),
+        Err(e) => {
+            error!(
+                "Failed to acquire lock: {}. Use default max_event_id_number 25",
+                e
+            );
+            FromPrimitive::from_usize(25).expect("should be fine")
+        }
+    };
+
+    let query_result: Result<i32, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+        let cluster_update_clone = cluster_update.clone();
+        let result = conn.transaction::<i32, Error, _>(|| {
+            let result = cluster_update_clone
+                .into_iter()
                 .filter_map(|c| {
-                    use std::str::FromStr;
-                    if let Some(cluster) = cluster_list
-                        .iter()
-                        .find(|cluster| Some(c.cluster_id.clone()) == cluster.cluster_id)
-                    {
-                        c.event_ids.as_ref()?;
-                        let now = Utc::now();
-                        let timestamp = NaiveDateTime::from_timestamp(now.timestamp(), 0);
-
-                        let sig = match &c.signature {
-                            Some(sig) => sig.clone(),
-                            None => cluster.signature.clone(),
-                        };
-                        let max_event_id_num = match max_event_id_num.lock() {
-                            Ok(num) => *num,
-                            Err(e) => {
-                                error!(
-                                    "Failed to aquire lock: {}. Use default max_event_id_number 25",
-                                    e
-                                );
-                                25
-                            }
-                        };
-                        let (event_ids, deleted_event_ids) = merge_cluster_examples(
-                            cluster.event_ids.clone(),
-                            c.event_ids.clone(),
-                            max_event_id_num,
-                        );
-                        let cluster_size = c.size.and_then(FromPrimitive::from_usize).map_or_else(
-                            || cluster.size.clone(),
-                            |new_size: BigDecimal| {
-                                // Reset the value of size if it exceeds 20 digits
-                                BigDecimal::from_str("100000000000000000000").ok().map_or(
-                                    new_size.clone(),
-                                    |max_size| {
-                                        if &new_size + &cluster.size < max_size {
-                                            &new_size + &cluster.size
-                                        } else {
-                                            new_size
-                                        }
-                                    },
-                                )
-                            },
-                        );
-                        let data_source_id =
-                            get_data_source_id(&conn, &c.data_source).unwrap_or_default();
-                        if data_source_id == 0 {
-                            None
-                        } else {
-                            if let Some(event_ids) = deleted_event_ids {
-                                let events = event_ids
-                                    .into_iter()
-                                    .map(|event_id| Event {
-                                        message_id: event_id,
-                                        raw_event: None,
-                                        data_source_id,
-                                    })
-                                    .collect::<Vec<_>>();
-                                deleted_events.extend(events);
-                            }
-                            Some((
-                                dsl::cluster_id.eq(c.cluster_id.clone()),
-                                dsl::detector_id.eq(c.detector_id),
-                                dsl::event_ids.eq(event_ids),
-                                dsl::signature.eq(sig),
-                                dsl::size.eq(cluster_size),
-                                dsl::score.eq(c.score),
-                                dsl::data_source_id.eq(data_source_id),
-                                dsl::last_modification_time.eq(Some(timestamp)),
-                            ))
-                        }
-                    } else {
-                        let event_ids = c.event_ids.as_ref().map(|e| {
-                            e.iter()
-                                .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
-                                .collect::<Vec<BigDecimal>>()
-                        });
-                        let sig = match &c.signature {
-                            Some(sig) => sig.clone(),
-                            None => "-".to_string(),
-                        };
-                        let cluster_size: BigDecimal = c
-                            .size
-                            .and_then(FromPrimitive::from_usize)
-                            .unwrap_or_else(|| FromPrimitive::from_usize(1).unwrap_or_default());
-                        let data_source_id = get_data_source_id(&conn, &c.data_source)
-                            .unwrap_or_else(|_| {
-                                data_source::add(&conn, &c.data_source, &c.data_source_type)
-                                    .unwrap_or_else(|_| {
-                                        get_data_source_id(&conn, &c.data_source)
-                                            .unwrap_or_default()
-                                    })
-                            });
-                        if data_source_id == 0 {
-                            None
-                        } else {
-                            Some((
-                                dsl::cluster_id.eq(c.cluster_id.clone()),
-                                dsl::detector_id.eq(c.detector_id),
-                                dsl::event_ids.eq(event_ids),
-                                dsl::signature.eq(sig),
-                                dsl::size.eq(cluster_size),
-                                dsl::score.eq(c.score),
-                                dsl::data_source_id.eq(data_source_id),
-                                dsl::last_modification_time.eq(None),
-                            ))
-                        }
-                    }
-                })
-                .collect();
-
-            update_events(&conn, &cluster_update, &deleted_events);
-
-            if replace_clusters.is_empty() {
-                Ok(0)
-            } else {
-                diesel::insert_into(dsl::cluster)
-                    .values(&replace_clusters)
-                    .on_conflict((dsl::cluster_id, dsl::data_source_id))
-                    .do_update()
-                    .set((
-                        dsl::event_ids.eq(excluded(dsl::event_ids)),
-                        dsl::signature.eq(excluded(dsl::signature)),
-                        dsl::size.eq(excluded(dsl::size)),
-                        dsl::score.eq(excluded(dsl::score)),
-                        dsl::last_modification_time.eq(excluded(dsl::last_modification_time)),
+                    let event_ids = c.event_ids.as_ref().map(|e| {
+                        e.iter()
+                            .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
+                            .collect::<Vec<BigDecimal>>()
+                    });
+                    let cluster_size: BigDecimal = c
+                        .size
+                        .and_then(FromPrimitive::from_usize)
+                        .unwrap_or_else(|| FromPrimitive::from_usize(1).unwrap_or_default());
+                    let query_result = diesel::select(attempt_cluster_upsert(
+                        max_event_id_num.clone(),
+                        c.cluster_id,
+                        c.data_source,
+                        c.data_source_type,
+                        c.detector_id,
+                        event_ids,
+                        c.signature,
+                        c.score,
+                        cluster_size,
                     ))
-                    .execute(&*conn)
-                    .map_err(Into::into)
-            }
-        })
+                    .get_result::<i32>(&conn);
+
+                    if let Err(e) = &query_result {
+                        log::error!("Failed to insert/update a cluster: {}", e);
+                    }
+                    query_result.ok()
+                })
+                .sum();
+
+            Ok(result)
+        });
+        update_events(&conn, &cluster_update);
+
+        result
     });
 
     match query_result {
@@ -333,50 +233,7 @@ pub(crate) async fn update_clusters(
     }
 }
 
-fn get_current_clusters(
-    conn: &Conn,
-    cluster_update: &[ClusterUpdate],
-) -> Result<Vec<Cluster>, Error> {
-    use cluster::dsl;
-    let mut query = dsl::cluster.into_boxed();
-    for cluster in cluster_update {
-        if let Ok(data_source_id) = get_data_source_id(&conn, &cluster.data_source) {
-            query = query.or_filter(
-                dsl::cluster_id
-                    .eq(&cluster.cluster_id)
-                    .and(dsl::data_source_id.eq(data_source_id)),
-            );
-        }
-    }
-    query
-        .select((dsl::cluster_id, dsl::signature, dsl::event_ids, dsl::size))
-        .load::<Cluster>(conn)
-        .map_err(Into::into)
-}
-
-fn merge_cluster_examples(
-    current_examples: Option<Vec<BigDecimal>>,
-    new_examples: Option<Vec<u64>>,
-    max_event_id_num: usize,
-) -> (Option<Vec<BigDecimal>>, Option<Vec<BigDecimal>>) {
-    new_examples.map_or((current_examples.clone(), None), |new_examples| {
-        let new_examples = new_examples
-            .into_iter()
-            .filter_map(FromPrimitive::from_u64)
-            .collect::<Vec<_>>();
-        let mut current_eg = current_examples.unwrap_or_default();
-        current_eg.extend(new_examples);
-        if current_eg.len() > max_event_id_num {
-            current_eg.sort();
-            let (delete_eg, current_eg) = current_eg.split_at(current_eg.len() - max_event_id_num);
-            (Some(current_eg.to_vec()), Some(delete_eg.to_vec()))
-        } else {
-            (Some(current_eg), None)
-        }
-    })
-}
-
-fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate], deleted_events: &[Event]) {
+fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate]) {
     let new_events = cluster_update
         .iter()
         .filter_map(|cluster| {
@@ -403,11 +260,6 @@ fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate], deleted_events: 
     if !new_events.is_empty() {
         if let Err(e) = add_events(&conn, &new_events) {
             log::error!("An error occurs while inserting events: {}", e);
-        }
-    }
-    if !deleted_events.is_empty() {
-        if let Err(e) = delete_events(&conn, &deleted_events) {
-            log::error!("An error occurs while deleting events: {}", e);
         }
     }
 }
