@@ -22,6 +22,26 @@ pub(crate) struct Event {
     pub(crate) raw_event: Option<Vec<u8>>,
 }
 
+impl Ord for Event {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.message_id.cmp(&other.message_id)
+    }
+}
+
+impl PartialOrd for Event {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Event {
+    fn eq(&self, other: &Self) -> bool {
+        self.message_id == other.message_id
+    }
+}
+
+impl Eq for Event {}
+
 pub(crate) fn add_events(conn: &Conn, events: &[Event]) -> Result<usize, Error> {
     use event::dsl;
     diesel::insert_into(dsl::event)
@@ -35,7 +55,7 @@ pub(crate) fn add_events(conn: &Conn, events: &[Event]) -> Result<usize, Error> 
 
 pub(crate) fn delete_events(conn: &Conn, events: &[Event]) -> Result<usize, Error> {
     use event::dsl;
-    conn.build_transaction().read_write().run(|| {
+    conn.transaction::<usize, Error, _>(|| {
         Ok(events
             .iter()
             .filter_map(|event| {

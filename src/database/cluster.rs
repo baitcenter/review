@@ -234,7 +234,7 @@ pub(crate) async fn update_clusters(
 }
 
 fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate]) {
-    let new_events = cluster_update
+    let mut new_events = cluster_update
         .iter()
         .filter_map(|cluster| {
             if let Ok(data_source_id) = get_data_source_id(conn, &cluster.data_source) {
@@ -258,6 +258,8 @@ fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate]) {
         .collect::<Vec<_>>();
 
     if !new_events.is_empty() {
+        new_events.sort();
+        new_events.dedup();
         if let Err(e) = add_events(&conn, &new_events) {
             log::error!("An error occurs while inserting events: {}", e);
         }
