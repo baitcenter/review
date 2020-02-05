@@ -11,6 +11,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A new endpoint `GET /api/template` to fetch template(s) from template table.
 - A new endpoint `POST /api/template` to create a new template.
 
+### Changed
+
+- Parameters on the `PUT /api/description` endpoint has changed.
+  - Add a query for the topic name of `data_source`.
+
+### Fixed
+
+- Since only cluster ids had been searched for to add new descriptions, 
+  the new ones had not been properly created. By checking the topic name of
+  clusters whose column statistics are to be created, it's fixed.
+
 ## [0.7.0] - 2020-01-28
 
 ### Added

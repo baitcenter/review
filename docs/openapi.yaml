@@ -684,6 +684,11 @@ paths:
       produces:
         - "text/plain"
       parameters:
+        - name: "data_source"
+          in: "query"
+          description: "data_source topic name of the cluster whose descriptions are to be created"
+          type: "string"
+          required: true
         - in: "body"
           name: "Description"
           description: "Description to be created"

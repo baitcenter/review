@@ -17,6 +17,7 @@ use super::schema::{
     description_enum, description_float, description_int, description_ipaddr, description_text,
     top_n_binary, top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
+use crate::database::data_source::DataSourceQuery;
 use crate::database::{self, build_err_msg, load_payload};
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -421,9 +422,11 @@ pub fn safe_cast_usize_to_i64(value: usize) -> i64 {
 pub(crate) async fn add_descriptions(
     pool: Data<database::Pool>,
     payload: Payload,
+    data_source: Query<DataSourceQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let bytes = load_payload(payload).await?;
     let insert_descriptions: Vec<DescriptionInsert> = serde_json::from_slice(&bytes)?;
+    let data_source: String = data_source.into_inner().data_source;
 
     let insert_result = pool.get().map_err(Into::into).and_then(|conn| {
         let mut result: Vec<Result<usize, database::Error>> = Vec::new();
@@ -448,10 +451,16 @@ pub(crate) async fn add_descriptions(
 
         for descriptions_of_cluster in insert_descriptions {
             let cluster_id = {
-                use schema::cluster::dsl;
-                match dsl::cluster
-                    .filter(dsl::cluster_id.eq(&descriptions_of_cluster.cluster_id))
-                    .select(dsl::id)
+                use schema::cluster::dsl as c_d;
+                use schema::data_source::dsl as d_d;
+                match c_d::cluster
+                    .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                    .filter(
+                        c_d::cluster_id
+                            .eq(&descriptions_of_cluster.cluster_id)
+                            .and(d_d::topic_name.eq(&data_source)),
+                    )
+                    .select(c_d::id)
                     .first::<i32>(&conn)
                 {
                     Ok(v) => v,
