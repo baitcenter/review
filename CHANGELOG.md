@@ -15,6 +15,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Parameters on the `PUT /api/description` endpoint has changed.
   - Add a query for the topic name of `data_source`.
+- The request body for `PUT /api/outlier` has been changed to include `id`. 
 
 ### Fixed
 
