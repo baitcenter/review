@@ -186,7 +186,7 @@ pub(crate) async fn update_clusters(
     let query_result: Result<i32, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         let cluster_update_clone = cluster_update.clone();
         let result = conn.transaction::<i32, Error, _>(|| {
-            let result = cluster_update_clone
+            Ok(cluster_update_clone
                 .into_iter()
                 .filter_map(|c| {
                     let event_ids = c.event_ids.as_ref().map(|e| {
@@ -216,9 +216,7 @@ pub(crate) async fn update_clusters(
                     }
                     query_result.ok()
                 })
-                .sum();
-
-            Ok(result)
+                .sum())
         });
         update_events(&conn, &cluster_update);
 
@@ -238,18 +236,10 @@ fn update_events(conn: &Conn, cluster_update: &[ClusterUpdate]) {
         .iter()
         .filter_map(|cluster| {
             if let Ok(data_source_id) = get_data_source_id(conn, &cluster.data_source) {
-                cluster.event_ids.as_ref().map(|event_ids| {
-                    event_ids
-                        .iter()
-                        .filter_map(|event_id| {
-                            FromPrimitive::from_u64(*event_id).map(|event_id| Event {
-                                message_id: event_id,
-                                raw_event: None,
-                                data_source_id,
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                })
+                cluster
+                    .event_ids
+                    .as_ref()
+                    .map(|event_ids| build_events(event_ids, data_source_id))
             } else {
                 None
             }

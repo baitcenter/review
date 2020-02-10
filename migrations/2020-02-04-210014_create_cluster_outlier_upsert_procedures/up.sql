@@ -162,3 +162,100 @@ BEGIN
   RETURN 1;
 END;
 $$ LANGUAGE plpgsql;
+
+/******************************************************
+ * ATTEMPT OUTLIER UPSERT
+ *
+ * attemp to insert or update an outlier
+ * return the number of rows updated (0 or 1)
+ ******************************************************/
+CREATE OR REPLACE FUNCTION attempt_outlier_upsert(
+  max_event_id_num NUMERIC,
+  o_id INTEGER,
+  raw_event BYTEA,
+  topic_name VARCHAR,
+  data_type VARCHAR,
+  event_ids NUMERIC(20, 0)[],
+  size NUMERIC
+)
+RETURNS INTEGER AS
+$$
+DECLARE
+  _data_source_id INTEGER;
+  _event_ids NUMERIC(20, 0)[];
+  _event_id NUMERIC(20, 0);
+BEGIN
+  IF array_length($6, 1) = 0 THEN
+    RETURN 0;
+  END IF;
+
+  SELECT id
+  INTO _data_source_id
+  FROM data_source
+  WHERE data_source.topic_name = $4
+  LIMIT 1;
+
+  IF _data_source_id IS NULL THEN
+    SELECT * 
+    INTO _data_source_id
+    FROM insert_data_source($4, $5);
+  END IF;
+
+  IF $2 = 0 THEN
+    IF array_length($6, 1) > $1 THEN
+      LOOP
+        EXECUTE
+          'SELECT MIN(i) FROM UNNEST($1) i'
+        INTO _event_id
+        USING $6;
+        $6 := array_remove($6, _event_id);
+        DELETE FROM event
+          WHERE message_id = _event_id 
+          AND data_source_id = _data_source_id;
+        IF array_length($6, 1) = $1 THEN
+          EXIT;
+        END IF;
+      END LOOP;
+    END IF;
+    INSERT INTO outlier
+        (raw_event, data_source_id, event_ids, size)
+        VALUES
+        ($3, _data_source_id, $6, $7);
+  ELSE 
+    SELECT outlier.event_ids
+    INTO _event_ids
+    FROM outlier
+    WHERE outlier.id = $2
+    LIMIT 1;
+
+    IF _event_ids IS NULL THEN
+      RETURN 0;
+    END IF;
+
+    _event_ids = array_cat($6, _event_ids);
+
+    IF array_length(_event_ids, 1) > $1 THEN
+      LOOP
+        EXECUTE
+          'SELECT MIN(i) FROM UNNEST($1) i'
+        INTO _event_id
+        USING _event_ids;
+        _event_ids := array_remove(_event_ids, _event_id);
+        DELETE FROM event
+          WHERE message_id = _event_id 
+          AND data_source_id = _data_source_id;
+        IF array_length(_event_ids, 1) = $1 THEN
+          EXIT;
+        END IF;
+      END LOOP;
+    END IF;
+
+    UPDATE outlier
+      SET 
+        event_ids = _event_ids,
+        size = $7
+      WHERE outlier.id = $2;
+  END IF;
+  RETURN 1;
+END;
+$$ LANGUAGE plpgsql;

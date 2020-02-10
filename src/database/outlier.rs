@@ -25,10 +25,12 @@ struct Outlier {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct OutlierUpdate {
+    id: i32,
     outlier: Vec<u8>,
     data_source: String,
     data_source_type: String,
     event_ids: Vec<u64>,
+    size: usize,
 }
 
 pub(crate) async fn delete_outliers(
@@ -116,6 +118,7 @@ pub(crate) async fn get_outliers(
             s.iter()
                 .filter(|s| *s.1)
                 .filter_map(|s| match s.0.to_lowercase().as_str() {
+                    "id" => Some("outlier.id"),
                     "outlier" => Some("right((outlier.raw_event)::TEXT, -2) as outlier"),
                     "data_source" => Some("data_source.topic_name as data_source"),
                     "size" => Some("outlier.size"),
@@ -193,178 +196,58 @@ pub(crate) async fn get_outliers(
     GetQuery::build_response(&query, per_page, query_result)
 }
 
-#[allow(clippy::too_many_lines)]
 pub(crate) async fn update_outliers(
     pool: Data<Pool>,
     payload: Payload,
     max_event_id_num: Data<Mutex<usize>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    use outlier::dsl;
     let bytes = load_payload(payload).await?;
     let outlier_update: Vec<OutlierUpdate> = serde_json::from_slice(&bytes)?;
-    let max_event_id_num = match max_event_id_num.lock() {
-        Ok(num) => *num,
+    let max_event_id_num: BigDecimal = match max_event_id_num.lock() {
+        Ok(num) => FromPrimitive::from_usize(*num).expect("should be fine"),
         Err(e) => {
             error!(
-                "Failed to acquire lock: {}. Use the default max_event_id_number 25",
+                "Failed to acquire lock: {}. Use default max_event_id_number 25",
                 e
             );
-            25
+            FromPrimitive::from_usize(25).expect("should be fine")
         }
     };
-    let mut deleted_events = Vec::<Event>::new();
-    let query_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
-        let mut query = dsl::outlier.into_boxed();
-        for outlier in &outlier_update {
-            if let Ok(data_source_id) = get_data_source_id(&conn, &outlier.data_source) {
-                query = query.or_filter(
-                    dsl::raw_event
-                        .eq(&outlier.outlier)
-                        .and(dsl::data_source_id.eq(data_source_id)),
-                );
-            }
-        }
-        query
-            .load::<Outlier>(&conn)
-            .map_err(Into::into)
-            .and_then(|outlier_list| {
-                let new_outliers = outlier_update
-                    .iter()
-                    .filter_map(|o| {
-                        use std::str::FromStr;
-                        if let Some(outlier) = outlier_list
-                            .iter()
-                            .find(|outlier| o.outlier == outlier.raw_event)
-                        {
-                            let o_size = FromPrimitive::from_usize(o.event_ids.len()).map_or_else(
-                                || outlier.size.clone(),
-                                |new_size: BigDecimal| {
-                                    // Reset the value of size if it exceeds 20 digits
-                                    BigDecimal::from_str("100000000000000000000").ok().map_or(
-                                        new_size.clone(),
-                                        |max_size| {
-                                            if &new_size + &outlier.size < max_size {
-                                                &new_size + &outlier.size
-                                            } else {
-                                                new_size
-                                            }
-                                        },
-                                    )
-                                },
-                            );
-                            let mut event_ids = o
-                                .event_ids
-                                .iter()
-                                .filter_map(|e| FromPrimitive::from_u64(*e))
-                                .collect::<Vec<BigDecimal>>();
-                            event_ids.extend(outlier.event_ids.clone());
-                            let (event_ids, deleted_event_ids) =
-                                if event_ids.len() > max_event_id_num {
-                                    event_ids.sort();
-                                    let (deleted_event_ids, event_ids) =
-                                        event_ids.split_at(event_ids.len() - max_event_id_num);
-                                    (event_ids.to_vec(), Some(deleted_event_ids.to_vec()))
-                                } else {
-                                    (event_ids, None)
-                                };
-                            if let Some(event_ids) = deleted_event_ids {
-                                let events = event_ids
-                                    .into_iter()
-                                    .map(|event_id| Event {
-                                        message_id: event_id,
-                                        raw_event: None,
-                                        data_source_id: outlier.data_source_id,
-                                    })
-                                    .collect::<Vec<_>>();
-                                deleted_events.extend(events);
-                            }
-                            Some(Outlier {
-                                id: outlier.id,
-                                raw_event: outlier.raw_event.clone(),
-                                data_source_id: outlier.data_source_id,
-                                event_ids,
-                                size: o_size,
-                            })
-                        } else {
-                            let mut event_ids = o
-                                .event_ids
-                                .iter()
-                                .filter_map(|e| FromPrimitive::from_u64(*e))
-                                .collect::<Vec<BigDecimal>>();
-                            let event_ids = if event_ids.len() > max_event_id_num {
-                                event_ids.sort();
-                                let (_, event_ids) =
-                                    event_ids.split_at(o.event_ids.len() - max_event_id_num);
-                                event_ids.to_vec()
-                            } else {
-                                event_ids
-                            };
-                            let size: BigDecimal = FromPrimitive::from_usize(o.event_ids.len())
-                                .unwrap_or_else(|| {
-                                    FromPrimitive::from_usize(1).unwrap_or_default()
-                                });
-                            let data_source_id = get_data_source_id(&conn, &o.data_source)
-                                .unwrap_or_else(|_| {
-                                    data_source::add(&conn, &o.data_source, &o.data_source_type)
-                                        .unwrap_or_else(|_| {
-                                            get_data_source_id(&conn, &o.data_source)
-                                                .unwrap_or_default()
-                                        })
-                                });
-                            if data_source_id == 0 {
-                                None
-                            } else {
-                                Some(Outlier {
-                                    id: 0,
-                                    raw_event: o.outlier.clone(),
-                                    data_source_id,
-                                    event_ids,
-                                    size,
-                                })
-                            }
-                        }
-                    })
-                    .collect::<Vec<_>>();
 
-                update_events(&conn, &outlier_update, &deleted_events);
-                conn.transaction::<usize, Error, _>(|| {
-                    Ok(new_outliers
+    let query_result: Result<i32, Error> = pool.get().map_err(Into::into).and_then(|conn| {
+        let outlier_update_clone = outlier_update.clone();
+        let result = conn.transaction::<i32, Error, _>(|| {
+            Ok(outlier_update_clone
+                .into_iter()
+                .filter_map(|o| {
+                    let event_ids = o
+                        .event_ids
                         .iter()
-                        .filter_map(|outlier| {
-                            if outlier.id == 0 {
-                                let result = diesel::insert_into(dsl::outlier)
-                                    .values((
-                                        dsl::raw_event.eq(&outlier.raw_event),
-                                        dsl::data_source_id.eq(outlier.data_source_id),
-                                        dsl::event_ids.eq(&outlier.event_ids),
-                                        dsl::size.eq(&outlier.size),
-                                    ))
-                                    .execute(&conn);
-                                if let Err(e) = result {
-                                    error!("An error occurs while inserting outliers: {}", e);
-                                    None
-                                } else {
-                                    Some(1)
-                                }
-                            } else {
-                                let result = diesel::update(dsl::outlier)
-                                    .filter(dsl::id.eq(outlier.id))
-                                    .set((
-                                        dsl::event_ids.eq(&outlier.event_ids),
-                                        dsl::size.eq(&outlier.size),
-                                    ))
-                                    .execute(&conn);
-                                if let Err(e) = result {
-                                    error!("An error occurs while updating outliers: {}", e);
-                                    None
-                                } else {
-                                    Some(1)
-                                }
-                            }
-                        })
-                        .sum())
+                        .filter_map(|event_id| FromPrimitive::from_u64(*event_id))
+                        .collect::<Vec<BigDecimal>>();
+                    if event_ids.is_empty() {
+                        return None;
+                    }
+                    let size: BigDecimal = FromPrimitive::from_usize(o.size)?;
+                    let query_result = diesel::select(attempt_outlier_upsert(
+                        max_event_id_num.clone(),
+                        o.id,
+                        o.outlier,
+                        o.data_source,
+                        o.data_source_type,
+                        event_ids,
+                        size,
+                    ))
+                    .get_result::<i32>(&conn);
+                    if let Err(e) = &query_result {
+                        log::error!("Failed to insert/update an outlier: {}", e);
+                    }
+                    query_result.ok()
                 })
-            })
+                .sum())
+        });
+        update_events(&conn, &outlier_update);
+        result
     });
 
     match query_result {
@@ -375,24 +258,12 @@ pub(crate) async fn update_outliers(
     }
 }
 
-fn update_events(conn: &Conn, outlier_update: &[OutlierUpdate], deleted_events: &[Event]) {
-    let new_events = outlier_update
+fn update_events(conn: &Conn, outlier_update: &[OutlierUpdate]) {
+    let mut new_events = outlier_update
         .iter()
         .filter_map(|outlier| {
             if let Ok(data_source_id) = get_data_source_id(conn, &outlier.data_source) {
-                Some(
-                    outlier
-                        .event_ids
-                        .iter()
-                        .filter_map(|event_id| {
-                            FromPrimitive::from_u64(*event_id).map(|event_id| Event {
-                                message_id: event_id,
-                                raw_event: None,
-                                data_source_id,
-                            })
-                        })
-                        .collect::<Vec<_>>(),
-                )
+                Some(build_events(&outlier.event_ids, data_source_id))
             } else {
                 None
             }
@@ -401,13 +272,10 @@ fn update_events(conn: &Conn, outlier_update: &[OutlierUpdate], deleted_events: 
         .collect::<Vec<_>>();
 
     if !new_events.is_empty() {
+        new_events.sort();
+        new_events.dedup();
         if let Err(e) = add_events(&conn, &new_events) {
             log::error!("An error occurs while inserting events: {}", e);
-        }
-    }
-    if !deleted_events.is_empty() {
-        if let Err(e) = delete_events(&conn, &deleted_events) {
-            log::error!("An error occurs while deleting events: {}", e);
         }
     }
 }

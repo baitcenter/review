@@ -1040,11 +1040,16 @@ definitions:
   OutlierCreateBody:
     type: "object"
     required:
+    - "id"
     - "outlier"
     - "data_source"
     - "data_source_type"
     - "event_ids"
     properties:
+      id:
+        type: "integer"
+        format: "uint32"
+        description: "id of this outlier"
       outlier:
         type: "array"
         items:

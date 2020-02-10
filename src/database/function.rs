@@ -42,6 +42,18 @@ sql_function! {
 }
 
 sql_function! {
+    fn attempt_outlier_upsert (
+        max_event_id_num: Numeric,
+        id: Integer,
+        raw_event: Bytea,
+        topic_name: Varchar,
+        data_type: Varchar,
+        event_ids: Array<Numeric>,
+        size: Numeric
+    ) -> Integer;
+}
+
+sql_function! {
     fn attempt_qualifier_id_update (
         cluster_id: Varchar,
         data_source: Varchar,

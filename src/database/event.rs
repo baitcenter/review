@@ -53,6 +53,19 @@ pub(crate) fn add_events(conn: &Conn, events: &[Event]) -> Result<usize, Error> 
         .map_err(Into::into)
 }
 
+pub(crate) fn build_events(event_ids: &[u64], data_source_id: i32) -> Vec<Event> {
+    event_ids
+        .iter()
+        .filter_map(|event_id| {
+            FromPrimitive::from_u64(*event_id).map(|event_id| Event {
+                message_id: event_id,
+                raw_event: None,
+                data_source_id,
+            })
+        })
+        .collect::<Vec<_>>()
+}
+
 pub(crate) fn delete_events(conn: &Conn, events: &[Event]) -> Result<usize, Error> {
     use event::dsl;
     conn.transaction::<usize, Error, _>(|| {
