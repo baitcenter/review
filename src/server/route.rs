@@ -233,5 +233,10 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .guard(guard::Post())
             .guard(guard::Header("content-type", "application/json"))
             .route(post().to(add_template)),
+    )
+    .service(
+        resource("/api/experiment/cluster/total")
+            .guard(guard::Get())
+            .route(get().to(get_sum_of_cluster_sizes)),
     );
 }
