@@ -238,5 +238,10 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/experiment/cluster/total")
             .guard(guard::Get())
             .route(get().to(get_sum_of_cluster_sizes)),
+    )
+    .service(
+        resource("/api/experiment/cluster/time-series")
+            .guard(guard::Get())
+            .route(get().to(get_cluster_time_series)),
     );
 }
