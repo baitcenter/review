@@ -178,22 +178,21 @@ pub(crate) async fn get_outliers(
         None
     };
 
-    let query_result: Result<Vec<GetQueryData>, Error> =
-        pool.get().map_err(Into::into).and_then(|conn| {
-            GetQuery::new(
-                select,
-                outlier_schema,
-                where_clause,
-                page,
-                per_page,
-                orderby,
-                order,
-            )
-            .get_results::<GetQueryData>(&conn)
-            .map_err(Into::into)
-        });
-
-    GetQuery::build_response(&query, per_page, query_result)
+    match pool.get() {
+        Ok(conn) => GetQuery::build_response(
+            select,
+            outlier_schema,
+            where_clause,
+            page,
+            per_page,
+            orderby,
+            order,
+            &conn,
+        ),
+        Err(e) => Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e))),
+    }
 }
 
 pub(crate) async fn update_outliers(
