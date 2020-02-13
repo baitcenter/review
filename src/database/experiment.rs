@@ -15,6 +15,9 @@ use std::collections::HashMap;
 use super::schema::{cluster, column_description, data_source, top_n_datetime};
 use crate::database::{self, build_err_msg};
 
+const R_SQUARE: f64 = 0.5;
+const REGRESSION_TOP_N: usize = 50;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct SizeSelectQuery {
     data_source: String,
@@ -65,9 +68,9 @@ struct TimeSeriesTransfer {
 struct TimeSeriesLinearRegression {
     pub cluster_id: String,
     pub series: Vec<(NaiveDateTime, usize)>,
-    pub slope: Option<f64>,
-    pub intercept: Option<f64>,
-    pub r_square: Option<f64>,
+    pub slope: f64,
+    pub intercept: f64,
+    pub r_square: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -209,7 +212,8 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
 
     match query_result {
         Ok(values) => {
-            let mut series: HashMap<usize, HashMap<String, HashMap<NaiveDateTime, usize>>> = HashMap::new(); // TODO: BigDecimal later?
+            let mut series: HashMap<usize, HashMap<String, HashMap<NaiveDateTime, usize>>> =
+                HashMap::new(); // TODO: BigDecimal later?
 
             for v in values {
                 if let (Some(column_index), Some(cluster_id), Some(value), Some(count)) = (
@@ -230,12 +234,22 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
 
             let mut series: Vec<TopNTimeSeriesTransfer> = series
                 .iter()
-                .map(|(column_index, cluster_series)|
-                    TopNTimeSeriesTransfer {
-                        column_index: *column_index,
-                        top_n: cluster_series.iter().map(|(cluster_id, series)| {
-                            let y_values: Vec<usize> = series.iter().map(|(_, count)| *count).collect();
-                            let (slope, intercept, r_square) = linear_regression(&y_values);
+                .map(|(column_index, cluster_series)| TopNTimeSeriesTransfer {
+                    column_index: *column_index,
+                    top_n: cluster_series
+                        .iter()
+                        .map(|(cluster_id, series)| {
+                            let y_values: Vec<usize> =
+                                series.iter().map(|(_, count)| *count).collect();
+                            let x_values: Vec<f64> = (0..y_values.len())
+                                .map(|x| x.to_f64().expect("safe: usize -> f64"))
+                                .collect();
+                            let y_values: Vec<f64> = y_values
+                                .iter()
+                                .map(|y| y.to_f64().expect("safe: usize -> f64"))
+                                .collect();
+                            let (slope, intercept, r_square) =
+                                linear_regression(&x_values, &y_values);
                             TimeSeriesLinearRegression {
                                 cluster_id: cluster_id.clone(),
                                 series: series.iter().map(|(dt, count)| (*dt, *count)).collect(),
@@ -243,9 +257,21 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                                 intercept,
                                 r_square,
                             }
-                        }).collect(),
-                    }
-                ).collect();
+                        })
+                        .collect(),
+                })
+                .collect();
+
+            for s in &mut series {
+                s.top_n.retain(|x| x.r_square > R_SQUARE);
+            }
+            for s in &mut series {
+                s.top_n
+                    .sort_by(|a, b| b.slope.partial_cmp(&a.slope).expect("always comparable"));
+            }
+            for s in &mut series {
+                s.top_n.truncate(REGRESSION_TOP_N);
+            }
 
             Ok(HttpResponse::Ok()
                 .header(http::header::CONTENT_TYPE, "application/json")
@@ -257,22 +283,29 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
     }
 }
 
-fn linear_regression(y_values: &[usize]) -> (Option<f64>, Option<f64>, Option<f64>) {
-    let x_values: Vec<f64> = (0..y_values.len()).map(|x| x.to_f64().expect("safe: usize -> f64")).collect();
-    let y_values: Vec<f64> = y_values.iter().map(|y| y.to_f64().expect("safe: usize -> f64")).collect();
-    if let Ok((slope, intercept)) = linreg::linear_regression::<f64, f64, f64>(&x_values, &y_values) {
-        let mut rss: f64 = 0.;
-        for (x, y) in izip!(x_values.iter(), y_values.iter()) {
-            rss += (y - (intercept + slope * x)).powi(2);
-        }
-        let y_mean = mean(&y_values);
-        let mut tss: f64 = 0.;
-        for y in y_values.iter() {
-            tss += (*y - y_mean).powi(2);
-        }
-        let r_square = 1. - rss / tss;
-        (Some(slope), Some(intercept), Some(r_square))
-    } else {
-        (None, None, None)
+#[allow(clippy::similar_names)]
+fn linear_regression(x_values: &[f64], y_values: &[f64]) -> (f64, f64, f64) {
+    let x_mean = mean(&x_values);
+    let y_mean = mean(&y_values);
+    let mut up: f64 = 0.;
+    let mut down: f64 = 0.;
+    for (x, y) in izip!(x_values.iter(), y_values.iter()) {
+        up += (x - x_mean) * (y - y_mean);
+        down += (x - x_mean).powi(2);
     }
+    let slope = up / down;
+    let intercept = y_mean - slope * x_mean;
+
+    let mut rss: f64 = 0.;
+    for (x, y) in izip!(x_values.iter(), y_values.iter()) {
+        rss += (y - (intercept + slope * x)).powi(2);
+    }
+
+    let mut tss: f64 = 0.;
+    for y in y_values.iter() {
+        tss += (*y - y_mean).powi(2);
+    }
+    let r_square = 1. - rss / tss;
+
+    (slope, intercept, r_square)
 }
