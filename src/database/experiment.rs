@@ -4,9 +4,11 @@ use actix_web::{
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
-use chrono::NaiveDateTime;
+use chfft::CFft1D;
+use chrono::{Duration, NaiveDateTime};
 use diesel::prelude::*;
 use itertools::izip;
+use num_complex::Complex;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use statistical::*;
@@ -16,7 +18,9 @@ use super::schema::{cluster, column_description, data_source, top_n_datetime};
 use crate::database::{self, build_err_msg};
 
 const R_SQUARE: f64 = 0.5;
+const SLOPE: f64 = 1.0;
 const REGRESSION_TOP_N: usize = 50;
+const MAX_HOUR_DIFF: i64 = 96;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SizeSelectQuery {
@@ -25,7 +29,7 @@ pub(crate) struct SizeSelectQuery {
 
 #[derive(Debug, Queryable, Serialize)]
 struct SizeOfClustersResponse {
-    pub size: BigDecimal,
+    size: BigDecimal,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,42 +45,47 @@ pub(crate) struct DataSourceSelectQuery {
 
 #[derive(Debug, Queryable)]
 struct TopNDateTimeLoadOfCluster {
-    pub column_index: i32,
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<NaiveDateTime>,
-    pub count: Option<i64>,
+    column_index: i32,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<NaiveDateTime>,
+    count: Option<i64>,
 }
 
 #[derive(Debug, Queryable)]
 struct TopNDateTimeLoadOfDataSource {
-    pub cluster_id: Option<String>,
-    pub column_index: i32,
-    pub description_id: i32,
-    pub ranking: Option<i64>,
-    pub value: Option<NaiveDateTime>,
-    pub count: Option<i64>,
+    cluster_id: Option<String>,
+    column_index: i32,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<NaiveDateTime>,
+    count: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct TimeSeriesTransfer {
-    pub column_index: usize,
-    pub series: Vec<(NaiveDateTime, usize)>,
+    column_index: usize,
+    series: Vec<(NaiveDateTime, usize)>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct TimeSeriesLinearRegression {
-    pub cluster_id: String,
-    pub series: Vec<(NaiveDateTime, usize)>,
-    pub slope: f64,
-    pub intercept: f64,
-    pub r_square: f64,
+    series: Vec<(NaiveDateTime, usize)>,
+    slope: f64,
+    intercept: f64,
+    r_square: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct TopNTimeSeriesTransfer {
-    pub column_index: usize,
-    pub top_n: Vec<TimeSeriesLinearRegression>,
+struct TimeSeriesLinearRegressionOfCluster {
+    cluster_id: String,
+    split_series: Vec<TimeSeriesLinearRegression>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct TopNTimeSeriesLinearRegressionOfCluster {
+    column_index: usize,
+    top_n: Vec<TimeSeriesLinearRegressionOfCluster>,
 }
 
 pub(crate) async fn get_sum_of_cluster_sizes(
@@ -232,42 +241,51 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 }
             }
 
-            let mut series: Vec<TopNTimeSeriesTransfer> = series
+            let mut series: Vec<TopNTimeSeriesLinearRegressionOfCluster> = series
                 .iter()
-                .map(|(column_index, cluster_series)| TopNTimeSeriesTransfer {
+                .map(|(column_index, cluster_series)| TopNTimeSeriesLinearRegressionOfCluster {
                     column_index: *column_index,
                     top_n: cluster_series
                         .iter()
                         .map(|(cluster_id, series)| {
-                            let y_values: Vec<usize> =
-                                series.iter().map(|(_, count)| *count).collect();
-                            let x_values: Vec<f64> = (0..y_values.len())
-                                .map(|x| x.to_f64().expect("safe: usize -> f64"))
-                                .collect();
-                            let y_values: Vec<f64> = y_values
-                                .iter()
-                                .map(|y| y.to_f64().expect("safe: usize -> f64"))
-                                .collect();
-                            let (slope, intercept, r_square) =
-                                linear_regression(&x_values, &y_values);
-                            TimeSeriesLinearRegression {
+                            let series_vec: Vec<(NaiveDateTime, usize)> = series.iter().map(|(dt, count)| (*dt, *count)).collect();
+//                            let series_vec = fill_vacant_hours(&series_vec);
+
+                            let parts_of_series: Vec<Vec<(NaiveDateTime, usize)>> = split_series(&series_vec);
+                            let cluster_time_series: Vec<TimeSeriesLinearRegression> = parts_of_series.iter().filter_map(|series| {
+                                    let y_values: Vec<usize> =
+                                        series.iter().map(|(_, count)| *count).collect();
+                                    let x_values: Vec<f64> = (0..y_values.len())
+                                        .map(|x| x.to_f64().expect("safe: usize -> f64"))
+                                        .collect();
+                                    let y_values: Vec<f64> = y_values
+                                        .iter()
+                                        .map(|y| y.to_f64().expect("safe: usize -> f64"))
+                                        .collect();
+                                    let (slope, intercept, r_square) =
+                                        linear_regression(&x_values, &y_values);
+
+                                    if r_square > R_SQUARE && slope > SLOPE {
+                                        Some(TimeSeriesLinearRegression {
+                                            series: series.clone(),
+                                            slope,
+                                            intercept,
+                                            r_square,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                }).collect();
+                            TimeSeriesLinearRegressionOfCluster {
                                 cluster_id: cluster_id.clone(),
-                                series: series.iter().map(|(dt, count)| (*dt, *count)).collect(),
-                                slope,
-                                intercept,
-                                r_square,
+                                split_series: cluster_time_series,
                             }
-                        })
-                        .collect(),
-                })
-                .collect();
+                        }).collect(),
+                   }).collect();
 
             for s in &mut series {
-                s.top_n.retain(|x| x.r_square > R_SQUARE);
-            }
-            for s in &mut series {
                 s.top_n
-                    .sort_by(|a, b| b.slope.partial_cmp(&a.slope).expect("always comparable"));
+                    .sort_by(|a, b| b.split_series.len().cmp(&a.split_series.len()));
             }
             for s in &mut series {
                 s.top_n.truncate(REGRESSION_TOP_N);
@@ -308,4 +326,73 @@ fn linear_regression(x_values: &[f64], y_values: &[f64]) -> (f64, f64, f64) {
     let r_square = 1. - rss / tss;
 
     (slope, intercept, r_square)
+}
+
+#[must_use]
+fn split_series(series: &[(NaiveDateTime, usize)]) -> Vec<Vec<(NaiveDateTime, usize)>> {
+    let mut data: Vec<Complex<f64>> = Vec::new();
+    for index in 1..series.len() {
+        data.push(Complex::new(
+            (series[index].1.to_f64().expect("safe: usize -> f64")  / series[index - 1].1.to_f64().expect("safe: usize -> f64")).ln(),
+            0.0));
+    }
+    let mut fft = CFft1D::<f64>::with_len(data.len());
+    let mut data = fft.forward(&data);
+
+    for d in data.iter_mut() {
+        d.im = 0.0;
+    }
+    let mut fft = CFft1D::<f64>::with_len(data.len());
+    let data = fft.backward(&data);
+
+    let mut locations: Vec<usize> = Vec::new();
+    for index in 1..data.len() {
+        if data[index - 1].re > 0.0 && data[index].re < 0.0 || data[index - 1].re < 0.0 && data[index].re > 0.0 {
+            locations.push(index);
+        }
+    }
+
+    let mut parts_of_series: Vec<Vec<(NaiveDateTime, usize)>> = Vec::new();
+    let mut series = series.clone();
+    for index in 0..locations.len() {
+        let split_location = if index == 0 {
+            locations[index]
+        } else {
+            locations[index] - locations[index - 1]
+        };
+        let (left, right) = series.split_at(split_location);
+        parts_of_series.push(left.to_vec());
+        series = right;
+    }
+    parts_of_series.push(series.to_vec());
+
+    parts_of_series
+}
+
+#[must_use]
+pub fn fill_vacant_hours(series: &[(NaiveDateTime, usize)]) -> Vec<(NaiveDateTime, usize)> {
+    let mut filled_series: Vec<(NaiveDateTime, usize)> = Vec::new();
+    for (index, hour) in series.iter().enumerate() {
+        if index == 0 {
+            filled_series.push(hour.clone());
+            continue;
+        } else {
+            let time_diff = (hour.0 - series[index - 1].0).num_hours();
+            let time_diff = if time_diff > 1 && time_diff < MAX_HOUR_DIFF {
+                time_diff
+            } else if time_diff >= MAX_HOUR_DIFF {
+                MAX_HOUR_DIFF
+            } else {
+                0
+            };
+
+            if time_diff > 0 {
+                for h in 1..time_diff {
+                    filled_series.push((series[index - 1].0 + Duration::hours(h), 0));
+                }
+            }
+            filled_series.push(hour.clone());
+        }
+    }
+    filled_series
 }
