@@ -4,12 +4,13 @@ use actix_web::{
     HttpResponse,
 };
 use bigdecimal::{BigDecimal, FromPrimitive};
-use chfft::CFft1D;
 use chrono::{Duration, NaiveDateTime};
 use diesel::prelude::*;
 use itertools::izip;
-use num_complex::Complex;
 use num_traits::ToPrimitive;
+use rustfft::FFTplanner;
+use rustfft::num_complex::Complex;
+use rustfft::num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use statistical::*;
 use std::collections::HashMap;
@@ -17,8 +18,8 @@ use std::collections::HashMap;
 use super::schema::{cluster, column_description, data_source, top_n_datetime};
 use crate::database::{self, build_err_msg};
 
-const R_SQUARE: f64 = 0.5;
-const SLOPE: f64 = 1.0;
+const R_SQUARE: f64 = 0.3;
+const SLOPE: f64 = 0.5;
 const REGRESSION_TOP_N: usize = 50;
 const MAX_HOUR_DIFF: i64 = 96;
 
@@ -79,6 +80,7 @@ struct TimeSeriesLinearRegression {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct TimeSeriesLinearRegressionOfCluster {
     cluster_id: String,
+    series: Vec<(NaiveDateTime, usize)>,
     split_series: Vec<TimeSeriesLinearRegression>,
 }
 
@@ -247,9 +249,10 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                     column_index: *column_index,
                     top_n: cluster_series
                         .iter()
-                        .map(|(cluster_id, series)| {
-                            let series_vec: Vec<(NaiveDateTime, usize)> = series.iter().map(|(dt, count)| (*dt, *count)).collect();
-//                            let series_vec = fill_vacant_hours(&series_vec);
+                        .filter_map(|(cluster_id, series)| {
+                            let mut series: Vec<(NaiveDateTime, usize)> = series.iter().map(|(dt, count)| (*dt, *count)).collect();
+                            series.sort_by(|a, b| a.0.cmp(&b.0));
+                            let series_vec = fill_vacant_hours(&series);
 
                             let parts_of_series: Vec<Vec<(NaiveDateTime, usize)>> = split_series(&series_vec);
                             let cluster_time_series: Vec<TimeSeriesLinearRegression> = parts_of_series.iter().filter_map(|series| {
@@ -276,9 +279,14 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                                         None
                                     }
                                 }).collect();
-                            TimeSeriesLinearRegressionOfCluster {
-                                cluster_id: cluster_id.clone(),
-                                split_series: cluster_time_series,
+                            if cluster_time_series.len() > 0 {
+                                Some(TimeSeriesLinearRegressionOfCluster {
+                                    cluster_id: cluster_id.clone(),
+                                    series,
+                                    split_series: cluster_time_series,
+                                })
+                            } else {
+                                None
                             }
                         }).collect(),
                    }).collect();
@@ -290,6 +298,8 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
             for s in &mut series {
                 s.top_n.truncate(REGRESSION_TOP_N);
             }
+
+            series.sort_by(|a, b| a.column_index.cmp(&b.column_index));
 
             Ok(HttpResponse::Ok()
                 .header(http::header::CONTENT_TYPE, "application/json")
@@ -330,20 +340,27 @@ fn linear_regression(x_values: &[f64], y_values: &[f64]) -> (f64, f64, f64) {
 
 #[must_use]
 fn split_series(series: &[(NaiveDateTime, usize)]) -> Vec<Vec<(NaiveDateTime, usize)>> {
-    let mut data: Vec<Complex<f64>> = Vec::new();
-    for index in 1..series.len() {
-        data.push(Complex::new(
-            (series[index].1.to_f64().expect("safe: usize -> f64")  / series[index - 1].1.to_f64().expect("safe: usize -> f64")).ln(),
-            0.0));
-    }
-    let mut fft = CFft1D::<f64>::with_len(data.len());
-    let mut data = fft.forward(&data);
-
-    for d in data.iter_mut() {
+    let mut input: Vec<Complex<f64>> = series.iter().enumerate().filter_map(|(index, value)| {
+        if index == 0 {
+            None
+        } else {
+            Some(Complex::new(
+                    (value.1.to_f64().expect("safe: usize -> f64")  / series[index - 1].1.to_f64().expect("safe: usize -> f64")).ln(),
+                    0.0))
+        }
+    }).collect();
+    let mut output: Vec<Complex<f64>> = vec![Complex::zero(); input.len()];
+    let mut planner = FFTplanner::new(false);
+    let fft = planner.plan_fft(input.len());
+    fft.process(&mut input, &mut output);
+    
+    for d in input.iter_mut() {
         d.im = 0.0;
     }
-    let mut fft = CFft1D::<f64>::with_len(data.len());
-    let data = fft.backward(&data);
+    let mut data: Vec<Complex<f64>> = vec![Complex::zero(); input.len()];
+    let mut planner = FFTplanner::new(true);
+    let fft = planner.plan_fft(input.len());
+    fft.process(&mut input, &mut data);
 
     let mut locations: Vec<usize> = Vec::new();
     for index in 1..data.len() {
