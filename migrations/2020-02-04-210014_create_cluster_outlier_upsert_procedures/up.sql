@@ -129,7 +129,7 @@ BEGIN
             DELETE FROM event
               WHERE message_id = event_id 
               AND data_source_id = current_data_source_id;
-          IF array_length(current_event_ids, 1) = $1 THEN
+          IF array_length(current_event_ids, 1) <= $1 THEN
             EXIT;
           END IF;
         END LOOP;
@@ -212,7 +212,7 @@ BEGIN
         DELETE FROM event
           WHERE message_id = _event_id 
           AND data_source_id = _data_source_id;
-        IF array_length($6, 1) = $1 THEN
+        IF array_length($6, 1) <= $1 THEN
           EXIT;
         END IF;
       END LOOP;
@@ -244,7 +244,7 @@ BEGIN
         DELETE FROM event
           WHERE message_id = _event_id 
           AND data_source_id = _data_source_id;
-        IF array_length(_event_ids, 1) = $1 THEN
+        IF array_length(_event_ids, 1) <= $1 THEN
           EXIT;
         END IF;
       END LOOP;

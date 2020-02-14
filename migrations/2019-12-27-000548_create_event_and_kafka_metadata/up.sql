@@ -124,7 +124,7 @@ BEGIN
       EXECUTE 'SELECT MIN(i) FROM UNNEST($1) i' INTO _event_id USING _event_ids;
       _event_ids := array_remove(_event_ids, event_id);
       DELETE FROM event WHERE event.message_id = _event_id AND event.data_source_id = _data_source_id;
-      IF array_length(_event_ids, 1) = $1 THEN
+      IF array_length(_event_ids, 1) <= $1 THEN
         EXIT;
       END IF;
     END LOOP;
@@ -140,7 +140,7 @@ BEGIN
       EXECUTE 'SELECT MIN(i) FROM UNNEST($1) i' INTO _event_id USING _event_ids;
       _event_ids := array_remove(_event_ids, event_id);
       DELETE FROM event WHERE event.message_id = _event_id AND event.data_source_id = _data_source_id;
-      IF array_length(_event_ids, 1) = $1 THEN
+      IF array_length(_event_ids, 1) <= $1 THEN
         EXIT;
       END IF;
     END LOOP;
