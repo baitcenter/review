@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::schema::template;
-use crate::database::{build_err_msg, load_payload, Error, Pool};
+use crate::database::{build_http_500_response, load_payload, Error, Pool};
 
 #[derive(Debug, Insertable, Queryable, Serialize, Deserialize)]
 #[table_name = "template"]
@@ -83,9 +83,7 @@ pub(crate) async fn add_template(
         Ok(template) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(template)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -153,8 +151,6 @@ pub(crate) async fn get_template(
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(template))
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

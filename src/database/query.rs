@@ -7,7 +7,7 @@ use diesel::sql_types::{BigInt, Jsonb};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::database::{build_err_msg, Conn, Error};
+use crate::database::{build_http_500_response, Conn, Error};
 
 #[derive(Debug, Deserialize, QueryableByName)]
 pub(crate) struct GetQueryData {
@@ -117,9 +117,7 @@ impl<'a> GetQuery<'a> {
                         .json(data))
                 }
             }
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     }
 

@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 use super::schema::event;
 use crate::database::{
-    build_err_msg, get_data_source_id, kafka_metadata_lookup, load_payload,
+    build_http_500_response, get_data_source_id, kafka_metadata_lookup, load_payload,
     lookup_events_with_no_raw_event, Conn, Error, Pool,
 };
 
@@ -156,9 +156,7 @@ pub(crate) async fn get_events(
                 Ok(data) => Ok(HttpResponse::Ok()
                     .header(http::header::CONTENT_TYPE, "application/json")
                     .json(data)),
-                Err(e) => Ok(HttpResponse::InternalServerError()
-                    .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(build_err_msg(&e))),
+                Err(e) => Ok(build_http_500_response(&e)),
             }
         } else {
             let message = json!({
@@ -228,9 +226,7 @@ pub(crate) async fn get_events_with_no_raw_event(
             Ok(data) => Ok(HttpResponse::Ok()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .body(data)),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::BadRequest().into())
@@ -250,8 +246,6 @@ pub(crate) async fn update_events(
 
     match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::ops::Bound;
 
 use super::schema::kafka_metadata;
-use crate::database::{build_err_msg, lookup_kafka_metadata, Conn, Error, Pool};
+use crate::database::{build_http_500_response, lookup_kafka_metadata, Conn, Error, Pool};
 
 #[derive(Debug, Clone, Insertable, Queryable, Serialize, Deserialize)]
 #[table_name = "kafka_metadata"]
@@ -37,9 +37,7 @@ pub(crate) async fn add_kafka_metadata(
     });
     match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -71,9 +69,7 @@ pub(crate) async fn get_kafka_metadata(
             Ok(metadata) => Ok(HttpResponse::Ok()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(metadata)),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::BadRequest().into())

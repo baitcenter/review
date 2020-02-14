@@ -1,5 +1,4 @@
 use actix_web::{
-    http,
     web::{Data, Payload, Query},
     HttpResponse,
 };
@@ -46,9 +45,7 @@ pub(crate) async fn delete_outliers(
     let conn = match pool.get() {
         Ok(conn) => conn,
         Err(e) => {
-            return Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e)))
+            return Ok(build_http_500_response(&e))
         }
     };
     if let Ok(data_source_id) = get_data_source_id(&conn, &data_source.data_source) {
@@ -93,9 +90,7 @@ pub(crate) async fn delete_outliers(
 
         match query_result {
             Ok(_) => Ok(HttpResponse::Ok().into()),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::InternalServerError().into())
@@ -189,9 +184,7 @@ pub(crate) async fn get_outliers(
             order,
             &conn,
         ),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -251,9 +244,7 @@ pub(crate) async fn update_outliers(
 
     match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 

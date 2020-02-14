@@ -18,7 +18,7 @@ use super::schema::{
     top_n_binary, top_n_datetime, top_n_enum, top_n_float, top_n_int, top_n_ipaddr, top_n_text,
 };
 use crate::database::data_source::DataSourceQuery;
-use crate::database::{self, build_err_msg, load_payload};
+use crate::database::{self, build_http_500_response, load_payload};
 
 #[derive(Clone, Debug, Default, Serialize)]
 struct DescriptionLoad {
@@ -810,9 +810,7 @@ pub(crate) async fn add_descriptions(
 
     match insert_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -843,9 +841,7 @@ pub(crate) async fn get_rounds_by_cluster(
         Ok(round_response) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(round_response)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -1263,8 +1259,6 @@ pub(crate) async fn get_description(
         Ok(response) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(response)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

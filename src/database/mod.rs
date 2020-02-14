@@ -1,4 +1,4 @@
-use actix_web::web::{BytesMut, Payload};
+use actix_web::{web::{BytesMut, Payload}, http, HttpResponse};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use futures::StreamExt;
@@ -54,12 +54,18 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
 }
 
-pub(crate) fn build_err_msg(e: &dyn std::error::Error) -> String {
+fn build_err_msg(e: &dyn std::error::Error) -> String {
     error!("{}", e);
     json!({
         "message": e.to_string(),
     })
     .to_string()
+}
+
+pub(crate) fn build_http_500_response(e: &dyn std::error::Error) -> HttpResponse {
+    HttpResponse::InternalServerError()
+        .header(http::header::CONTENT_TYPE, "application/json")
+        .body(build_err_msg(e))
 }
 
 pub(crate) async fn load_payload(mut payload: Payload) -> Result<BytesMut, actix_web::Error> {

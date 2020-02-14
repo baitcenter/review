@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::schema::category;
-use crate::database::{build_err_msg, Error, Pool};
+use crate::database::{build_http_500_response, Error, Pool};
 
 #[derive(Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[table_name = "category"]
@@ -37,9 +37,7 @@ pub(crate) async fn add_category(
         Ok(category) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(category)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -55,9 +53,7 @@ pub(crate) async fn get_category_table(pool: Data<Pool>) -> Result<HttpResponse,
         Ok(category) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(category)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -77,8 +73,6 @@ pub(crate) async fn update_category(
 
     match update_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use serde::Serialize;
 
 use super::schema::status;
-use crate::database::{build_err_msg, Error, Pool};
+use crate::database::{build_http_500_response, Error, Pool};
 
 #[derive(Debug, Identifiable, Queryable, Serialize)]
 #[table_name = "status"]
@@ -24,8 +24,6 @@ pub(crate) async fn get_status_table(pool: Data<Pool>) -> Result<HttpResponse, a
         Ok(status_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(status_table)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

@@ -45,9 +45,7 @@ pub(crate) async fn add_indicator(
 
         match insert_result {
             Ok(_) => Ok(HttpResponse::Created().into()),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::BadRequest().into())
@@ -88,9 +86,7 @@ pub(crate) async fn delete_indicator(
     match delete_result {
         Ok(0) => Ok(HttpResponse::BadRequest().into()),
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -158,9 +154,7 @@ pub(crate) async fn get_indicators(
             order,
             &conn,
         ),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -206,9 +200,7 @@ pub(crate) async fn update_indicator(
             Ok(_) => Ok(HttpResponse::InternalServerError()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .body(json!({"message": "Something went wrong"}).to_string())),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::BadRequest().into())

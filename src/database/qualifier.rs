@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::schema::qualifier;
-use crate::database::{build_err_msg, Error, Pool};
+use crate::database::{build_http_500_response, Error, Pool};
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[table_name = "qualifier"]
@@ -26,8 +26,6 @@ pub(crate) async fn get_qualifier_table(
         Ok(qualifier_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(qualifier_table)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

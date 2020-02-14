@@ -8,15 +8,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::schema::data_source;
-use crate::database::{build_err_msg, Conn, Error, Pool};
+use crate::database::{build_http_500_response, Conn, Error, Pool};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DataSourceQuery {
     pub(crate) data_source: String,
 }
 
-#[derive(Debug, Identifiable, Queryable, Deserialize, Serialize)]
-#[table_name = "data_source"]
+#[derive(Debug, Queryable, Deserialize, Serialize)]
 pub(crate) struct DataSource {
     pub(crate) id: i32,
     pub(crate) topic_name: String,
@@ -78,8 +77,6 @@ pub(crate) async fn get_data_source_table(
         Ok(data_source_table) => Ok(HttpResponse::Ok()
             .header(http::header::CONTENT_TYPE, "application/json")
             .json(data_source_table)),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }

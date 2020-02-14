@@ -1,5 +1,4 @@
 use actix_web::{
-    http,
     web::{Data, Json, Path, Payload, Query},
     HttpResponse,
 };
@@ -102,9 +101,7 @@ pub(crate) async fn get_clusters(
             order,
             &conn,
         ),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -143,9 +140,7 @@ pub(crate) async fn update_cluster(
         match query_result {
             Ok(1) => Ok(HttpResponse::Ok().into()),
             Ok(_) => Ok(HttpResponse::InternalServerError().into()),
-            Err(e) => Ok(HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e))),
+            Err(e) => Ok(build_http_500_response(&e)),
         }
     } else {
         Ok(HttpResponse::BadRequest().into())
@@ -224,9 +219,7 @@ pub(crate) async fn update_clusters(
 
     match query_result {
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -291,9 +284,7 @@ pub(crate) async fn update_qualifiers(
     match query_result {
         Ok(0) => Ok(HttpResponse::BadRequest().into()),
         Ok(_) => Ok(HttpResponse::Ok().into()),
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
