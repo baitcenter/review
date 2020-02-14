@@ -58,18 +58,15 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
 }
 
-fn build_err_msg(e: &dyn std::error::Error) -> String {
+pub(crate) fn build_http_500_response(e: &dyn std::error::Error) -> HttpResponse {
     error!("{}", e);
-    json!({
+    let err_msg = json!({
         "message": e.to_string(),
     })
-    .to_string()
-}
-
-pub(crate) fn build_http_500_response(e: &dyn std::error::Error) -> HttpResponse {
+    .to_string();
     HttpResponse::InternalServerError()
         .header(http::header::CONTENT_TYPE, "application/json")
-        .body(build_err_msg(e))
+        .body(err_msg)
 }
 
 pub(crate) async fn load_payload(mut payload: Payload) -> Result<BytesMut, actix_web::Error> {

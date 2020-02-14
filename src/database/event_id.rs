@@ -8,7 +8,7 @@ use diesel::prelude::*;
 use serde_json::Value;
 use std::sync::Mutex;
 
-use crate::database::{attempt_event_ids_update, build_err_msg, Conn, Pool};
+use crate::database::{attempt_event_ids_update, build_http_500_response, Conn, Pool};
 
 pub(crate) async fn get_max_event_id_num(max_event_id_num: Data<Mutex<usize>>) -> HttpResponse {
     let max_event_id_num = max_event_id_num.lock().unwrap();
@@ -48,9 +48,7 @@ pub(crate) async fn update_max_event_id_num(
                 *max_event_id_num = new_max_event_id_num;
                 HttpResponse::Ok().into()
             }
-            Err(e) => HttpResponse::InternalServerError()
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(build_err_msg(&e)),
+            Err(e) => build_http_500_response(&e),
         },
         None => HttpResponse::BadRequest().into(),
     }
