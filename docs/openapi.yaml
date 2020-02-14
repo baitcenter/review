@@ -761,7 +761,7 @@ paths:
             $ref: "#/definitions/TemplateCreateBody"
           description: "New values of template"
       responses:
-        200:
+        201:
           description: "Created template successfully"
         500:
           description: "Internal server error"

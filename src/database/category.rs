@@ -34,9 +34,7 @@ pub(crate) async fn add_category(
     });
 
     match insert_result {
-        Ok(category) => Ok(HttpResponse::Ok()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .json(category)),
+        Ok(_) => Ok(HttpResponse::Created().into()),
         Err(e) => Ok(build_http_500_response(&e)),
     }
 }
