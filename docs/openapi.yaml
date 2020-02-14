@@ -1045,6 +1045,7 @@ definitions:
     - "data_source"
     - "data_source_type"
     - "event_ids"
+    - "size"
     properties:
       id:
         type: "integer"
@@ -1068,6 +1069,10 @@ definitions:
           type: "integer"
           format: "uint64"
         description: "list of event ids for this outlier"
+      size:
+        type: "integer"
+        format: "uint32"
+        description: "the number of event_ids for this outlier"
   DataSource:
     type: "object"
     properties:

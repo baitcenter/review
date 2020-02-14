@@ -44,9 +44,7 @@ pub(crate) async fn delete_outliers(
     let data_source = data_source.into_inner();
     let conn = match pool.get() {
         Ok(conn) => conn,
-        Err(e) => {
-            return Ok(build_http_500_response(&e))
-        }
+        Err(e) => return Ok(build_http_500_response(&e)),
     };
     if let Ok(data_source_id) = get_data_source_id(&conn, &data_source.data_source) {
         let mut query = dsl::outlier.into_boxed();

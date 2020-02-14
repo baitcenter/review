@@ -1,4 +1,8 @@
-use actix_web::{web::{BytesMut, Payload}, http, HttpResponse};
+use actix_web::{
+    http,
+    web::{BytesMut, Payload},
+    HttpResponse,
+};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use futures::StreamExt;
