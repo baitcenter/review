@@ -4,7 +4,7 @@ This file documents all notable changes to this project. The format of this file
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2020-02-14
 
 ### Added
 
@@ -287,7 +287,7 @@ v0.4.1
   - `ETCD_ADDR`
   - `ETCD_SIG_KEY`
 
-[Unreleased]: https://github.com/petabi/review/compare/0.7.0...master
+[0.8.0]: https://github.com/petabi/review/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/petabi/review/compare/0.6.3...0.7.0
 [0.6.3]: https://github.com/petabi/review/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/petabi/review/compare/0.6.1...0.6.2
