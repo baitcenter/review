@@ -1,14 +1,14 @@
 CREATE TABLE event (
   id SERIAL PRIMARY KEY,
   message_id NUMERIC(20, 0) NOT NULL,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  data_source_id INTEGER NOT NULL,
   raw_event BYTEA,
   UNIQUE (message_id, data_source_id)
 );
 
 CREATE TABLE kafka_metadata (
   id SERIAL PRIMARY KEY,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  data_source_id INTEGER NOT NULL,
   partition INTEGER NOT NULL,
   offsets BIGINT NOT NULL,
   message_ids NUMRANGE NOT NULL,

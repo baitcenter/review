@@ -255,10 +255,6 @@ table! {
     }
 }
 
-joinable!(cluster -> category (category_id));
-joinable!(cluster -> data_source (data_source_id));
-joinable!(cluster -> qualifier (qualifier_id));
-joinable!(cluster -> status (status_id));
 joinable!(column_description -> cluster (cluster_id));
 joinable!(column_description -> description_element_type (type_id));
 joinable!(description_binary -> column_description (description_id));
@@ -268,10 +264,6 @@ joinable!(description_float -> column_description (description_id));
 joinable!(description_int -> column_description (description_id));
 joinable!(description_ipaddr -> column_description (description_id));
 joinable!(description_text -> column_description (description_id));
-joinable!(event -> data_source (data_source_id));
-joinable!(indicator -> data_source (data_source_id));
-joinable!(kafka_metadata -> data_source (data_source_id));
-joinable!(outlier -> data_source (data_source_id));
 joinable!(top_n_binary -> column_description (description_id));
 joinable!(top_n_datetime -> column_description (description_id));
 joinable!(top_n_enum -> column_description (description_id));

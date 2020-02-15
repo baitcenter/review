@@ -29,15 +29,15 @@ INSERT INTO status VALUES(3,'disabled');
 CREATE TABLE cluster (
   id SERIAL PRIMARY KEY,
   cluster_id TEXT,
-  category_id INTEGER NOT NULL DEFAULT 1 REFERENCES category(id),
+  category_id INTEGER NOT NULL DEFAULT 1,
   detector_id INTEGER NOT NULL,
   event_ids NUMERIC(20, 0)[],
-  qualifier_id INTEGER NOT NULL DEFAULT 2 REFERENCES qualifier(id),
-  status_id INTEGER NOT NULL DEFAULT 2 REFERENCES Status(id),
+  qualifier_id INTEGER NOT NULL DEFAULT 2,
+  status_id INTEGER NOT NULL DEFAULT 2,
   signature TEXT NOT NULL,
   size NUMERIC(20, 0) NOT NULL,
   score FLOAT8,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  data_source_id INTEGER NOT NULL,
   last_modification_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (cluster_id, data_source_id)
 );
@@ -45,7 +45,7 @@ CREATE TABLE cluster (
 CREATE TABLE outlier (
   id SERIAL PRIMARY KEY,
   raw_event BYTEA NOT NULL,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  data_source_id INTEGER NOT NULL,
   event_ids NUMERIC(20, 0)[] NOT NULL,
   size NUMERIC(20, 0) NOT NULL
 );
@@ -55,7 +55,7 @@ CREATE TABLE indicator (
   name TEXT NOT NULL,
   description TEXT,
   token JSONB NOT NULL,
-  data_source_id INTEGER NOT NULL REFERENCES data_source(id),
+  data_source_id INTEGER NOT NULL,
   last_modification_time TIMESTAMP,
   UNIQUE (name)
 );
