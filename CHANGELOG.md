@@ -24,6 +24,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the new ones had not been properly created. By checking the topic name of
   clusters whose column statistics are to be created, it's fixed.
 
+### Removed
+
+- Subcommands on the `review` command line is removed.
+
 ## [0.7.0] - 2020-01-28
 
 ### Added
