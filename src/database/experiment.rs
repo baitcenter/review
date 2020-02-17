@@ -20,10 +20,10 @@ use super::schema::{cluster, column_description, data_source, top_n_datetime};
 use crate::database::{self, build_err_msg};
 
 const MIN_R_SQUARE: f64 = 0.1; // 0 <= R^2 <= 1. if R^2 = 1, y_i = linear_function(x_i) with all i.
-const MIN_SLOPE: f64 = 1000.0;
+const MIN_SLOPE: f64 = 300.0;
 const REGRESSION_TOP_N: usize = 20;
 const MAX_HOUR_DIFF: i64 = 96;
-const TREND_SENSITIVITY: f64 = 0.9; // how much rate of the right will be 0. The smaller, the more sensible
+const TREND_SENSITIVITY: f64 = 0.35; // how much rate of the right will be 0. The smaller, the more sensible
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SizeSelectQuery {
@@ -184,7 +184,7 @@ pub(crate) async fn get_cluster_time_series(
                         series.sort_by(|a, b| a.0.cmp(&b.0));
                         let series = fill_vacant_hours(&series, MAX_HOUR_DIFF);
                         let split_series = if let Some(true) = query.split {
-                            if series.len() > 1 {
+                            if series.len() > 0 {
                                 Some(split_series(&series))
                             } else {
                                 None
