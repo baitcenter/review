@@ -16,14 +16,15 @@ use serde::{Deserialize, Serialize};
 use statistical::*;
 use std::collections::HashMap;
 
-use super::schema::{cluster, column_description, data_source, top_n_datetime};
+use super::schema::{cluster, column_description, data_source, top_n_datetime, top_n_ipaddr};
 use crate::database::{self, build_err_msg};
 
-const MIN_R_SQUARE: f64 = 0.1; // 0 <= R^2 <= 1. if R^2 = 1, y_i = linear_function(x_i) with all i.
-const MIN_SLOPE: f64 = 300.0;
-const REGRESSION_TOP_N: usize = 20;
 const MAX_HOUR_DIFF: i64 = 24;
-const TREND_SENSITIVITY: f64 = 0.65; // Data will be removed from this point to the right end. The larger, the more sensible
+const DEFAULT_MIN_R_SQUARE: f64 = 0.1; // 0 <= R^2 <= 1. if R^2 = 1, y_i = linear_function(x_i) with all i.
+const DEFAULT_MIN_SLOPE: f64 = 300.0;
+const DEFAULT_NUMBER_OF_TOP_N_REGRESSION: usize = 20;
+const DEFAULT_TREND_SENSITIVITY: f64 = 0.65; // Data will be removed from this point to the right end. The larger, the more sensible
+const DEFAULT_NUMBER_OF_TOP_N_IP: usize = 30;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SizeSelectQuery {
@@ -96,6 +97,28 @@ struct TimeSeriesLinearRegressionOfCluster {
 struct TopNTimeSeriesLinearRegressionOfCluster {
     column_index: usize,
     top_n: Vec<TimeSeriesLinearRegressionOfCluster>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TopNIpAddrSelectQuery {
+    data_source: String,
+    cluster_id: String,
+    number_of_top_n: Option<usize>,
+}
+
+#[derive(Debug, Queryable)]
+struct TopNIpAddrOfCluster {
+    column_index: i32,
+    description_id: i32,
+    ranking: Option<i64>,
+    value: Option<String>,
+    count: Option<i64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct TopNIpAddrTransfer {
+    column_index: usize,
+    top_n: Vec<(String, usize)>,
 }
 
 pub(crate) async fn get_sum_of_cluster_sizes(
@@ -189,7 +212,7 @@ pub(crate) async fn get_cluster_time_series(
                         //                        let series = fill_vacant_hours(&series, MAX_HOUR_DIFF);
                         let split_series = if let Some(true) = query.split {
                             if series.len() > 0 {
-                                Some(split_series(&series, TREND_SENSITIVITY))
+                                Some(split_series(&series, DEFAULT_TREND_SENSITIVITY))
                             } else {
                                 None
                             }
@@ -268,10 +291,10 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 }
             }
 
-            let top_number = query.top_number.unwrap_or(REGRESSION_TOP_N);
-            let min_r_square = query.r_square.unwrap_or(MIN_R_SQUARE);
-            let min_slope = query.slope.unwrap_or(MIN_SLOPE);
-            let trend_sensitivity = query.sensitivity.unwrap_or(TREND_SENSITIVITY);
+            let top_number = query.top_number.unwrap_or(DEFAULT_NUMBER_OF_TOP_N_REGRESSION);
+            let min_r_square = query.r_square.unwrap_or(DEFAULT_MIN_R_SQUARE);
+            let min_slope = query.slope.unwrap_or(DEFAULT_MIN_SLOPE);
+            let trend_sensitivity = query.sensitivity.unwrap_or(DEFAULT_TREND_SENSITIVITY);
 
             let mut series: Vec<TopNTimeSeriesLinearRegressionOfCluster> = series
                 .iter()
@@ -564,5 +587,72 @@ fn locate_next_of_front_small_ones(series: &[(NaiveDateTime, usize)]) -> usize {
         location
     } else {
         0
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+pub(crate) async fn get_top_n_ipaddr_of_cluster(
+    pool: Data<database::Pool>,
+    query: Query<TopNIpAddrSelectQuery>,
+) -> Result<HttpResponse, actix_web::Error> {
+    use cluster::dsl as c_d;
+    use column_description::dsl as col_d;
+    use data_source::dsl as d_d;
+    use top_n_ipaddr::dsl as top_d;
+    let query_result: Result<Vec<TopNIpAddrOfCluster>, database::Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            c_d::cluster
+                .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                .inner_join(col_d::column_description.on(col_d::cluster_id.eq(c_d::id)))
+                .inner_join(top_d::top_n_ipaddr.on(top_d::description_id.eq(col_d::id)))
+                .select((
+                    col_d::column_index,
+                    col_d::id,
+                    top_d::ranking,
+                    top_d::value,
+                    top_d::count,
+                ))
+                .filter(d_d::topic_name.eq(&query.data_source)
+                    .and(c_d::cluster_id.eq(&query.cluster_id)))
+                .load::<TopNIpAddrOfCluster>(&conn)
+                .map_err(Into::into)
+        });
+
+    match query_result {
+        Ok(values) => {
+            let mut top_n: HashMap<usize, HashMap<String, usize>> = HashMap::new(); // String: Ip Address
+
+            for v in values {
+                if let (Some(column_index), Some(value), Some(count)) = (
+                    v.column_index.to_usize(),
+                    v.value,
+                    v.count.and_then(|c| c.to_usize()),
+                ) {
+                    *top_n
+                        .entry(column_index)
+                        .or_insert_with(HashMap::<String, usize>::new)
+                        .entry(value)
+                        .or_insert(0_usize) += count;
+                }
+            }
+            
+            let mut top_n: Vec<TopNIpAddrTransfer> = top_n.iter().map(|t| {
+                let mut top_n: Vec<(String, usize)> = t.1.iter().map(|t| (t.0.clone(), *t.1)).collect();
+                top_n.sort_by(|a, b| b.1.cmp(&a.1));
+                top_n.truncate(query.number_of_top_n.unwrap_or(DEFAULT_NUMBER_OF_TOP_N_IP));
+                TopNIpAddrTransfer {
+                    column_index: *t.0,
+                    top_n,
+                }
+            }).collect();
+            top_n.sort_by(|a, b| a.column_index.cmp(&b.column_index));
+
+            Ok(HttpResponse::Ok()
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .json(top_n))
+        }
+        Err(e) => Ok(HttpResponse::InternalServerError()
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(build_err_msg(&e))),
     }
 }
