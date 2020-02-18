@@ -22,8 +22,8 @@ use crate::database::{self, build_err_msg};
 const MIN_R_SQUARE: f64 = 0.1; // 0 <= R^2 <= 1. if R^2 = 1, y_i = linear_function(x_i) with all i.
 const MIN_SLOPE: f64 = 300.0;
 const REGRESSION_TOP_N: usize = 20;
-const MAX_HOUR_DIFF: i64 = 96;
-const TREND_SENSITIVITY: f64 = 0.35; // how much rate of the right will be 0. The smaller, the more sensible
+const MAX_HOUR_DIFF: i64 = 24;
+const TREND_SENSITIVITY: f64 = 0.65; // Data will be removed from this point to the right end. The larger, the more sensible
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SizeSelectQuery {
@@ -43,8 +43,12 @@ pub(crate) struct ClusterSelectQuery {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct DataSourceSelectQuery {
+pub(crate) struct TimeSeriesTopNSelectQuery {
     data_source: String,
+    top_number: Option<usize>,
+    r_square: Option<f64>,
+    slope: Option<f64>,
+    sensitivity: Option<f64>,
 }
 
 #[derive(Debug, Queryable)]
@@ -182,10 +186,10 @@ pub(crate) async fn get_cluster_time_series(
                         let mut series: Vec<(NaiveDateTime, usize)> =
                             top_n.iter().map(|(dt, count)| (*dt, *count)).collect();
                         series.sort_by(|a, b| a.0.cmp(&b.0));
-                        let series = fill_vacant_hours(&series, MAX_HOUR_DIFF);
+                        //                        let series = fill_vacant_hours(&series, MAX_HOUR_DIFF);
                         let split_series = if let Some(true) = query.split {
                             if series.len() > 0 {
-                                Some(split_series(&series))
+                                Some(split_series(&series, TREND_SENSITIVITY))
                             } else {
                                 None
                             }
@@ -217,7 +221,7 @@ pub(crate) async fn get_cluster_time_series(
 #[allow(clippy::too_many_lines)]
 pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
     pool: Data<database::Pool>,
-    query: Query<DataSourceSelectQuery>,
+    query: Query<TimeSeriesTopNSelectQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use cluster::dsl as c_d;
     use column_description::dsl as col_d;
@@ -264,6 +268,11 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 }
             }
 
+            let top_number = query.top_number.unwrap_or(REGRESSION_TOP_N);
+            let min_r_square = query.r_square.unwrap_or(MIN_R_SQUARE);
+            let min_slope = query.slope.unwrap_or(MIN_SLOPE);
+            let trend_sensitivity = query.sensitivity.unwrap_or(TREND_SENSITIVITY);
+
             let mut series: Vec<TopNTimeSeriesLinearRegressionOfCluster> = series
                 .iter()
                 .map(
@@ -278,7 +287,7 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                                     series.sort_by(|a, b| a.0.cmp(&b.0));
                                     let series = fill_vacant_hours(&series, MAX_HOUR_DIFF);
                                     let parts_of_series: Vec<Vec<(NaiveDateTime, usize)>> =
-                                        split_series(&series);
+                                        split_series(&series, trend_sensitivity);
                                     let cluster_time_series: Vec<TimeSeriesLinearRegression> =
                                         parts_of_series
                                             .iter()
@@ -301,7 +310,7 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                                                 let (slope, intercept, r_square) =
                                                     linear_regression(&x_values, &y_values);
 
-                                                if r_square > MIN_R_SQUARE && slope > MIN_SLOPE {
+                                                if r_square > min_r_square && slope > min_slope {
                                                     Some(TimeSeriesLinearRegression {
                                                         series: series.clone(),
                                                         slope,
@@ -332,11 +341,14 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 .collect();
 
             for s in &mut series {
+                s.top_n.sort_by(|a, b| b.series.len().cmp(&a.series.len()));
+            }
+            for s in &mut series {
                 s.top_n
                     .sort_by(|a, b| b.split_series.len().cmp(&a.split_series.len()));
             }
             for s in &mut series {
-                s.top_n.truncate(REGRESSION_TOP_N);
+                s.top_n.truncate(top_number);
             }
 
             series.sort_by(|a, b| a.column_index.cmp(&b.column_index));
@@ -379,7 +391,10 @@ fn linear_regression(x_values: &[f64], y_values: &[f64]) -> (f64, f64, f64) {
 }
 
 #[must_use]
-fn split_series(series: &[(NaiveDateTime, usize)]) -> Vec<Vec<(NaiveDateTime, usize)>> {
+fn split_series(
+    series: &[(NaiveDateTime, usize)],
+    trend_sensitivity: f64,
+) -> Vec<Vec<(NaiveDateTime, usize)>> {
     if series.len() == 0 {
         return Vec::new();
     } else if series.len() == 1 {
@@ -409,11 +424,10 @@ fn split_series(series: &[(NaiveDateTime, usize)]) -> Vec<Vec<(NaiveDateTime, us
     let fft = planner.plan_fft(input.len());
     fft.process(&mut input, &mut output);
 
-    let erase_point = output.len()
-        - (output.len().to_f64().expect("safe: usize -> f64") * TREND_SENSITIVITY)
-            .trunc()
-            .to_usize()
-            .expect("safe: usize -> f64 -> usize");
+    let erase_point = (output.len().to_f64().expect("safe: usize -> f64") * trend_sensitivity)
+        .trunc()
+        .to_usize()
+        .expect("safe: usize -> f64 -> usize");
     for o in output.iter_mut().skip(erase_point) {
         *o = Complex::new(0.0, 0.0);
     }
