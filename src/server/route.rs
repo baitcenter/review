@@ -240,13 +240,18 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
             .route(get().to(get_sum_of_cluster_sizes)),
     )
     .service(
-        resource("/api/experimental/cluster/time-series")
+        resource("/api/experimental/cluster/time_series")
             .guard(guard::Get())
             .route(get().to(get_cluster_time_series)),
     )
     .service(
-        resource("/api/experimental/data_source/time-series/regression")
+        resource("/api/experimental/data_source/time_series/regression")
             .guard(guard::Get())
             .route(get().to(get_top_n_of_cluster_time_series_by_linear_regression)),
+    )
+    .service(
+        resource("/api/experimental/cluster/top_n_ipaddr")
+            .guard(guard::Get())
+            .route(get().to(get_top_n_ipaddr_of_cluster)),
     );
 }
