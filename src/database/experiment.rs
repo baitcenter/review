@@ -46,7 +46,7 @@ pub(crate) struct ClusterSelectQuery {
 #[derive(Debug, Deserialize)]
 pub(crate) struct TimeSeriesTopNSelectQuery {
     data_source: String,
-    top_number: Option<usize>,
+    number_of_top_n: Option<usize>,
     r_square: Option<f64>,
     slope: Option<f64>,
     sensitivity: Option<f64>,
@@ -291,7 +291,9 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 }
             }
 
-            let top_number = query.top_number.unwrap_or(DEFAULT_NUMBER_OF_TOP_N_REGRESSION);
+            let number_of_top_n = query
+                .number_of_top_n
+                .unwrap_or(DEFAULT_NUMBER_OF_TOP_N_REGRESSION);
             let min_r_square = query.r_square.unwrap_or(DEFAULT_MIN_R_SQUARE);
             let min_slope = query.slope.unwrap_or(DEFAULT_MIN_SLOPE);
             let trend_sensitivity = query.sensitivity.unwrap_or(DEFAULT_TREND_SENSITIVITY);
@@ -371,7 +373,7 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                     .sort_by(|a, b| b.split_series.len().cmp(&a.split_series.len()));
             }
             for s in &mut series {
-                s.top_n.truncate(top_number);
+                s.top_n.truncate(number_of_top_n);
             }
 
             series.sort_by(|a, b| a.column_index.cmp(&b.column_index));
@@ -612,8 +614,11 @@ pub(crate) async fn get_top_n_ipaddr_of_cluster(
                     top_d::value,
                     top_d::count,
                 ))
-                .filter(d_d::topic_name.eq(&query.data_source)
-                    .and(c_d::cluster_id.eq(&query.cluster_id)))
+                .filter(
+                    d_d::topic_name
+                        .eq(&query.data_source)
+                        .and(c_d::cluster_id.eq(&query.cluster_id)),
+                )
                 .load::<TopNIpAddrOfCluster>(&conn)
                 .map_err(Into::into)
         });
@@ -635,16 +640,20 @@ pub(crate) async fn get_top_n_ipaddr_of_cluster(
                         .or_insert(0_usize) += count;
                 }
             }
-            
-            let mut top_n: Vec<TopNIpAddrTransfer> = top_n.iter().map(|t| {
-                let mut top_n: Vec<(String, usize)> = t.1.iter().map(|t| (t.0.clone(), *t.1)).collect();
-                top_n.sort_by(|a, b| b.1.cmp(&a.1));
-                top_n.truncate(query.number_of_top_n.unwrap_or(DEFAULT_NUMBER_OF_TOP_N_IP));
-                TopNIpAddrTransfer {
-                    column_index: *t.0,
-                    top_n,
-                }
-            }).collect();
+
+            let mut top_n: Vec<TopNIpAddrTransfer> = top_n
+                .iter()
+                .map(|t| {
+                    let mut top_n: Vec<(String, usize)> =
+                        t.1.iter().map(|t| (t.0.clone(), *t.1)).collect();
+                    top_n.sort_by(|a, b| b.1.cmp(&a.1));
+                    top_n.truncate(query.number_of_top_n.unwrap_or(DEFAULT_NUMBER_OF_TOP_N_IP));
+                    TopNIpAddrTransfer {
+                        column_index: *t.0,
+                        top_n,
+                    }
+                })
+                .collect();
             top_n.sort_by(|a, b| a.column_index.cmp(&b.column_index));
 
             Ok(HttpResponse::Ok()
