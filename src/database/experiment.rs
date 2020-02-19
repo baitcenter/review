@@ -17,7 +17,7 @@ use statistical::*;
 use std::collections::HashMap;
 
 use super::schema::{cluster, column_description, data_source, top_n_datetime, top_n_ipaddr};
-use crate::database::{self, build_err_msg};
+use crate::database::{self, build_http_500_response};
 
 const MAX_HOUR_DIFF: i64 = 24;
 const DEFAULT_MIN_R_SQUARE: f64 = 0.1; // 0 <= R^2 <= 1. if R^2 = 1, y_i = linear_function(x_i) with all i.
@@ -148,9 +148,7 @@ pub(crate) async fn get_sum_of_cluster_sizes(
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(SizeOfClustersResponse { size: total }))
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -235,9 +233,7 @@ pub(crate) async fn get_cluster_time_series(
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(series))
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -382,9 +378,7 @@ pub(crate) async fn get_top_n_of_cluster_time_series_by_linear_regression(
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(series))
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
 
@@ -660,8 +654,6 @@ pub(crate) async fn get_top_n_ipaddr_of_cluster(
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(top_n))
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .body(build_err_msg(&e))),
+        Err(e) => Ok(build_http_500_response(&e)),
     }
 }
