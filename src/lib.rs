@@ -8,8 +8,7 @@ mod kafka_consumer;
 mod server;
 
 use actix_web::dev::Server;
-use anyhow::{Context, Error, Result};
-use log::error;
+use anyhow::{Context, Result};
 
 /// Creates and runs an Actix server.
 ///
@@ -33,11 +32,4 @@ pub fn init() -> Result<Server> {
         .with_context(|| format!("invalid IP address/port for review: {}", reviewd_addr))?;
 
     Ok(server::run(&database_url, &reviewd_addr, kafka_url).context("failed to create server")?)
-}
-
-pub fn log_error(e: &Error) {
-    error!("{}", e);
-    for cause in e.chain() {
-        error!("\tcaused by: {}", cause);
-    }
 }

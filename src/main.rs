@@ -6,7 +6,7 @@ async fn main() -> io::Result<()> {
     let server = match review::init() {
         Ok(server) => server,
         Err(e) => {
-            review::log_error(&e);
+            log::error!("{:#}", e);
             std::process::exit(1);
         }
     };
