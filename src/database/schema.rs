@@ -181,6 +181,8 @@ table! {
         format -> Nullable<Jsonb>,
         dimension_default -> Nullable<Int8>,
         dimensions -> Nullable<Array<Int8>>,
+        time_intervals -> Nullable<Array<Text>>,
+        numbers_of_top_n -> Nullable<Array<Int8>>,
     }
 }
 

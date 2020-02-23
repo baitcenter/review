@@ -9,5 +9,7 @@ CREATE TABLE template (
     format JSONB,
     dimension_default BIGINT,
     dimensions BIGINT[],
+    time_intervals TEXT[],
+    numbers_of_top_n BIGINT[],
     UNIQUE(name)
 );
