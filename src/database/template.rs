@@ -14,6 +14,7 @@ use crate::database::{build_http_500_response, load_payload, Error, Pool};
 #[table_name = "template"]
 struct Template {
     name: String,
+    description: Option<String>,
     event_type: String,
     method: String,
     algorithm: Option<String>,
@@ -28,11 +29,11 @@ struct Template {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct TemplateSelectQuery {
-    name: Option<String>,
+    name: Option<String>, // if None, all templates are being fetched.
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct TemplateDeleteQuery {
+pub(crate) struct TemplateNameQuery {
     name: String,
 }
 
@@ -46,6 +47,7 @@ struct Format {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct TemplateHttpTransfer {
     name: String,
+    description: Option<String>,
     event_type: String,
     method: String,
     algorithm: Option<String>,
@@ -72,6 +74,7 @@ pub(crate) async fn add_template(
 
     let new_template = Template {
         name: new_template.name,
+        description: new_template.description,
         event_type: new_template.event_type,
         method: new_template.method,
         algorithm: new_template.algorithm,
@@ -100,6 +103,7 @@ pub(crate) async fn add_template(
 pub(crate) async fn update_template(
     pool: Data<Pool>,
     payload: Payload,
+    query: Query<TemplateNameQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use template::dsl;
     let bytes = load_payload(payload).await?;
@@ -109,9 +113,9 @@ pub(crate) async fn update_template(
         .format
         .and_then(|f| serde_json::to_value(&f).ok());
 
-    let name = new_template.name.clone();
     let new_template = Template {
         name: new_template.name,
+        description: new_template.description,
         event_type: new_template.event_type,
         method: new_template.method,
         algorithm: new_template.algorithm,
@@ -126,7 +130,7 @@ pub(crate) async fn update_template(
 
     let update_result: Result<usize, Error> = pool.get().map_err(Into::into).and_then(|conn| {
         diesel::update(dsl::template)
-            .filter(dsl::name.eq(&name))
+            .filter(dsl::name.eq(&query.name))
             .set(new_template)
             .execute(&conn)
             .map_err(Into::into)
@@ -140,7 +144,7 @@ pub(crate) async fn update_template(
 
 pub(crate) async fn delete_template(
     pool: Data<Pool>,
-    query: Query<TemplateDeleteQuery>,
+    query: Query<TemplateNameQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     use template::dsl;
     let delete_result: Result<_, Error> = pool.get().map_err(Into::into).and_then(|conn| {
@@ -167,6 +171,7 @@ pub(crate) async fn get_template(
                 Some(name) => template::dsl::template
                     .select((
                         template::dsl::name,
+                        template::dsl::description,
                         template::dsl::event_type,
                         template::dsl::method,
                         template::dsl::algorithm,
@@ -185,6 +190,7 @@ pub(crate) async fn get_template(
                 None => template::dsl::template
                     .select((
                         template::dsl::name,
+                        template::dsl::description,
                         template::dsl::event_type,
                         template::dsl::method,
                         template::dsl::algorithm,
@@ -210,6 +216,7 @@ pub(crate) async fn get_template(
                         t.format.and_then(|f| serde_json::from_value(f).ok());
                     TemplateHttpTransfer {
                         name: t.name,
+                        description: t.description,
                         event_type: t.event_type,
                         method: t.method,
                         algorithm: t.algorithm,

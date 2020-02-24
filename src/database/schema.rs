@@ -173,6 +173,7 @@ table! {
     template (id) {
         id -> Int4,
         name -> Text,
+        description -> Nullable<Text>,
         event_type -> Text,
         method -> Text,
         algorithm -> Nullable<Text>,

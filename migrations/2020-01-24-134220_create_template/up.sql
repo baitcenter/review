@@ -1,6 +1,7 @@
 CREATE TABLE template (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
+    description TEXT,
     event_type TEXT NOT NULL,
     method TEXT NOT NULL,
     algorithm TEXT,
