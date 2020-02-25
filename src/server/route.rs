@@ -264,5 +264,10 @@ pub(crate) fn init_app(cfg: &mut ServiceConfig) {
         resource("/api/experimental/cluster/top_n_ipaddr")
             .guard(guard::Get())
             .route(get().to(get_top_n_ipaddr_of_cluster)),
+    )
+    .service(
+        resource("/api/experimental/summary")
+            .guard(guard::Get())
+            .route(get().to(get_summary)),
     );
 }

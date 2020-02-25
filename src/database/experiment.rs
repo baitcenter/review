@@ -17,6 +17,7 @@ use statistical::*;
 use std::collections::HashMap;
 
 use super::schema::{cluster, column_description, data_source, top_n_datetime, top_n_ipaddr};
+use super::data_source::DataSource;
 use crate::database::{self, build_http_500_response};
 
 const MAX_HOUR_DIFF: i64 = 24;
@@ -119,6 +120,18 @@ struct TopNIpAddrOfCluster {
 struct TopNIpAddrTransfer {
     column_index: usize,
     top_n: Vec<(String, usize)>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct SummaryTransfer {
+    id: i32,
+    topic_name: String,
+    data_type: String,
+    number_of_events: BigDecimal,
+    number_of_clusters: BigDecimal,
+    number_of_outliers: BigDecimal,
+    number_of_columns: usize,
+    number_of_rounds: usize,
 }
 
 pub(crate) async fn get_sum_of_cluster_sizes(
@@ -653,6 +666,75 @@ pub(crate) async fn get_top_n_ipaddr_of_cluster(
             Ok(HttpResponse::Ok()
                 .header(http::header::CONTENT_TYPE, "application/json")
                 .json(top_n))
+        }
+        Err(e) => Ok(build_http_500_response(&e)),
+    }
+}
+
+pub(crate) async fn get_summary(
+    pool: Data<database::Pool>,
+) -> Result<HttpResponse, actix_web::Error> {
+    use cluster::dsl as c_d;
+    use data_source::dsl as d_d;
+
+    let query_result: Result<Vec<SummaryTransfer>, database::Error> =
+        pool.get().map_err(Into::into).and_then(|conn| {
+            let data_source = match d_d::data_source
+                .order_by(d_d::id.asc())
+                .load::<DataSource>(&conn) {
+                    Ok(data_source) => data_source,
+                    Err(e) => return Ok(build_http_500_response(&e)),
+                };
+            
+            let mut summary: Vec<SummaryTransfer> = Vec::new();
+            for data_source in data_source.iter() {
+                let sizes: Result<Vec<BigDecimal>> = match c_d::cluster
+                    .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                    .select(c_d::size)
+                    .filter(d_d::topic_name.eq(&data_source.topic_name))
+                    .order_by(d_d::id.asc())
+                    .load::<BigDecimal>(&conn) {
+                        Ok(sizes) => sizes,
+                        Err(e) => return Ok(build_http_500_response(&e)),
+                    };
+                let mut events: BigDecimal = BigDecimal::from_usize(0).unwrap(); // TODO: Exception handling                    
+                for q in sizes {
+                    events += q;
+                }
+
+                let clusters: Result<i64> = match c_d::cluster
+                            .inner_join(d_d::data_source.on(c_d::data_source_id.eq(d_d::id)))
+                            .select(c_d::size)
+                            .filter(d_d::topic_name.eq(&data_source.topic_name))
+                            .order_by(d_d::id.asc())
+                            .load::<BigDecimal>(&conn)
+                            .map_err(Into::into)
+
+                        let mut events: BigDecimal = BigDecimal::from_usize(0).unwrap(); // TODO: Exception handling                    
+                        match query_result {
+                            Ok(sizes) => {
+                                for q in sizes {
+                                    events += q;
+                                }
+                            }
+                            Err(e) => return Ok(build_http_500_response(&e)),
+                        }
+
+
+                        summary.push(SummaryTransfer {
+                            id: data_source.id,
+                            topic_name: data_source.topic_name.clone(),
+                            data_type: data_source.data_type.clone(),
+                            number_of_events: events,
+                            number_of_clusters: BigDecimal::from_usize(0).unwrap(),
+                            number_of_outliers: BigDecimal::from_usize(0).unwrap(),
+                            number_of_columns: 0,
+                            number_of_rounds: 0,
+                        });
+                    }
+                    Ok(HttpResponse::Ok()
+                        .header(http::header::CONTENT_TYPE, "application/json")
+                        .json(summary))
         }
         Err(e) => Ok(build_http_500_response(&e)),
     }
